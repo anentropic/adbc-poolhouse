@@ -1,0 +1,37 @@
+
+[changelog]
+# Changelog header
+header = """
+# Changelog\n
+All notable changes to this project will be documented in this file.\n
+"""
+# Template for the changelog body
+body = """
+{% for group, commits in commits | group_by(attribute="group") %}
+    ### {{ group | upper_first }}
+    {% for commit in commits %}
+        - {{ commit.message | upper_first }}\
+    {% endfor %}
+{% endfor %}\n
+"""
+# Remove leading and trailing whitespace
+trim = true
+
+[git]
+# Parse commits based on conventional commits specification
+conventional_commits = true
+# Filter out commits that are not conventional
+filter_unconventional = true
+# Group commits by type
+commit_parsers = [
+    { message = "^feat", group = "Features" },
+    { message = "^fix", group = "Bug Fixes" },
+    { message = "^docs", group = "Documentation" },
+    { message = "^perf", group = "Performance" },
+    { message = "^refactor", group = "Refactoring" },
+    { message = "^style", group = "Styling" },
+    { message = "^test", group = "Testing" },
+    { message = "^chore", group = "Miscellaneous" },
+]
+# Sort commits by type
+sort_commits = "oldest"

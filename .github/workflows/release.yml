@@ -1,0 +1,122 @@
+
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+      - 'v[0-9]+.[0-9]+.[0-9]+-*'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build distributions
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: Sync dependencies
+        run: uv sync --locked --dev
+
+      - name: Build wheel and sdist
+        run: uv build
+
+      - name: Upload distributions
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+          retention-days: 7
+
+  validate:
+    name: Validate distributions
+    needs: [build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.14"]
+    steps:
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Download distributions
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Test wheel installation
+        run: |
+          uv venv --python ${{ matrix.python-version }} test-env-wheel
+          uv pip install --python test-env-wheel/bin/python dist/*.whl
+          test-env-wheel/bin/python -c "import {{ cookiecutter.package_name }}; print('Wheel installation OK')"
+
+      - name: Test sdist installation
+        run: |
+          uv venv --python ${{ matrix.python-version }} test-env-sdist
+          uv pip install --python test-env-sdist/bin/python dist/*.tar.gz
+          test-env-sdist/bin/python -c "import adbc_poolhouse; print('Sdist installation OK')"
+
+      - name: Check py.typed marker in wheel
+        run: |
+          unzip -l dist/*.whl | grep "adbc_poolhouse/py.typed" || (echo "ERROR: py.typed marker missing" && exit 1)
+
+  changelog:
+    name: Generate changelog
+    needs: [build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Install git-cliff
+        run: |
+          curl -L https://github.com/orhun/git-cliff/releases/download/v2.7.0/git-cliff-2.7.0-x86_64-unknown-linux-gnu.tar.gz | tar xz -C /usr/local/bin
+
+      - name: Generate changelog
+        run: git-cliff --latest --output CHANGELOG.md
+
+      - name: Upload changelog
+        uses: actions/upload-artifact@v4
+        with:
+          name: changelog
+          path: CHANGELOG.md
+
+  publish:
+    name: Publish to PyPI
+    needs: [validate, changelog]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment:
+      name: pypi
+      url: https://pypi.org/p/adbc-poolhouse
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Download distributions
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
