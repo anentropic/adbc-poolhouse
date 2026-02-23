@@ -5,29 +5,30 @@
 See: .planning/PROJECT.md (updated 2026-02-23)
 
 **Core value:** One config in, one pool out — `create_pool(SnowflakeConfig(...))` returns a ready-to-use SQLAlchemy QueuePool in a single call.
-**Current focus:** Phase 1 — Pre-flight Fixes
+**Current focus:** Phase 2 — Dependency Declarations
 
 ## Current Position
 
-Phase: 1 of 7 (Pre-flight Fixes)
+Phase: 2 of 7 (Dependency Declarations)
 Plan: 1 of 1 in current phase
-Status: Phase complete
-Last activity: 2026-02-23 — Plan 01-01 executed
+Status: Plan complete
+Last activity: 2026-02-24 — Plan 02-01 executed
 
-Progress: [█░░░░░░░░░] 14%
+Progress: [██░░░░░░░░] 28%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 1
+- Total plans completed: 2
 - Average duration: ~1 min
-- Total execution time: ~1 min
+- Total execution time: ~2 min
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 01-pre-flight-fixes | 1 | ~1 min | ~1 min |
+| 02-dependency-declarations | 1 | ~1 min | ~1 min |
 
 **Recent Trend:**
 - Last 5 plans: 1 min
@@ -48,6 +49,10 @@ Recent decisions affecting current work:
 - [01-01]: detect-secrets fetched by prek from GitHub hook entry — NOT added to pyproject.toml dev dependencies
 - [01-01]: Baseline generated with --exclude-files "^.planning/" to embed exclusion in filters_used and produce clean results: {} output
 - [01-01]: exclude: .secrets.baseline mandatory in hook entry — SHA-256 hashes in baseline JSON trigger HexHighEntropyString/SecretKeyword detectors
+- [02-01]: Open lower bounds only (>=X, no <Y cap) for runtime deps — tight upper bounds cause unnecessary consumer dep conflicts for common transitive deps
+- [02-01]: duckdb extra uses duckdb>=0.9.1 (not adbc-driver-duckdb which does not exist on PyPI — adbc_driver_duckdb is bundled inside duckdb wheel since 0.9.1)
+- [02-01]: [all] meta-extra uses self-referencing adbc-poolhouse[extra] syntax — standard pip/uv pattern for meta-extras
+- [02-01]: Foundry backends (Databricks, Redshift, Trino, MSSQL, Teradata) excluded from optional extras — not on PyPI; deferred to Phase 7
 
 ### Pending Todos
 
@@ -60,6 +65,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-23
-Stopped at: Completed 01-01-PLAN.md — pre-flight toolchain fixes, prek gate green
+Last session: 2026-02-24
+Stopped at: Completed 02-01-PLAN.md — runtime deps, optional extras, dev deps declared; REQUIREMENTS.md corrected
 Resume file: None

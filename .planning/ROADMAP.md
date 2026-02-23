@@ -130,7 +130,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Pre-flight Fixes | 1/1 | Complete | 2026-02-23 |
-| 2. Dependency Declarations | 0/2 | Not started | - |
+| 2. Dependency Declarations | 1/2 | In Progress|  |
 | 3. Config Layer | 0/TBD | Not started | - |
 | 4. Translation and Driver Detection | 0/TBD | Not started | - |
 | 5. Pool Factory and DuckDB Integration | 0/TBD | Not started | - |
