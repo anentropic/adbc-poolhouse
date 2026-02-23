@@ -30,7 +30,10 @@ Decimal phases appear between their surrounding integers in numeric order.
   1. `basedpyright` reports `pythonVersion = "3.11"` in `pyproject.toml` — no 3.13+ type features pass silently
   2. `detect-secrets` is active in `.pre-commit-config.yaml` and runs on every commit
   3. `prek` passes with zero violations on the unchanged codebase after both fixes
-**Plans**: TBD
+**Plans**: 1 plan
+
+Plans:
+- [ ] 01-01-PLAN.md — Fix basedpyright pythonVersion, add detect-secrets hook + baseline, verify prek gate
 
 ### Phase 2: Dependency Declarations
 **Goal**: All runtime and dev dependencies are declared in `pyproject.toml`, version-resolved with `uv`, and the lock file reflects the complete dependency graph
