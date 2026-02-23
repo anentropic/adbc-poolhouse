@@ -9,11 +9,11 @@
 
 Pre-implementation fixes and dependency declarations.
 
-- [ ] **SETUP-01**: Fix `pythonVersion = "3.14"` to `"3.11"` in `[tool.basedpyright]` section of `pyproject.toml`
+- [x] **SETUP-01**: Fix `pythonVersion = "3.14"` to `"3.11"` in `[tool.basedpyright]` section of `pyproject.toml`
 - [ ] **SETUP-02**: Add runtime dependencies to `pyproject.toml`: `pydantic-settings>=2.7,<3`, `sqlalchemy>=2.0,<3`, `adbc-driver-manager>=1.0,<2`
 - [ ] **SETUP-03**: Add per-warehouse optional extras: `[duckdb]`, `[snowflake]`, `[bigquery]`, `[postgresql]`, `[flightsql]`, `[databricks]`, `[redshift]`, `[trino]`, `[mssql]`, `[teradata]`, `[all]`
 - [ ] **SETUP-04**: Add `syrupy>=4.0` and `coverage[toml]` to dev dependencies (`unittest.mock` is stdlib — no additional mock dependency needed)
-- [ ] **SETUP-05**: Add `detect-secrets` to `.pre-commit-config.yaml` (must be active before any Snowflake snapshot commits)
+- [x] **SETUP-05**: Add `detect-secrets` to `.pre-commit-config.yaml` (must be active before any Snowflake snapshot commits)
 
 ### Config Layer
 
@@ -124,8 +124,8 @@ Isolates all type suppressions to dedicated internal modules.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| SETUP-01 | Phase 1 | Pending |
-| SETUP-05 | Phase 1 | Pending |
+| SETUP-01 | Phase 1 | Complete |
+| SETUP-05 | Phase 1 | Complete |
 | SETUP-02 | Phase 2 | Pending |
 | SETUP-03 | Phase 2 | Pending |
 | SETUP-04 | Phase 2 | Pending |
