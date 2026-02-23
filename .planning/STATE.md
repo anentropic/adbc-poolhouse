@@ -5,30 +5,30 @@
 See: .planning/PROJECT.md (updated 2026-02-23)
 
 **Core value:** One config in, one pool out — `create_pool(SnowflakeConfig(...))` returns a ready-to-use SQLAlchemy QueuePool in a single call.
-**Current focus:** Phase 2 — Dependency Declarations
+**Current focus:** Phase 3 — Package Structure
 
 ## Current Position
 
-Phase: 2 of 7 (Dependency Declarations)
-Plan: 1 of 1 in current phase
-Status: Plan complete
-Last activity: 2026-02-24 — Plan 02-01 executed
+Phase: 2 of 7 (Dependency Declarations) - Complete
+Plan: 2 of 2 in phase 2 complete; advancing to Phase 3
+Status: Phase complete
+Last activity: 2026-02-24 — Plan 02-02 executed
 
-Progress: [██░░░░░░░░] 28%
+Progress: [███░░░░░░░] 35%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 2
+- Total plans completed: 3
 - Average duration: ~1 min
-- Total execution time: ~2 min
+- Total execution time: ~3 min
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 01-pre-flight-fixes | 1 | ~1 min | ~1 min |
-| 02-dependency-declarations | 1 | ~1 min | ~1 min |
+| 02-dependency-declarations | 2 | ~2 min | ~1 min |
 
 **Recent Trend:**
 - Last 5 plans: 1 min
@@ -53,6 +53,8 @@ Recent decisions affecting current work:
 - [02-01]: duckdb extra uses duckdb>=0.9.1 (not adbc-driver-duckdb which does not exist on PyPI — adbc_driver_duckdb is bundled inside duckdb wheel since 0.9.1)
 - [02-01]: [all] meta-extra uses self-referencing adbc-poolhouse[extra] syntax — standard pip/uv pattern for meta-extras
 - [02-01]: Foundry backends (Databricks, Redshift, Trino, MSSQL, Teradata) excluded from optional extras — not on PyPI; deferred to Phase 7
+- [Phase 02-02]: uv.lock committed to git enabling CI to enforce reproducible builds via uv sync --frozen
+- [Phase 02-02]: Extras isolation verified: each warehouse driver extra installs only its own driver without cross-contamination
 
 ### Pending Todos
 
@@ -66,5 +68,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-24
-Stopped at: Completed 02-01-PLAN.md — runtime deps, optional extras, dev deps declared; REQUIREMENTS.md corrected
+Stopped at: Completed 02-02-PLAN.md — uv.lock committed (1603 lines, 82 packages), extras isolation verified, prek gate green, CI frozen sync confirmed
 Resume file: None

@@ -13,7 +13,7 @@ Starting from a complete scaffold with zero production code, seven phases build 
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Pre-flight Fixes** - Correct broken toolchain config and add detect-secrets before any implementation begins
-- [ ] **Phase 2: Dependency Declarations** - Declare runtime deps, optional warehouse extras, and missing dev deps in pyproject.toml
+- [x] **Phase 2: Dependency Declarations** - Declare runtime deps, optional warehouse extras, and missing dev deps in pyproject.toml (completed 2026-02-23)
 - [ ] **Phase 3: Config Layer** - Build typed Pydantic BaseSettings config models for all warehouses plus exceptions
 - [ ] **Phase 4: Translation and Driver Detection** - Pure translation functions, lazy driver resolution, and typed facades isolating type suppressions
 - [ ] **Phase 5: Pool Factory and DuckDB Integration** - Assemble the public `create_pool()` API and validate it end-to-end with DuckDB tests
@@ -130,7 +130,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Pre-flight Fixes | 1/1 | Complete | 2026-02-23 |
-| 2. Dependency Declarations | 1/2 | In Progress|  |
+| 2. Dependency Declarations | 2/2 | Complete   | 2026-02-23 |
 | 3. Config Layer | 0/TBD | Not started | - |
 | 4. Translation and Driver Detection | 0/TBD | Not started | - |
 | 5. Pool Factory and DuckDB Integration | 0/TBD | Not started | - |
