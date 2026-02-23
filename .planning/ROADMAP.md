@@ -44,7 +44,11 @@ Plans:
   2. `pip install adbc-poolhouse[duckdb]` installs only the DuckDB optional extra (no other warehouse driver pulled in)
   3. `pip install adbc-poolhouse[snowflake]` installs only the Snowflake optional extra
   4. `pip install adbc-poolhouse[all]` installs all warehouse extras
-**Plans**: TBD
+**Plans**: 2 plans
+
+Plans:
+- [ ] 02-01-PLAN.md — Add runtime deps, optional extras, dev deps to pyproject.toml; update REQUIREMENTS.md
+- [ ] 02-02-PLAN.md — Validate uv resolution, commit uv.lock, verify prek gate
 
 ### Phase 3: Config Layer
 **Goal**: Consumers can construct typed, validated, environment-variable-friendly warehouse config objects for every supported backend without importing any ADBC or SQLAlchemy code
@@ -126,7 +130,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Pre-flight Fixes | 1/1 | Complete | 2026-02-23 |
-| 2. Dependency Declarations | 0/TBD | Not started | - |
+| 2. Dependency Declarations | 0/2 | Not started | - |
 | 3. Config Layer | 0/TBD | Not started | - |
 | 4. Translation and Driver Detection | 0/TBD | Not started | - |
 | 5. Pool Factory and DuckDB Integration | 0/TBD | Not started | - |
