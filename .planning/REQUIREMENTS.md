@@ -89,7 +89,7 @@ Isolates all type suppressions to dedicated internal modules.
 ### Project Tooling
 
 - [ ] **TOOL-01**: Project-specific docs writing skill at `.claude/skills/adbc-poolhouse-docs-author/SKILL.md` — adapted from the cubano docs author skill (content TBD before docs phase begins)
-- [ ] **TOOL-02**: `CLAUDE.md` instruction: for any `PLAN.md` with documentation tasks, add `@.claude/skills/adbc-poolhouse-docs-author/SKILL.md` to `<execution_context>`
+- [ ] **TOOL-02**: `CLAUDE.md` instruction: for all plans in phases ≥ 7 (not only plans labelled as documentation tasks), include `@.claude/skills/adbc-poolhouse-docs-author/SKILL.md` in `<execution_context>` — documentation is a quality gate for every phase from Phase 7 onwards
 
 ---
 
@@ -122,26 +122,58 @@ Isolates all type suppressions to dedicated internal modules.
 
 ## Traceability
 
-*Populated during roadmap creation.*
-
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| SETUP-01 through SETUP-05 | TBD | Pending |
-| CFG-01 through CFG-07 | TBD | Pending |
-| TRANS-01 through TRANS-05 | TBD | Pending |
-| DRIV-01 through DRIV-04 | TBD | Pending |
-| POOL-01 through POOL-05 | TBD | Pending |
-| TYPE-01 through TYPE-02 | TBD | Pending |
-| TEST-01 through TEST-07 | TBD | Pending |
-| DOCS-01 through DOCS-04 | TBD | Pending |
-| DIST-01 through DIST-03 | TBD | Pending |
-| TOOL-01 through TOOL-02 | TBD | Pending |
+| SETUP-01 | Phase 1 | Pending |
+| SETUP-05 | Phase 1 | Pending |
+| SETUP-02 | Phase 2 | Pending |
+| SETUP-03 | Phase 2 | Pending |
+| SETUP-04 | Phase 2 | Pending |
+| CFG-01 | Phase 3 | Pending |
+| CFG-02 | Phase 3 | Pending |
+| CFG-03 | Phase 3 | Pending |
+| CFG-04 | Phase 3 | Pending |
+| CFG-05 | Phase 3 | Pending |
+| CFG-06 | Phase 3 | Pending |
+| CFG-07 | Phase 3 | Pending |
+| TEST-04 | Phase 3 | Pending |
+| TRANS-01 | Phase 4 | Pending |
+| TRANS-02 | Phase 4 | Pending |
+| TRANS-03 | Phase 4 | Pending |
+| TRANS-04 | Phase 4 | Pending |
+| TRANS-05 | Phase 4 | Pending |
+| DRIV-01 | Phase 4 | Pending |
+| DRIV-02 | Phase 4 | Pending |
+| DRIV-03 | Phase 4 | Pending |
+| DRIV-04 | Phase 4 | Pending |
+| TYPE-01 | Phase 4 | Pending |
+| TYPE-02 | Phase 4 | Pending |
+| TEST-05 | Phase 4 | Pending |
+| TEST-06 | Phase 4 | Pending |
+| POOL-01 | Phase 5 | Pending |
+| POOL-02 | Phase 5 | Pending |
+| POOL-03 | Phase 5 | Pending |
+| POOL-04 | Phase 5 | Pending |
+| POOL-05 | Phase 5 | Pending |
+| TEST-01 | Phase 5 | Pending |
+| TEST-02 | Phase 5 | Pending |
+| TEST-07 | Phase 5 | Pending |
+| TEST-03 | Phase 6 | Pending |
+| TOOL-01 | Phase 7 | Pending |
+| TOOL-02 | Phase 7 | Pending |
+| DOCS-01 | Phase 7 | Pending |
+| DOCS-02 | Phase 7 | Pending |
+| DOCS-03 | Phase 7 | Pending |
+| DOCS-04 | Phase 7 | Pending |
+| DIST-01 | Phase 7 | Pending |
+| DIST-02 | Phase 7 | Pending |
+| DIST-03 | Phase 7 | Pending |
 
 **Coverage:**
-- v1 requirements: 43 total
-- Mapped to phases: 0 (pending roadmap)
-- Unmapped: 43 ⚠️
+- v1 requirements: 44 total
+- Mapped to phases: 44
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-02-23*
-*Last updated: 2026-02-23 after initial definition*
+*Last updated: 2026-02-23 — traceability populated after roadmap creation*
