@@ -10,8 +10,8 @@
 Pre-implementation fixes and dependency declarations.
 
 - [x] **SETUP-01**: Fix `pythonVersion = "3.14"` to `"3.11"` in `[tool.basedpyright]` section of `pyproject.toml`
-- [ ] **SETUP-02**: Add runtime dependencies to `pyproject.toml`: `pydantic-settings>=2.7,<3`, `sqlalchemy>=2.0,<3`, `adbc-driver-manager>=1.0,<2`
-- [ ] **SETUP-03**: Add per-warehouse optional extras: `[duckdb]`, `[snowflake]`, `[bigquery]`, `[postgresql]`, `[flightsql]`, `[databricks]`, `[redshift]`, `[trino]`, `[mssql]`, `[teradata]`, `[all]`
+- [ ] **SETUP-02**: Add runtime dependencies to `pyproject.toml`: `pydantic-settings>=2.0.0`, `sqlalchemy>=2.0.0`, `adbc-driver-manager>=1.0.0` (open lower bounds only — no upper bound caps; tight `<Y` bounds cause unnecessary consumer dep conflicts for common transitive deps)
+- [ ] **SETUP-03**: Add per-warehouse optional extras for PyPI-available drivers only: `[duckdb]` (via `duckdb>=0.9.1` package — `adbc_driver_duckdb` is bundled inside the `duckdb` wheel since 0.9.1), `[snowflake]`, `[bigquery]`, `[postgresql]`, `[flightsql]`, `[all]`. Foundry-distributed backends (Databricks, Redshift, Trino, MSSQL, Teradata) are NOT given extras in v1 — those drivers are not on PyPI and will be documented in Phase 7.
 - [ ] **SETUP-04**: Add `syrupy>=4.0` and `coverage[toml]` to dev dependencies (`unittest.mock` is stdlib — no additional mock dependency needed)
 - [x] **SETUP-05**: Add `detect-secrets` to `.pre-commit-config.yaml` (must be active before any Snowflake snapshot commits)
 
