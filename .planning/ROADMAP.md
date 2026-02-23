@@ -12,7 +12,7 @@ Starting from a complete scaffold with zero production code, seven phases build 
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: Pre-flight Fixes** - Correct broken toolchain config and add detect-secrets before any implementation begins
+- [x] **Phase 1: Pre-flight Fixes** - Correct broken toolchain config and add detect-secrets before any implementation begins
 - [ ] **Phase 2: Dependency Declarations** - Declare runtime deps, optional warehouse extras, and missing dev deps in pyproject.toml
 - [ ] **Phase 3: Config Layer** - Build typed Pydantic BaseSettings config models for all warehouses plus exceptions
 - [ ] **Phase 4: Translation and Driver Detection** - Pure translation functions, lazy driver resolution, and typed facades isolating type suppressions
@@ -33,7 +33,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Plans**: 1 plan
 
 Plans:
-- [ ] 01-01-PLAN.md — Fix basedpyright pythonVersion, add detect-secrets hook + baseline, verify prek gate
+- [x] 01-01-PLAN.md — Fix basedpyright pythonVersion, add detect-secrets hook + baseline, verify prek gate
 
 ### Phase 2: Dependency Declarations
 **Goal**: All runtime and dev dependencies are declared in `pyproject.toml`, version-resolved with `uv`, and the lock file reflects the complete dependency graph
@@ -125,7 +125,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Pre-flight Fixes | 0/TBD | Not started | - |
+| 1. Pre-flight Fixes | 1/1 | Complete | 2026-02-23 |
 | 2. Dependency Declarations | 0/TBD | Not started | - |
 | 3. Config Layer | 0/TBD | Not started | - |
 | 4. Translation and Driver Detection | 0/TBD | Not started | - |
