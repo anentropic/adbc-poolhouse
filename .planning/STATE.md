@@ -79,6 +79,8 @@ Recent decisions affecting current work:
 - [Phase 04-03]: NOT_FOUND detection via adbc_driver_manager.Error.status_code == AdbcStatusCode.NOT_FOUND (int-enum 3) — more reliable than string matching; secondary 'NOT_FOUND' in str(exc) fallback kept for forward compatibility
 - [Phase 04-03]: create_adbc_connection uses explicit keyword args (entrypoint=, db_kwargs=) with type: ignore[arg-type] rather than **dict spread — basedpyright cannot assign dict[str, object] to typed overload parameters
 - [Phase 04]: Patch target 'importlib.util.find_spec' (global) — _drivers.py uses module-level import style; plain Exception() bypasses except adbc_driver_manager.Error; SIM117 requires combined with statements
+- [04-04]: SnowflakeConfig.schema_ requires model_validate({'schema': 'X'}) in tests — validation_alias='schema' means kwarg schema_='X' raises extra_forbidden ValidationError; established pattern for all validation_alias fields
+- [04-04]: FlightSQLConfig() is not empty dict — tls_skip_verify and with_cookie_middleware bool defaults always emit as 'false'/'false' strings; tests assert exact 2-key dict not empty dict
 
 ### Pending Todos
 
@@ -92,5 +94,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-24
-Stopped at: Completed 04-05-PLAN.md — driver detection unit tests (TEST-06); 11 tests covering all 3 detection paths, Foundry find_spec bypass, DRIV-03 NOT_FOUND reraise; Phase 4 all 5 plans complete; prek green
+Stopped at: Completed 04-04-PLAN.md — 32 translator unit tests (test_translators.py) asserting exact ADBC key mapping contracts for all 10 warehouses + coordinator dispatch; TEST-05 complete; prek green
 Resume file: None
