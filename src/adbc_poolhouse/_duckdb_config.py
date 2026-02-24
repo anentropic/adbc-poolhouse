@@ -4,10 +4,11 @@ from __future__ import annotations
 
 from typing import Self
 
-from pydantic import model_validator
+from pydantic import field_validator, model_validator
 from pydantic_settings import SettingsConfigDict
 
 from adbc_poolhouse._base_config import BaseWarehouseConfig
+from adbc_poolhouse._exceptions import ConfigurationError  # noqa: TC001
 
 
 class DuckDBConfig(BaseWarehouseConfig):
@@ -41,13 +42,51 @@ class DuckDBConfig(BaseWarehouseConfig):
     read_only: bool = False
     """Open the database in read-only mode. Env: DUCKDB_READ_ONLY."""
 
+    @field_validator("pool_size")
+    @classmethod
+    def validate_pool_size(cls, v: int) -> int:
+        if v <= 0:
+            raise ConfigurationError(f"pool_size must be > 0, got {v}")
+        return v
+
+    @field_validator("max_overflow")
+    @classmethod
+    def validate_max_overflow(cls, v: int) -> int:
+        if v < 0:
+            raise ConfigurationError(f"max_overflow must be >= 0, got {v}")
+        return v
+
+    @field_validator("timeout")
+    @classmethod
+    def validate_timeout(cls, v: int) -> int:
+        if v <= 0:
+            raise ConfigurationError(f"timeout must be > 0, got {v}")
+        return v
+
+    @field_validator("recycle")
+    @classmethod
+    def validate_recycle(cls, v: int) -> int:
+        if v <= 0:
+            raise ConfigurationError(f"recycle must be > 0, got {v}")
+        return v
+
+    @field_validator("database")
+    @classmethod
+    def validate_database(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ConfigurationError(f"database must be a non-empty string, got {v!r}")
+        return v
+
     def _adbc_driver_key(self) -> str:
         return "duckdb"
+
+    def _adbc_entrypoint(self) -> str | None:
+        return "duckdb_adbc_init"
 
     @model_validator(mode="after")
     def check_memory_pool_size(self) -> Self:
         if self.database == ":memory:" and self.pool_size > 1:
-            raise ValueError(
+            raise ConfigurationError(
                 'pool_size > 1 with database=":memory:" will give each pool '
                 "connection an isolated in-memory database (each connection "
                 "sees a different empty DB, so shared state is impossible). "
