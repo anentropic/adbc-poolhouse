@@ -99,7 +99,11 @@ Plans:
   3. Arrow allocator contexts are released on connection checkin — memory leak validation test passes with no accumulation after repeated checkin cycles
   4. No module-level singletons exist — importing `adbc_poolhouse` does not create any pool or connection object
   5. `DuckDBConfig(database=":memory:", pool_size=2)` raises `ValueError` before `create_pool()` is ever called
-**Plans**: TBD
+**Plans**: 2 plans
+
+Plans:
+- [ ] 05-01-PLAN.md — Exception hierarchy (_exceptions.py) + config layer updates (_base_config.py, _duckdb_config.py)
+- [ ] 05-02-PLAN.md — TDD: pool factory implementation (_pool_factory.py) + public API exports (__init__.py)
 
 ### Phase 6: Snowflake Integration
 **Goal**: Snowflake connection tests are committed as syrupy snapshots that CI can replay without credentials — real credentials used only for local snapshot recording
@@ -149,6 +153,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | 2. Dependency Declarations | 2/2 | Complete   | 2026-02-23 |
 | 3. Config Layer | 7/7 | Complete   | 2026-02-24 |
 | 4. Translation and Driver Detection | 5/5 | Complete   | 2026-02-24 |
-| 5. Pool Factory and DuckDB Integration | 0/TBD | Not started | - |
+| 5. Pool Factory and DuckDB Integration | 0/2 | Not started | - |
 | 6. Snowflake Integration | 0/TBD | Not started | - |
 | 7. Documentation and PyPI Publication | 0/TBD | Not started | - |
