@@ -80,7 +80,14 @@ Plans:
   2. Driver detection unit tests pass all three paths: (a) PyPI package found via `find_spec`, (b) PyPI absent but Foundry path loads via `adbc_driver_manager`, (c) both absent raises `ImportError` with the exact install command
   3. `import adbc_poolhouse` in a bare environment (no warehouse drivers installed) raises no error — all driver imports are lazy
   4. All `cast()` and `# type: ignore` suppressions are contained exclusively in `_pool_types.py` and `_driver_api.py` — zero suppressions in public modules
-**Plans**: TBD
+**Plans**: 5 plans
+
+Plans:
+- [ ] 04-01-PLAN.md — DuckDB + Apache translators (translate_duckdb, translate_bigquery, translate_postgresql, translate_flightsql)
+- [ ] 04-02-PLAN.md — Snowflake + Foundry translators (translate_snowflake, translate_databricks, translate_redshift, translate_trino, translate_mssql, translate_teradata)
+- [ ] 04-03-PLAN.md — Wiring layer: _translators.py coordinator, _drivers.py detection, _driver_api.py ADBC facade, _pool_types.py type scaffold
+- [ ] 04-04-PLAN.md — TDD: translator unit tests (TEST-05)
+- [ ] 04-05-PLAN.md — TDD: driver detection unit tests (TEST-06)
 
 ### Phase 5: Pool Factory and DuckDB Integration
 **Goal**: `create_pool(config)` is the complete, working public API — consumers can call it with a DuckDB config and get back a functional QueuePool
@@ -141,7 +148,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | 1. Pre-flight Fixes | 1/1 | Complete | 2026-02-23 |
 | 2. Dependency Declarations | 2/2 | Complete   | 2026-02-23 |
 | 3. Config Layer | 7/7 | Complete   | 2026-02-24 |
-| 4. Translation and Driver Detection | 0/TBD | Not started | - |
+| 4. Translation and Driver Detection | 0/5 | Not started | - |
 | 5. Pool Factory and DuckDB Integration | 0/TBD | Not started | - |
 | 6. Snowflake Integration | 0/TBD | Not started | - |
 | 7. Documentation and PyPI Publication | 0/TBD | Not started | - |
