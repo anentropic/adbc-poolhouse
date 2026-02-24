@@ -9,19 +9,19 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 
 ## Current Position
 
-Phase: 3 of 7 (Config Layer) - Complete
-Plan: 7 of 7 in phase 3 complete
-Status: Phase 3 Complete — Ready for Phase 4
-Last activity: 2026-02-24 — Plan 03-07 executed (26 config model unit tests, TEST-04 complete)
+Phase: 4 of 7 (Translation and Driver Detection) - In Progress
+Plan: 1 of 5 in phase 4 complete
+Status: Phase 4 Active — Plan 04-01 complete
+Last activity: 2026-02-24 — Plan 04-01 executed (4 pure translator functions: DuckDB, PostgreSQL, BigQuery, FlightSQL)
 
-Progress: [████████░░] 72%
+Progress: [████████░░] 75%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 4
-- Average duration: ~2 min
-- Total execution time: ~11 min
+- Total plans completed: 5
+- Average duration: ~3 min
+- Total execution time: ~15 min
 
 **By Phase:**
 
@@ -30,6 +30,7 @@ Progress: [████████░░] 72%
 | 01-pre-flight-fixes | 1 | ~1 min | ~1 min |
 | 02-dependency-declarations | 2 | ~2 min | ~1 min |
 | 03-config-layer | 7 | ~28 min | ~4 min |
+| 04-translation-and-driver-detection | 1 | ~4 min | ~4 min |
 
 **Recent Trend:**
 - Last 5 plans: 1-8 min
@@ -67,6 +68,10 @@ Recent decisions affecting current work:
 - [Phase 03-config-layer]: DuckDB env prefix pool_size tests require DUCKDB_DATABASE env var set to file path — in-memory pool_size > 1 raises ValidationError
 - [Phase 03-config-layer]: type: ignore[call-arg] for SnowflakeConfig() calls without account= in env prefix tests — basedpyright cannot see env var-provided required fields at type-check time
 - [Phase 03-config-layer]: pragma: allowlist secret on variables holding PEM/password strings, not inline in constructor — avoids ruff line-length and detect-secrets conflicts simultaneously
+- [04-01]: Translator config imports in TYPE_CHECKING block — with from __future__ import annotations, config class imports are only needed at type-check time (not runtime), so ruff TC001 correctly flags them; differs from Pydantic config files where SecretStr must stay at module level
+- [04-01]: translate_postgresql omits use_copy — adbc.postgresql.use_copy is a StatementOptions key (per-statement), not a DatabaseOptions key (per-connection); passing to dbapi.connect() is incorrect; Phase 5 must apply at cursor level
+- [04-01]: translate_flightsql always emits tls_skip_verify and with_cookie_middleware — bool fields with defaults (never None), so always included as 'true'/'false' strings in output dict
+- [04-01]: FlightSQL connect_timeout uses raw string key 'adbc.flight.sql.rpc.timeout_seconds.connect' — documented in ADBC FlightSQL docs but absent from Python DatabaseOptions enum; included as raw string
 
 ### Pending Todos
 
@@ -80,5 +85,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-24
-Stopped at: Completed 03-07-PLAN.md — 26 config model unit tests across 5 classes; all TEST-04 requirements met; prek green; Phase 3 complete (7/7 plans)
+Stopped at: Completed 04-01-PLAN.md — 4 pure translator functions (DuckDB, PostgreSQL, BigQuery, FlightSQL); TRANS-01, TRANS-03, TRANS-05 requirements met; prek green
 Resume file: None
