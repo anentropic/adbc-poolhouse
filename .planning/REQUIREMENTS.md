@@ -41,10 +41,10 @@ Maps config model fields to ADBC driver kwargs for `adbc_driver_manager.dbapi.co
 
 Locates and loads the correct ADBC driver; all imports are lazy.
 
-- [ ] **DRIV-01**: Detect PyPI ADBC driver packages using `importlib.util.find_spec()` (not bare `except ImportError`, which swallows broken native extensions)
-- [ ] **DRIV-02**: Fall back to `adbc_driver_manager` with the correct `.lib` suffix driver path (e.g. `adbc_driver_snowflake.lib`, not `adbc_driver_snowflake`)
-- [ ] **DRIV-03**: When neither path succeeds: raise `ImportError` with a human-readable message including the exact install command for the missing driver
-- [ ] **DRIV-04**: All driver detection and imports are lazy — deferred to `create_pool()` call, never executed at module import time
+- [x] **DRIV-01**: Detect PyPI ADBC driver packages using `importlib.util.find_spec()` (not bare `except ImportError`, which swallows broken native extensions)
+- [x] **DRIV-02**: Fall back to `adbc_driver_manager` with the correct `.lib` suffix driver path (e.g. `adbc_driver_snowflake.lib`, not `adbc_driver_snowflake`)
+- [x] **DRIV-03**: When neither path succeeds: raise `ImportError` with a human-readable message including the exact install command for the missing driver
+- [x] **DRIV-04**: All driver detection and imports are lazy — deferred to `create_pool()` call, never executed at module import time
 
 ### Pool Factory
 
@@ -60,8 +60,8 @@ Assembles the `QueuePool`; primary public API.
 
 Isolates all type suppressions to dedicated internal modules.
 
-- [ ] **TYPE-01**: `_pool_types.py` internal module — all SQLAlchemy pool interactions that require `cast()` or `# type: ignore` are routed through this single facade (SQLAlchemy pool stubs are incomplete for standalone QueuePool usage)
-- [ ] **TYPE-02**: `_driver_api.py` internal module — all ADBC driver calls that require `cast()` or `# type: ignore` are routed through this single facade (ADBC driver packages have absent or partial type stubs)
+- [x] **TYPE-01**: `_pool_types.py` internal module — all SQLAlchemy pool interactions that require `cast()` or `# type: ignore` are routed through this single facade (SQLAlchemy pool stubs are incomplete for standalone QueuePool usage)
+- [x] **TYPE-02**: `_driver_api.py` internal module — all ADBC driver calls that require `cast()` or `# type: ignore` are routed through this single facade (ADBC driver packages have absent or partial type stubs)
 
 ### Testing
 
@@ -142,12 +142,12 @@ Isolates all type suppressions to dedicated internal modules.
 | TRANS-03 | Phase 4 | Complete |
 | TRANS-04 | Phase 4 | Complete |
 | TRANS-05 | Phase 4 | Complete |
-| DRIV-01 | Phase 4 | Pending |
-| DRIV-02 | Phase 4 | Pending |
-| DRIV-03 | Phase 4 | Pending |
-| DRIV-04 | Phase 4 | Pending |
-| TYPE-01 | Phase 4 | Pending |
-| TYPE-02 | Phase 4 | Pending |
+| DRIV-01 | Phase 4 | Complete |
+| DRIV-02 | Phase 4 | Complete |
+| DRIV-03 | Phase 4 | Complete |
+| DRIV-04 | Phase 4 | Complete |
+| TYPE-01 | Phase 4 | Complete |
+| TYPE-02 | Phase 4 | Complete |
 | TEST-05 | Phase 4 | Pending |
 | TEST-06 | Phase 4 | Pending |
 | POOL-01 | Phase 5 | Pending |

@@ -10,9 +10,9 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 ## Current Position
 
 Phase: 4 of 7 (Translation and Driver Detection) - In Progress
-Plan: 2 of 5 in phase 4 complete
-Status: Phase 4 Active — Plan 04-02 complete
-Last activity: 2026-02-24 — Plan 04-02 executed (6 translator functions: Snowflake + 5 Foundry backends; TRANS-02, TRANS-04, TRANS-05 complete)
+Plan: 3 of 5 in phase 4 complete
+Status: Phase 4 Active — Plan 04-03 complete
+Last activity: 2026-02-24 — Plan 04-03 executed (translate_config dispatcher, resolve_driver 3-path, create_adbc_connection ADBC facade, AdbcCreatorFn alias; DRIV-01 through DRIV-04, TYPE-01 TYPE-02 complete)
 
 Progress: [████████░░] 75%
 
@@ -30,7 +30,7 @@ Progress: [████████░░] 75%
 | 01-pre-flight-fixes | 1 | ~1 min | ~1 min |
 | 02-dependency-declarations | 2 | ~2 min | ~1 min |
 | 03-config-layer | 7 | ~28 min | ~4 min |
-| 04-translation-and-driver-detection | 2 | ~11 min | ~5 min |
+| 04-translation-and-driver-detection | 3 | ~15 min | ~5 min |
 
 **Recent Trend:**
 - Last 5 plans: 1-8 min
@@ -75,6 +75,9 @@ Recent decisions affecting current work:
 - [04-02]: TYPE_CHECKING block for translator config imports — translator functions (not Pydantic models) safely use TYPE_CHECKING; ruff TC001 correctly flags runtime imports in this context unlike Pydantic field annotations
 - [04-02]: Trino and MSSQL use URI-first with decomposed field fallback — plan said URI-only but configs have full field sets; URI-first pattern is more complete and backward-compatible
 - [04-02]: Teradata dbs_port key — teradatasql Python driver uses dbs_port (not port) for the port parameter; LOW confidence, needs verification against Foundry driver
+- [Phase 04-03]: WarehouseConfig Protocol uses TYPE_CHECKING block in dispatcher modules — ruff TC001 correctly flags runtime import of Protocol used only as annotation with __future__ annotations active
+- [Phase 04-03]: NOT_FOUND detection via adbc_driver_manager.Error.status_code == AdbcStatusCode.NOT_FOUND (int-enum 3) — more reliable than string matching; secondary 'NOT_FOUND' in str(exc) fallback kept for forward compatibility
+- [Phase 04-03]: create_adbc_connection uses explicit keyword args (entrypoint=, db_kwargs=) with type: ignore[arg-type] rather than **dict spread — basedpyright cannot assign dict[str, object] to typed overload parameters
 
 ### Pending Todos
 
@@ -88,5 +91,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-24
-Stopped at: Completed 04-02-PLAN.md — 6 translator functions (Snowflake + Databricks/Redshift/Trino/MSSQL/Teradata); TRANS-02, TRANS-04, TRANS-05 requirements met; prek green
+Stopped at: Completed 04-03-PLAN.md — translate_config dispatcher, resolve_driver 3-path detection, create_adbc_connection ADBC facade with NOT_FOUND reraise, AdbcCreatorFn type alias; DRIV-01 through DRIV-04, TYPE-01 TYPE-02 requirements met; prek green
 Resume file: None
