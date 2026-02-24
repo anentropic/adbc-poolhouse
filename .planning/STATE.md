@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 ## Current Position
 
 Phase: 3 of 7 (Config Layer) - In Progress
-Plan: 5 of 7 in phase 3 complete
-Status: Wave 2 Complete
-Last activity: 2026-02-24 — Plans 03-02 through 03-05 executed (wave 2 parallel)
+Plan: 6 of 7 in phase 3 complete
+Status: Wave 3 In Progress
+Last activity: 2026-02-24 — Plan 03-06 executed (public API wiring, __init__.py with 12 re-exports)
 
-Progress: [██████░░░░] 60%
+Progress: [███████░░░] 65%
 
 ## Performance Metrics
 
@@ -29,7 +29,7 @@ Progress: [██████░░░░] 60%
 |-------|-------|-------|----------|
 | 01-pre-flight-fixes | 1 | ~1 min | ~1 min |
 | 02-dependency-declarations | 2 | ~2 min | ~1 min |
-| 03-config-layer | 5 | ~20 min | ~4 min |
+| 03-config-layer | 6 | ~23 min | ~4 min |
 
 **Recent Trend:**
 - Last 5 plans: 1-8 min
@@ -63,6 +63,7 @@ Recent decisions affecting current work:
 - [03-05]: MSSQLConfig is one class covering SQL Server, Azure SQL, Azure Fabric, and Synapse Analytics — not separate classes per variant (locked CONTEXT.md decision)
 - [03-05]: TeradataConfig fields are LOW confidence — triangulated from Teradata JDBC and teradatasql Python driver docs because Columnar ADBC Teradata driver docs returned 404; each field has source attribution docstring
 - [03-05]: SecretStr import uses # noqa: TC002 (not TYPE_CHECKING block) — Pydantic BaseSettings resolves field annotations at class-creation time making runtime import necessary
+- [03-06]: __all__ uses 12 names (11 config classes + WarehouseConfig Protocol); all imports from _-prefixed internal modules ensuring no ADBC driver needed at import time
 
 ### Pending Todos
 
@@ -76,5 +77,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-24
-Stopped at: Completed 03-04-PLAN.md — _databricks_config.py (DatabricksConfig with PAT/OAuth fields), _redshift_config.py (RedshiftConfig provisioned/serverless), _trino_config.py (TrinoConfig with ssl=True default) created; prek green; schema_ alias pattern and # noqa: TC002 for sole SecretStr imports established
+Stopped at: Completed 03-06-PLAN.md — __init__.py updated with 12 public re-exports (all 11 warehouse configs + WarehouseConfig Protocol); prek green; all ROADMAP Phase 3 success criteria 1, 2, 4 verified
 Resume file: None
