@@ -9,10 +9,10 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 
 ## Current Position
 
-Phase: 5 of 7 (Pool Factory and DuckDB Integration) - In Progress
-Plan: 1 of 2 in phase 5 complete
-Status: In Progress — Plan 05-01 complete (exception hierarchy + config foundation)
-Last activity: 2026-02-24 — Plan 05-01 executed (_exceptions.py with PoolhouseError/ConfigurationError; _adbc_entrypoint() on Protocol/BaseWarehouseConfig/DuckDB; 5 DuckDBConfig bounds validators; prek green)
+Phase: 5 of 7 (Pool Factory and DuckDB Integration) - Complete
+Plan: 2 of 2 in phase 5 complete
+Status: Phase 5 Complete — Plan 05-02 complete (create_pool() factory; Arrow cleanup; public exports)
+Last activity: 2026-02-24 — Plan 05-02 executed (create_pool() with ADBC source+clone pattern; Arrow cursor cleanup on reset event; public API exports; 16 new tests; 86 total tests green)
 
 Progress: [██████████] 87%
 
@@ -31,7 +31,7 @@ Progress: [██████████] 87%
 | 02-dependency-declarations | 2 | ~2 min | ~1 min |
 | 03-config-layer | 7 | ~28 min | ~4 min |
 | 04-translation-and-driver-detection | 5 | ~19 min | ~4 min |
-| 05-pool-factory-and-duckdb-integration | 1 | ~2 min | ~2 min |
+| 05-pool-factory-and-duckdb-integration | 2 | ~6 min | ~3 min |
 
 **Recent Trend:**
 - Last 5 plans: 1-8 min
@@ -86,6 +86,10 @@ Recent decisions affecting current work:
 - [05-01]: _adbc_entrypoint() is concrete (not abstract) on BaseWarehouseConfig returning None — only DuckDB overrides it; other drivers have no explicit entry point
 - [05-01]: ConfigurationError import in _duckdb_config.py uses # noqa: TC001 — runtime import required inside field_validators, not TYPE_CHECKING block
 - [05-01]: field_validators added before model_validator — per-field bounds checks fire before cross-field :memory:+pool_size check
+- [Phase 05]: ADBC source+clone pattern: create_adbc_connection opens source connection, QueuePool uses source.adbc_clone as factory
+- [Phase 05]: pool._adbc_source attached dynamically so callers can close source after pool.dispose()
+- [Phase 05]: reset event (not checkin) for Arrow cleanup — reset fires on all return paths including invalidation; checkin receives None on invalidation
+- [Phase 05]: TDD RED+GREEN combined in one commit — basedpyright strict mode (includes tests/) fails on unknown imports; RED-only commit blocked by pre-commit hooks
 
 ### Pending Todos
 
@@ -99,5 +103,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-24
-Stopped at: Completed 05-01-PLAN.md — exception hierarchy (_exceptions.py: PoolhouseError + ConfigurationError); _adbc_entrypoint() on Protocol/BaseWarehouseConfig/DuckDB; 5 DuckDBConfig bounds validators; prek green
+Stopped at: Completed 05-02-PLAN.md — create_pool() factory with ADBC source+clone pattern; Arrow cursor cleanup on reset event; public API exports (create_pool, PoolhouseError, ConfigurationError); 16 new tests; 86 total tests green; Phase 5 complete
 Resume file: None

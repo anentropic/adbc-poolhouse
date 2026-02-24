@@ -50,10 +50,10 @@ Locates and loads the correct ADBC driver; all imports are lazy.
 
 Assembles the `QueuePool`; primary public API.
 
-- [ ] **POOL-01**: `create_pool(config) -> QueuePool` — accepts any supported config model, returns a ready-to-use `sqlalchemy.pool.QueuePool`
-- [ ] **POOL-02**: Default pool settings: `pool_size=5`, `max_overflow=3`, `timeout=30`, `pool_pre_ping=False`, `recycle=3600` (pre-ping disabled — it does not function correctly on a standalone `QueuePool` without a SQLAlchemy dialect; `recycle=3600` is the connection health mechanism)
-- [ ] **POOL-03**: Consumer can override any pool setting by passing kwargs to `create_pool(config, pool_size=10, ...)`
-- [ ] **POOL-04**: Arrow memory `reset_agent` event listener registered on pool creation — releases Arrow allocator contexts on connection checkin to prevent memory accumulation in long-running servers
+- [x] **POOL-01**: `create_pool(config) -> QueuePool` — accepts any supported config model, returns a ready-to-use `sqlalchemy.pool.QueuePool`
+- [x] **POOL-02**: Default pool settings: `pool_size=5`, `max_overflow=3`, `timeout=30`, `pool_pre_ping=False`, `recycle=3600` (pre-ping disabled — it does not function correctly on a standalone `QueuePool` without a SQLAlchemy dialect; `recycle=3600` is the connection health mechanism)
+- [x] **POOL-03**: Consumer can override any pool setting by passing kwargs to `create_pool(config, pool_size=10, ...)`
+- [x] **POOL-04**: Arrow memory `reset_agent` event listener registered on pool creation — releases Arrow allocator contexts on connection checkin to prevent memory accumulation in long-running servers
 - [x] **POOL-05**: No global state — the library creates no module-level singletons; all pool instances are owned and managed by the consumer
 
 ### Type Infrastructure
@@ -65,13 +65,13 @@ Isolates all type suppressions to dedicated internal modules.
 
 ### Testing
 
-- [ ] **TEST-01**: DuckDB end-to-end integration tests: pool creation, connection checkout, query execution, pool disposal (no credentials required)
+- [x] **TEST-01**: DuckDB end-to-end integration tests: pool creation, connection checkout, query execution, pool disposal (no credentials required)
 - [x] **TEST-02**: `DuckDBConfig(database=":memory:", pool_size=2)` raises `ValueError` (isolation validator test)
 - [ ] **TEST-03**: Snowflake `syrupy` snapshot tests with a custom `SnowflakeArrowSnapshotSerializer` that strips non-deterministic fields (`queryId`, timestamps, `elapsedTime`) before serialization — recorded locally with real credentials, replayed in CI against committed snapshots
 - [x] **TEST-04**: Unit tests for all config models: field validation, `SecretStr` handling, `env_prefix` isolation, `model_validator` behaviour
 - [x] **TEST-05**: Unit tests for all parameter translators: given a config instance, assert the exact ADBC kwargs dict produced
 - [x] **TEST-06**: Unit tests for driver detection with `unittest.mock.patch`: three paths — (a) PyPI package found via `find_spec`, (b) PyPI missing, Foundry path loaded via `adbc_driver_manager`, (c) both missing, correct `ImportError` with install instructions raised
-- [ ] **TEST-07**: Memory leak validation test for the Arrow `reset_agent` event listener — confirms Arrow allocator contexts are released on connection checkin
+- [x] **TEST-07**: Memory leak validation test for the Arrow `reset_agent` event listener — confirms Arrow allocator contexts are released on connection checkin
 
 ### Documentation
 
@@ -150,14 +150,14 @@ Isolates all type suppressions to dedicated internal modules.
 | TYPE-02 | Phase 4 | Complete |
 | TEST-05 | Phase 4 | Complete |
 | TEST-06 | Phase 4 | Complete |
-| POOL-01 | Phase 5 | Pending |
-| POOL-02 | Phase 5 | Pending |
-| POOL-03 | Phase 5 | Pending |
-| POOL-04 | Phase 5 | Pending |
+| POOL-01 | Phase 5 | Complete |
+| POOL-02 | Phase 5 | Complete |
+| POOL-03 | Phase 5 | Complete |
+| POOL-04 | Phase 5 | Complete |
 | POOL-05 | Phase 5 | Complete |
-| TEST-01 | Phase 5 | Pending |
+| TEST-01 | Phase 5 | Complete |
 | TEST-02 | Phase 5 | Complete |
-| TEST-07 | Phase 5 | Pending |
+| TEST-07 | Phase 5 | Complete |
 | TEST-03 | Phase 6 | Pending |
 | TOOL-01 | Phase 7 | Pending |
 | TOOL-02 | Phase 7 | Pending |
