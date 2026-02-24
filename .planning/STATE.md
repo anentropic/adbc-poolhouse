@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-02-23)
 
 **Core value:** One config in, one pool out — `create_pool(SnowflakeConfig(...))` returns a ready-to-use SQLAlchemy QueuePool in a single call.
-**Current focus:** Phase 4 — Driver Detection
+**Current focus:** Phase 5 — Pool Factory and DuckDB Integration
 
 ## Current Position
 
-Phase: 4 of 7 (Translation and Driver Detection) - In Progress
-Plan: 5 of 5 in phase 4 complete
-Status: Phase 4 Complete — Plan 04-05 complete (all 5 plans done)
-Last activity: 2026-02-24 — Plan 04-05 executed (driver detection unit tests TEST-06; 11 tests covering all 3 paths, Foundry skip, DRIV-03 NOT_FOUND reraise; prek green)
+Phase: 5 of 7 (Pool Factory and DuckDB Integration) - In Progress
+Plan: 1 of 2 in phase 5 complete
+Status: In Progress — Plan 05-01 complete (exception hierarchy + config foundation)
+Last activity: 2026-02-24 — Plan 05-01 executed (_exceptions.py with PoolhouseError/ConfigurationError; _adbc_entrypoint() on Protocol/BaseWarehouseConfig/DuckDB; 5 DuckDBConfig bounds validators; prek green)
 
-Progress: [██████████] 85%
+Progress: [██████████] 87%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 6
+- Total plans completed: 7
 - Average duration: ~3 min
-- Total execution time: ~22 min
+- Total execution time: ~24 min
 
 **By Phase:**
 
@@ -31,6 +31,7 @@ Progress: [██████████] 85%
 | 02-dependency-declarations | 2 | ~2 min | ~1 min |
 | 03-config-layer | 7 | ~28 min | ~4 min |
 | 04-translation-and-driver-detection | 5 | ~19 min | ~4 min |
+| 05-pool-factory-and-duckdb-integration | 1 | ~2 min | ~2 min |
 
 **Recent Trend:**
 - Last 5 plans: 1-8 min
@@ -81,6 +82,10 @@ Recent decisions affecting current work:
 - [Phase 04]: Patch target 'importlib.util.find_spec' (global) — _drivers.py uses module-level import style; plain Exception() bypasses except adbc_driver_manager.Error; SIM117 requires combined with statements
 - [04-04]: SnowflakeConfig.schema_ requires model_validate({'schema': 'X'}) in tests — validation_alias='schema' means kwarg schema_='X' raises extra_forbidden ValidationError; established pattern for all validation_alias fields
 - [04-04]: FlightSQLConfig() is not empty dict — tls_skip_verify and with_cookie_middleware bool defaults always emit as 'false'/'false' strings; tests assert exact 2-key dict not empty dict
+- [05-01]: ConfigurationError dual-inherits PoolhouseError+ValueError — pydantic wraps it in ValidationError (which inherits ValueError), preserving raises ValueError test expectations
+- [05-01]: _adbc_entrypoint() is concrete (not abstract) on BaseWarehouseConfig returning None — only DuckDB overrides it; other drivers have no explicit entry point
+- [05-01]: ConfigurationError import in _duckdb_config.py uses # noqa: TC001 — runtime import required inside field_validators, not TYPE_CHECKING block
+- [05-01]: field_validators added before model_validator — per-field bounds checks fire before cross-field :memory:+pool_size check
 
 ### Pending Todos
 
@@ -94,5 +99,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-24
-Stopped at: Completed 04-04-PLAN.md — 32 translator unit tests (test_translators.py) asserting exact ADBC key mapping contracts for all 10 warehouses + coordinator dispatch; TEST-05 complete; prek green
+Stopped at: Completed 05-01-PLAN.md — exception hierarchy (_exceptions.py: PoolhouseError + ConfigurationError); _adbc_entrypoint() on Protocol/BaseWarehouseConfig/DuckDB; 5 DuckDBConfig bounds validators; prek green
 Resume file: None
