@@ -60,7 +60,16 @@ Plans:
   3. All config models load values from environment variables using their correct `env_prefix` (e.g. `SNOWFLAKE_ACCOUNT` populates `SnowflakeConfig.account`)
   4. `from adbc_poolhouse import DuckDBConfig, SnowflakeConfig` succeeds in a Python environment with only pydantic-settings installed — no ADBC driver required at import time
   5. All config model unit tests pass (field validation, SecretStr handling, env_prefix isolation, model_validator behaviour)
-**Plans**: TBD
+**Plans**: 7 plans
+
+Plans:
+- [ ] 03-01-PLAN.md — Base config (BaseWarehouseConfig + WarehouseConfig Protocol) + DuckDBConfig with in-memory validator
+- [ ] 03-02-PLAN.md — SnowflakeConfig with full Snowflake ADBC parameter set and private key mutual exclusion
+- [ ] 03-03-PLAN.md — Apache backends: BigQueryConfig, PostgreSQLConfig, FlightSQLConfig
+- [ ] 03-04-PLAN.md — Foundry backends part 1: DatabricksConfig, RedshiftConfig, TrinoConfig
+- [ ] 03-05-PLAN.md — Foundry backends part 2: MSSQLConfig, TeradataConfig (LOW confidence fields)
+- [ ] 03-06-PLAN.md — Public API: update __init__.py with all config model re-exports
+- [ ] 03-07-PLAN.md — TDD unit tests for all config models (TEST-04)
 
 ### Phase 4: Translation and Driver Detection
 **Goal**: Given a config object, the library can produce exact ADBC driver kwargs and resolve the correct driver binary — all without executing any driver code at module import time
@@ -131,7 +140,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 |-------|----------------|--------|-----------|
 | 1. Pre-flight Fixes | 1/1 | Complete | 2026-02-23 |
 | 2. Dependency Declarations | 2/2 | Complete   | 2026-02-23 |
-| 3. Config Layer | 0/TBD | Not started | - |
+| 3. Config Layer | 0/7 | Not started | - |
 | 4. Translation and Driver Detection | 0/TBD | Not started | - |
 | 5. Pool Factory and DuckDB Integration | 0/TBD | Not started | - |
 | 6. Snowflake Integration | 0/TBD | Not started | - |
