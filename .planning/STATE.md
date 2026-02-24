@@ -60,6 +60,9 @@ Recent decisions affecting current work:
 - [03-01]: typing.Self from stdlib (not typing_extensions) — ruff upgraded per Python 3.14 project target
 - [03-02]: Path import kept at module level with # noqa: TC003 — Pydantic resolves field type annotations at runtime even with from __future__ import annotations; moving to TYPE_CHECKING block causes PydanticUndefinedAnnotation
 - [03-02]: schema_ field alias approach: Field(validation_alias='schema', alias='schema') maps SNOWFLAKE_SCHEMA env var to schema_ Python attribute without trailing underscore in env var name
+- [03-05]: MSSQLConfig is one class covering SQL Server, Azure SQL, Azure Fabric, and Synapse Analytics — not separate classes per variant (locked CONTEXT.md decision)
+- [03-05]: TeradataConfig fields are LOW confidence — triangulated from Teradata JDBC and teradatasql Python driver docs because Columnar ADBC Teradata driver docs returned 404; each field has source attribution docstring
+- [03-05]: SecretStr import uses # noqa: TC002 (not TYPE_CHECKING block) — Pydantic BaseSettings resolves field annotations at class-creation time making runtime import necessary
 
 ### Pending Todos
 
@@ -73,5 +76,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-24
-Stopped at: Completed 03-02-PLAN.md — _snowflake_config.py (SnowflakeConfig with full ADBC field set, JWT/OAuth/MFA/Okta/PAT/WIF auth methods, private key mutual exclusion validator) created; prek green
+Stopped at: Completed 03-05-PLAN.md — _mssql_config.py (MSSQLConfig single class for SQL Server/Azure SQL/Fabric/Synapse, fedauth for Azure AD) and _teradata_config.py (TeradataConfig LOW-confidence triangulated fields with source attribution) created; prek green; Phase 3 complete
 Resume file: None
