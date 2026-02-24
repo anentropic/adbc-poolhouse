@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 ## Current Position
 
 Phase: 4 of 7 (Translation and Driver Detection) - In Progress
-Plan: 1 of 5 in phase 4 complete
-Status: Phase 4 Active — Plan 04-01 complete
-Last activity: 2026-02-24 — Plan 04-01 executed (4 pure translator functions: DuckDB, PostgreSQL, BigQuery, FlightSQL)
+Plan: 2 of 5 in phase 4 complete
+Status: Phase 4 Active — Plan 04-02 complete
+Last activity: 2026-02-24 — Plan 04-02 executed (6 translator functions: Snowflake + 5 Foundry backends; TRANS-02, TRANS-04, TRANS-05 complete)
 
 Progress: [████████░░] 75%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 5
+- Total plans completed: 6
 - Average duration: ~3 min
-- Total execution time: ~15 min
+- Total execution time: ~22 min
 
 **By Phase:**
 
@@ -30,7 +30,7 @@ Progress: [████████░░] 75%
 | 01-pre-flight-fixes | 1 | ~1 min | ~1 min |
 | 02-dependency-declarations | 2 | ~2 min | ~1 min |
 | 03-config-layer | 7 | ~28 min | ~4 min |
-| 04-translation-and-driver-detection | 1 | ~4 min | ~4 min |
+| 04-translation-and-driver-detection | 2 | ~11 min | ~5 min |
 
 **Recent Trend:**
 - Last 5 plans: 1-8 min
@@ -72,6 +72,9 @@ Recent decisions affecting current work:
 - [04-01]: translate_postgresql omits use_copy — adbc.postgresql.use_copy is a StatementOptions key (per-statement), not a DatabaseOptions key (per-connection); passing to dbapi.connect() is incorrect; Phase 5 must apply at cursor level
 - [04-01]: translate_flightsql always emits tls_skip_verify and with_cookie_middleware — bool fields with defaults (never None), so always included as 'true'/'false' strings in output dict
 - [04-01]: FlightSQL connect_timeout uses raw string key 'adbc.flight.sql.rpc.timeout_seconds.connect' — documented in ADBC FlightSQL docs but absent from Python DatabaseOptions enum; included as raw string
+- [04-02]: TYPE_CHECKING block for translator config imports — translator functions (not Pydantic models) safely use TYPE_CHECKING; ruff TC001 correctly flags runtime imports in this context unlike Pydantic field annotations
+- [04-02]: Trino and MSSQL use URI-first with decomposed field fallback — plan said URI-only but configs have full field sets; URI-first pattern is more complete and backward-compatible
+- [04-02]: Teradata dbs_port key — teradatasql Python driver uses dbs_port (not port) for the port parameter; LOW confidence, needs verification against Foundry driver
 
 ### Pending Todos
 
@@ -85,5 +88,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-24
-Stopped at: Completed 04-01-PLAN.md — 4 pure translator functions (DuckDB, PostgreSQL, BigQuery, FlightSQL); TRANS-01, TRANS-03, TRANS-05 requirements met; prek green
+Stopped at: Completed 04-02-PLAN.md — 6 translator functions (Snowflake + Databricks/Redshift/Trino/MSSQL/Teradata); TRANS-02, TRANS-04, TRANS-05 requirements met; prek green
 Resume file: None

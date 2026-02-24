@@ -32,9 +32,9 @@ Typed, validated, environment-variable-friendly warehouse configuration models.
 Maps config model fields to ADBC driver kwargs for `adbc_driver_manager.dbapi.connect()`.
 
 - [x] **TRANS-01**: Translator for `DuckDBConfig` → DuckDB ADBC driver kwargs
-- [ ] **TRANS-02**: Translator for `SnowflakeConfig` → Snowflake ADBC driver kwargs (all auth methods produce correct kwargs)
+- [x] **TRANS-02**: Translator for `SnowflakeConfig` → Snowflake ADBC driver kwargs (all auth methods produce correct kwargs)
 - [x] **TRANS-03**: Translators for all remaining Apache backends (`BigQueryConfig`, `PostgreSQLConfig`, `FlightSQLConfig`)
-- [ ] **TRANS-04**: Translators for all Foundry backends (`DatabricksConfig`, `RedshiftConfig`, `TrinoConfig`, `MSSQLConfig`, `TeradataConfig`)
+- [x] **TRANS-04**: Translators for all Foundry backends (`DatabricksConfig`, `RedshiftConfig`, `TrinoConfig`, `MSSQLConfig`, `TeradataConfig`)
 - [x] **TRANS-05**: All translators are pure functions with no ADBC driver imports (importable even when the target driver is not installed)
 
 ### Driver Detection
@@ -138,9 +138,9 @@ Isolates all type suppressions to dedicated internal modules.
 | CFG-07 | Phase 3 | Complete |
 | TEST-04 | Phase 3 | Complete |
 | TRANS-01 | Phase 4 | Complete |
-| TRANS-02 | Phase 4 | Pending |
+| TRANS-02 | Phase 4 | Complete |
 | TRANS-03 | Phase 4 | Complete |
-| TRANS-04 | Phase 4 | Pending |
+| TRANS-04 | Phase 4 | Complete |
 | TRANS-05 | Phase 4 | Complete |
 | DRIV-01 | Phase 4 | Pending |
 | DRIV-02 | Phase 4 | Pending |
