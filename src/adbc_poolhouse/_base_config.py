@@ -22,6 +22,8 @@ class WarehouseConfig(Protocol):
     timeout: int
     recycle: int
 
+    def _adbc_entrypoint(self) -> str | None: ...
+
 
 class BaseWarehouseConfig(BaseSettings, abc.ABC):
     """
@@ -49,3 +51,14 @@ class BaseWarehouseConfig(BaseSettings, abc.ABC):
         concrete subclass; used in Phase 4 translation layer.
         """
         ...
+
+    def _adbc_entrypoint(self) -> str | None:
+        """
+        Return the ADBC entry-point symbol, or None if not required.
+
+        DuckDB overrides this to return ``'duckdb_adbc_init'``.
+        All other drivers do not need an explicit entry point.
+
+        Internal only — not part of the public API.
+        """
+        return None
