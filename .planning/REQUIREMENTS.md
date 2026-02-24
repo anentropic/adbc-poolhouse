@@ -68,7 +68,7 @@ Isolates all type suppressions to dedicated internal modules.
 - [ ] **TEST-01**: DuckDB end-to-end integration tests: pool creation, connection checkout, query execution, pool disposal (no credentials required)
 - [ ] **TEST-02**: `DuckDBConfig(database=":memory:", pool_size=2)` raises `ValueError` (isolation validator test)
 - [ ] **TEST-03**: Snowflake `syrupy` snapshot tests with a custom `SnowflakeArrowSnapshotSerializer` that strips non-deterministic fields (`queryId`, timestamps, `elapsedTime`) before serialization — recorded locally with real credentials, replayed in CI against committed snapshots
-- [ ] **TEST-04**: Unit tests for all config models: field validation, `SecretStr` handling, `env_prefix` isolation, `model_validator` behaviour
+- [x] **TEST-04**: Unit tests for all config models: field validation, `SecretStr` handling, `env_prefix` isolation, `model_validator` behaviour
 - [ ] **TEST-05**: Unit tests for all parameter translators: given a config instance, assert the exact ADBC kwargs dict produced
 - [ ] **TEST-06**: Unit tests for driver detection with `unittest.mock.patch`: three paths — (a) PyPI package found via `find_spec`, (b) PyPI missing, Foundry path loaded via `adbc_driver_manager`, (c) both missing, correct `ImportError` with install instructions raised
 - [ ] **TEST-07**: Memory leak validation test for the Arrow `reset_agent` event listener — confirms Arrow allocator contexts are released on connection checkin
@@ -136,7 +136,7 @@ Isolates all type suppressions to dedicated internal modules.
 | CFG-05 | Phase 3 | Complete |
 | CFG-06 | Phase 3 | Complete |
 | CFG-07 | Phase 3 | Complete |
-| TEST-04 | Phase 3 | Pending |
+| TEST-04 | Phase 3 | Complete |
 | TRANS-01 | Phase 4 | Pending |
 | TRANS-02 | Phase 4 | Pending |
 | TRANS-03 | Phase 4 | Pending |

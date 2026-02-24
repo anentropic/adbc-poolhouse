@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-02-23)
 
 **Core value:** One config in, one pool out — `create_pool(SnowflakeConfig(...))` returns a ready-to-use SQLAlchemy QueuePool in a single call.
-**Current focus:** Phase 3 — Package Structure
+**Current focus:** Phase 4 — Driver Detection
 
 ## Current Position
 
-Phase: 3 of 7 (Config Layer) - In Progress
-Plan: 6 of 7 in phase 3 complete
-Status: Wave 3 In Progress
-Last activity: 2026-02-24 — Plan 03-06 executed (public API wiring, __init__.py with 12 re-exports)
+Phase: 3 of 7 (Config Layer) - Complete
+Plan: 7 of 7 in phase 3 complete
+Status: Phase 3 Complete — Ready for Phase 4
+Last activity: 2026-02-24 — Plan 03-07 executed (26 config model unit tests, TEST-04 complete)
 
-Progress: [███████░░░] 65%
+Progress: [████████░░] 72%
 
 ## Performance Metrics
 
@@ -29,7 +29,7 @@ Progress: [███████░░░] 65%
 |-------|-------|-------|----------|
 | 01-pre-flight-fixes | 1 | ~1 min | ~1 min |
 | 02-dependency-declarations | 2 | ~2 min | ~1 min |
-| 03-config-layer | 6 | ~23 min | ~4 min |
+| 03-config-layer | 7 | ~28 min | ~4 min |
 
 **Recent Trend:**
 - Last 5 plans: 1-8 min
@@ -64,6 +64,9 @@ Recent decisions affecting current work:
 - [03-05]: TeradataConfig fields are LOW confidence — triangulated from Teradata JDBC and teradatasql Python driver docs because Columnar ADBC Teradata driver docs returned 404; each field has source attribution docstring
 - [03-05]: SecretStr import uses # noqa: TC002 (not TYPE_CHECKING block) — Pydantic BaseSettings resolves field annotations at class-creation time making runtime import necessary
 - [03-06]: __all__ uses 12 names (11 config classes + WarehouseConfig Protocol); all imports from _-prefixed internal modules ensuring no ADBC driver needed at import time
+- [Phase 03-config-layer]: DuckDB env prefix pool_size tests require DUCKDB_DATABASE env var set to file path — in-memory pool_size > 1 raises ValidationError
+- [Phase 03-config-layer]: type: ignore[call-arg] for SnowflakeConfig() calls without account= in env prefix tests — basedpyright cannot see env var-provided required fields at type-check time
+- [Phase 03-config-layer]: pragma: allowlist secret on variables holding PEM/password strings, not inline in constructor — avoids ruff line-length and detect-secrets conflicts simultaneously
 
 ### Pending Todos
 
@@ -77,5 +80,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-24
-Stopped at: Completed 03-06-PLAN.md — __init__.py updated with 12 public re-exports (all 11 warehouse configs + WarehouseConfig Protocol); prek green; all ROADMAP Phase 3 success criteria 1, 2, 4 verified
+Stopped at: Completed 03-07-PLAN.md — 26 config model unit tests across 5 classes; all TEST-04 requirements met; prek green; Phase 3 complete (7/7 plans)
 Resume file: None
