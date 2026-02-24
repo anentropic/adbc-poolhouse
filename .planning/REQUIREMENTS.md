@@ -21,8 +21,8 @@ Typed, validated, environment-variable-friendly warehouse configuration models.
 
 - [x] **CFG-01**: `DuckDBConfig` — Pydantic `BaseSettings` subclass covering all DuckDB ADBC connection parameters; `env_prefix="DUCKDB_"`
 - [x] **CFG-02**: `DuckDBConfig` `model_validator` raises `ValueError` when `database=":memory:"` and `pool_size > 1` (each pool connection would get an isolated in-memory database — almost certainly a consumer bug)
-- [ ] **CFG-03**: `SnowflakeConfig` — Pydantic `BaseSettings` subclass covering all auth methods supported by the installed `adbc-driver-snowflake` (verify against driver source, do not guess); `env_prefix="SNOWFLAKE_"`
-- [ ] **CFG-04**: `SnowflakeConfig` private key: separate `private_key_path: Path | None` and `private_key_pem: SecretStr | None` fields with a mutual exclusivity validator (a plain `str` field is ambiguous between a file path and PEM content)
+- [x] **CFG-03**: `SnowflakeConfig` — Pydantic `BaseSettings` subclass covering all auth methods supported by the installed `adbc-driver-snowflake` (verify against driver source, do not guess); `env_prefix="SNOWFLAKE_"`
+- [x] **CFG-04**: `SnowflakeConfig` private key: separate `private_key_path: Path | None` and `private_key_pem: SecretStr | None` fields with a mutual exclusivity validator (a plain `str` field is ambiguous between a file path and PEM content)
 - [ ] **CFG-05**: Config models for all remaining Apache ADBC backends: `BigQueryConfig`, `PostgreSQLConfig`, `FlightSQLConfig` — each a `BaseSettings` subclass with appropriate `env_prefix`, fields verified against driver docs/source
 - [ ] **CFG-06**: Config models for all Foundry-distributed backends: `DatabricksConfig`, `RedshiftConfig`, `TrinoConfig`, `MSSQLConfig` (covering Fabric/Synapse variants), `TeradataConfig` — each a `BaseSettings` subclass with appropriate `env_prefix`, fields verified against driver docs/source
 - [x] **CFG-07**: All config models: consumer can pass pool tuning kwargs (`pool_size`, `max_overflow`, `timeout`, `recycle`) directly on the config model as optional fields with the library's defaults
@@ -131,8 +131,8 @@ Isolates all type suppressions to dedicated internal modules.
 | SETUP-04 | Phase 2 | Complete |
 | CFG-01 | Phase 3 | Complete |
 | CFG-02 | Phase 3 | Complete |
-| CFG-03 | Phase 3 | Pending |
-| CFG-04 | Phase 3 | Pending |
+| CFG-03 | Phase 3 | Complete |
+| CFG-04 | Phase 3 | Complete |
 | CFG-05 | Phase 3 | Pending |
 | CFG-06 | Phase 3 | Pending |
 | CFG-07 | Phase 3 | Complete |

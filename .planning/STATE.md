@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 
 ## Current Position
 
-Phase: 3 of 7 (Config Layer) - In Progress
-Plan: 1 of 5 in phase 3 complete
-Status: Executing
-Last activity: 2026-02-24 — Plan 03-01 executed
+Phase: 3 of 7 (Config Layer) - Complete
+Plan: 5 of 5 in phase 3 complete
+Status: Phase Complete
+Last activity: 2026-02-24 — Plan 03-05 executed
 
-Progress: [████░░░░░░] 40%
+Progress: [██████░░░░] 60%
 
 ## Performance Metrics
 
@@ -29,7 +29,7 @@ Progress: [████░░░░░░] 40%
 |-------|-------|-------|----------|
 | 01-pre-flight-fixes | 1 | ~1 min | ~1 min |
 | 02-dependency-declarations | 2 | ~2 min | ~1 min |
-| 03-config-layer | 1 | ~8 min | ~8 min |
+| 03-config-layer | 5 | ~20 min | ~4 min |
 
 **Recent Trend:**
 - Last 5 plans: 1-8 min
@@ -58,6 +58,8 @@ Recent decisions affecting current work:
 - [Phase 02-02]: Extras isolation verified: each warehouse driver extra installs only its own driver without cross-contamination
 - [03-01]: DuckDBConfig.pool_size defaults to 1 (not inherited base default of 5) — in-memory DuckDB isolates each connection to a different empty DB; pool_size > 1 with :memory: raises ValidationError
 - [03-01]: typing.Self from stdlib (not typing_extensions) — ruff upgraded per Python 3.14 project target
+- [03-02]: Path import kept at module level with # noqa: TC003 — Pydantic resolves field type annotations at runtime even with from __future__ import annotations; moving to TYPE_CHECKING block causes PydanticUndefinedAnnotation
+- [03-02]: schema_ field alias approach: Field(validation_alias='schema', alias='schema') maps SNOWFLAKE_SCHEMA env var to schema_ Python attribute without trailing underscore in env var name
 
 ### Pending Todos
 
@@ -71,5 +73,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-24
-Stopped at: Completed 03-01-PLAN.md — _base_config.py (BaseWarehouseConfig + WarehouseConfig Protocol) and _duckdb_config.py (DuckDBConfig with pool_size=1 in-memory default) created; prek green
+Stopped at: Completed 03-02-PLAN.md — _snowflake_config.py (SnowflakeConfig with full ADBC field set, JWT/OAuth/MFA/Okta/PAT/WIF auth methods, private key mutual exclusion validator) created; prek green
 Resume file: None
