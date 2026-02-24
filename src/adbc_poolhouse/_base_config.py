@@ -1,0 +1,51 @@
+"""Base warehouse configuration: abstract base class and Protocol type."""
+
+from __future__ import annotations
+
+import abc
+from typing import Protocol, runtime_checkable
+
+from pydantic_settings import BaseSettings
+
+
+@runtime_checkable
+class WarehouseConfig(Protocol):
+    """
+    Structural type for any adbc-poolhouse warehouse config model.
+
+    Downstream code annotates function parameters as `config: WarehouseConfig`
+    to accept any supported warehouse config without importing concrete classes.
+    """
+
+    pool_size: int
+    max_overflow: int
+    timeout: int
+    recycle: int
+
+
+class BaseWarehouseConfig(BaseSettings, abc.ABC):
+    """
+    Public abstract base for all warehouse config models.
+
+    Provides pool tuning fields with library defaults. Cannot be instantiated
+    directly — subclasses must implement _adbc_driver_key().
+
+    Pool tuning fields are inherited by all concrete configs, and each
+    concrete config's env_prefix applies to these fields automatically.
+    For example, DUCKDB_POOL_SIZE populates DuckDBConfig.pool_size.
+    """
+
+    pool_size: int = 5
+    max_overflow: int = 3
+    timeout: int = 30
+    recycle: int = 3600
+
+    @abc.abstractmethod
+    def _adbc_driver_key(self) -> str:
+        """
+        Internal: returns the ADBC driver name used by the driver manager.
+
+        Not part of the public API (underscore prefix). Implemented by each
+        concrete subclass; used in Phase 4 translation layer.
+        """
+        ...
