@@ -42,6 +42,3 @@ class BigQueryConfig(BaseWarehouseConfig):
 
     dataset_id: str | None = None
     """Default dataset. Env: BIGQUERY_DATASET_ID."""
-
-    def _adbc_driver_key(self) -> str:
-        return "bigquery"

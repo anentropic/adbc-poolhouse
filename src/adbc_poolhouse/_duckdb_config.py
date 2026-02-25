@@ -77,9 +77,6 @@ class DuckDBConfig(BaseWarehouseConfig):
             raise ConfigurationError(f"database must be a non-empty string, got {v!r}")
         return v
 
-    def _adbc_driver_key(self) -> str:
-        return "duckdb"
-
     def _adbc_entrypoint(self) -> str | None:
         return "duckdb_adbc_init"
 

@@ -29,7 +29,7 @@ Internal only — not exported from ``__init__.py``.
 from __future__ import annotations
 
 import importlib.util
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from adbc_poolhouse._bigquery_config import BigQueryConfig
 from adbc_poolhouse._databricks_config import DatabricksConfig
@@ -140,8 +140,8 @@ def _resolve_pypi_driver(pkg_name: str, extra: str) -> str:  # noqa: ARG001
     """
     spec = importlib.util.find_spec(pkg_name)
     if spec is not None:
-        pkg = __import__(pkg_name)
-        return pkg._driver_path()  # type: ignore[attr-defined]
+        pkg: Any = __import__(pkg_name)
+        return pkg._driver_path()
     # Path 2: return package name for adbc_driver_manager manifest resolution.
     # If manifest is also absent, create_adbc_connection() will catch NOT_FOUND
     # and raise ImportError with the install instructions.

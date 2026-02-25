@@ -18,8 +18,8 @@ def translate_postgresql(config: PostgreSQLConfig) -> dict[str, str]:
     Note:
         'adbc.postgresql.use_copy' is a StatementOptions key — it is NOT a
         database-level kwarg and cannot be passed to dbapi.connect(). The
-        use_copy field is intentionally omitted here. Phase 5 must handle it
-        at the cursor level if needed.
+        use_copy field is intentionally omitted here; it belongs in cursor
+        StatementOptions, not in the connect kwargs.
         Verified against installed adbc_driver_postgresql source.
     """
     kwargs: dict[str, str] = {}

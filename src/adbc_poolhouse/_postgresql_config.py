@@ -28,6 +28,3 @@ class PostgreSQLConfig(BaseWarehouseConfig):
     use_copy: bool = True
     """Use PostgreSQL COPY protocol for bulk query execution (driver default:
     True). Disable if COPY triggers permission errors. Env: POSTGRESQL_USE_COPY."""
-
-    def _adbc_driver_key(self) -> str:
-        return "postgresql"

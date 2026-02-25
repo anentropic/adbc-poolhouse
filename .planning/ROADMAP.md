@@ -47,8 +47,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 02-01-PLAN.md — Add runtime deps, optional extras, dev deps to pyproject.toml; update REQUIREMENTS.md
-- [ ] 02-02-PLAN.md — Validate uv resolution, commit uv.lock, verify prek gate
+- [x] 02-01-PLAN.md — Add runtime deps, optional extras, dev deps to pyproject.toml; update REQUIREMENTS.md
+- [x] 02-02-PLAN.md — Validate uv resolution, commit uv.lock, verify prek gate
 
 ### Phase 3: Config Layer
 **Goal**: Consumers can construct typed, validated, environment-variable-friendly warehouse config objects for every supported backend without importing any ADBC or SQLAlchemy code
@@ -63,13 +63,13 @@ Plans:
 **Plans**: 7 plans
 
 Plans:
-- [ ] 03-01-PLAN.md — Base config (BaseWarehouseConfig + WarehouseConfig Protocol) + DuckDBConfig with in-memory validator
-- [ ] 03-02-PLAN.md — SnowflakeConfig with full Snowflake ADBC parameter set and private key mutual exclusion
-- [ ] 03-03-PLAN.md — Apache backends: BigQueryConfig, PostgreSQLConfig, FlightSQLConfig
-- [ ] 03-04-PLAN.md — Foundry backends part 1: DatabricksConfig, RedshiftConfig, TrinoConfig
-- [ ] 03-05-PLAN.md — Foundry backends part 2: MSSQLConfig, TeradataConfig (LOW confidence fields)
-- [ ] 03-06-PLAN.md — Public API: update __init__.py with all config model re-exports
-- [ ] 03-07-PLAN.md — TDD unit tests for all config models (TEST-04)
+- [x] 03-01-PLAN.md — Base config (BaseWarehouseConfig + WarehouseConfig Protocol) + DuckDBConfig with in-memory validator
+- [x] 03-02-PLAN.md — SnowflakeConfig with full Snowflake ADBC parameter set and private key mutual exclusion
+- [x] 03-03-PLAN.md — Apache backends: BigQueryConfig, PostgreSQLConfig, FlightSQLConfig
+- [x] 03-04-PLAN.md — Foundry backends part 1: DatabricksConfig, RedshiftConfig, TrinoConfig
+- [x] 03-05-PLAN.md — Foundry backends part 2: MSSQLConfig, TeradataConfig (LOW confidence fields)
+- [x] 03-06-PLAN.md — Public API: update __init__.py with all config model re-exports
+- [x] 03-07-PLAN.md — TDD unit tests for all config models (TEST-04)
 
 ### Phase 4: Translation and Driver Detection
 **Goal**: Given a config object, the library can produce exact ADBC driver kwargs and resolve the correct driver binary — all without executing any driver code at module import time
@@ -83,11 +83,11 @@ Plans:
 **Plans**: 5 plans
 
 Plans:
-- [ ] 04-01-PLAN.md — DuckDB + Apache translators (translate_duckdb, translate_bigquery, translate_postgresql, translate_flightsql)
-- [ ] 04-02-PLAN.md — Snowflake + Foundry translators (translate_snowflake, translate_databricks, translate_redshift, translate_trino, translate_mssql, translate_teradata)
-- [ ] 04-03-PLAN.md — Wiring layer: _translators.py coordinator, _drivers.py detection, _driver_api.py ADBC facade, _pool_types.py type scaffold
-- [ ] 04-04-PLAN.md — TDD: translator unit tests (TEST-05)
-- [ ] 04-05-PLAN.md — TDD: driver detection unit tests (TEST-06)
+- [x] 04-01-PLAN.md — DuckDB + Apache translators (translate_duckdb, translate_bigquery, translate_postgresql, translate_flightsql)
+- [x] 04-02-PLAN.md — Snowflake + Foundry translators (translate_snowflake, translate_databricks, translate_redshift, translate_trino, translate_mssql, translate_teradata)
+- [x] 04-03-PLAN.md — Wiring layer: _translators.py coordinator, _drivers.py detection, _driver_api.py ADBC facade, _pool_types.py type scaffold
+- [x] 04-04-PLAN.md — TDD: translator unit tests (TEST-05)
+- [x] 04-05-PLAN.md — TDD: driver detection unit tests (TEST-06)
 
 ### Phase 5: Pool Factory and DuckDB Integration
 **Goal**: `create_pool(config)` is the complete, working public API — consumers can call it with a DuckDB config and get back a functional QueuePool
@@ -102,8 +102,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 05-01-PLAN.md — Exception hierarchy (_exceptions.py) + config layer updates (_base_config.py, _duckdb_config.py)
-- [ ] 05-02-PLAN.md — TDD: pool factory implementation (_pool_factory.py) + public API exports (__init__.py)
+- [x] 05-01-PLAN.md — Exception hierarchy (_exceptions.py) + config layer updates (_base_config.py, _duckdb_config.py)
+- [x] 05-02-PLAN.md — TDD: pool factory implementation (_pool_factory.py) + public API exports (__init__.py)
 
 ### Phase 6: Snowflake Integration
 **Goal**: Snowflake connection tests are committed as syrupy snapshots that CI can replay without credentials — real credentials used only for local snapshot recording

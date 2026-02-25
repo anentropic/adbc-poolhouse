@@ -51,6 +51,3 @@ class RedshiftConfig(BaseWarehouseConfig):
 
     sslmode: str | None = None
     """SSL mode (e.g. 'require', 'verify-full'). Env: REDSHIFT_SSLMODE."""
-
-    def _adbc_driver_key(self) -> str:
-        return "redshift"

@@ -63,6 +63,3 @@ class MSSQLConfig(BaseWarehouseConfig):
     Values: 'ActiveDirectoryPassword', 'ActiveDirectoryMsi',
     'ActiveDirectoryServicePrincipal', 'ActiveDirectoryInteractive'.
     Env: MSSQL_FEDAUTH."""
-
-    def _adbc_driver_key(self) -> str:
-        return "mssql"

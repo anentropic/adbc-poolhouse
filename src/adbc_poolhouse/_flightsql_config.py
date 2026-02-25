@@ -76,6 +76,3 @@ class FlightSQLConfig(BaseWarehouseConfig):
     with_cookie_middleware: bool = False
     """Enable gRPC cookie middleware (required by some servers for session
     management). Env: FLIGHTSQL_WITH_COOKIE_MIDDLEWARE."""
-
-    def _adbc_driver_key(self) -> str:
-        return "flightsql"

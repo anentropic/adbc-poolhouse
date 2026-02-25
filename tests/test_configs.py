@@ -22,9 +22,12 @@ from adbc_poolhouse import (
 
 
 class TestBaseWarehouseConfig:
-    def test_cannot_instantiate_directly(self) -> None:
-        with pytest.raises(TypeError):
-            BaseWarehouseConfig()  # type: ignore[abstract]
+    def test_pool_tuning_defaults(self) -> None:
+        """Base class pool tuning defaults are inherited by all concrete configs."""
+        assert BaseWarehouseConfig.model_fields["pool_size"].default == 5
+        assert BaseWarehouseConfig.model_fields["max_overflow"].default == 3
+        assert BaseWarehouseConfig.model_fields["timeout"].default == 30
+        assert BaseWarehouseConfig.model_fields["recycle"].default == 3600
 
 
 class TestDuckDBConfig:

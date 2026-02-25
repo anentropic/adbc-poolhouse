@@ -2,10 +2,10 @@
 Teradata ADBC parameter translator.
 
 TODO: LOW CONFIDENCE -- TeradataConfig field names were triangulated from Teradata JDBC
-and teradatasql Python driver docs because the Columnar ADBC Teradata driver docs
-returned 404 at Phase 3 and Phase 4 research time. Verify field names against the
-actual Teradata Foundry driver when docs become available.
-Driver name: 'teradata' (LOW confidence -- inferred from pattern, docs returned 404).
+and teradatasql Python driver docs. As of 2026-02-25, Teradata is not listed in the
+ADBC Driver Foundry (docs.adbc-drivers.org); the driver may be distributed separately
+or not yet released. Verify field names against the actual driver when available.
+Driver name: 'teradata' (LOW confidence -- inferred from Foundry naming pattern).
 """
 
 from __future__ import annotations

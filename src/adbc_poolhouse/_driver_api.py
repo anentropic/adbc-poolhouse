@@ -5,8 +5,7 @@ This module is the single location for all ``adbc_driver_manager`` type
 suppressions and for the Foundry NOT_FOUND catch-and-reraise logic (DRIV-03).
 
 All ``cast()`` calls and ``# type: ignore`` suppressions touching ADBC types
-must live here or in ``_pool_types.py``. No other module may import
-``adbc_driver_manager`` directly.
+must live here. No other module may import ``adbc_driver_manager`` directly.
 
 ``adbc_driver_manager`` is a runtime dependency (always installed as a
 transitive dep of any warehouse driver). Its top-level import here is

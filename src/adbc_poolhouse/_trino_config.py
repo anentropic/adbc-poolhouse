@@ -56,6 +56,3 @@ class TrinoConfig(BaseWarehouseConfig):
     source: str | None = None
     """Application identifier sent to Trino coordinator.
     Env: TRINO_SOURCE."""
-
-    def _adbc_driver_key(self) -> str:
-        return "trino"

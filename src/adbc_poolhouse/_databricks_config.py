@@ -16,7 +16,9 @@ class DatabricksConfig(BaseWarehouseConfig):
     PyPI). Install via the ADBC Driver Foundry.
 
     Supports PAT (personal access token) and OAuth (U2M and M2M) auth.
-    Connection can be specified as a full URI or via decomposed fields.
+    Connection must be specified as a full URI. Individual fields (host,
+    http_path, token) are stored for potential future decomposed-field
+    translation but are not currently passed to the driver.
 
     Pool tuning fields are inherited and loaded from DATABRICKS_* env vars.
 
@@ -57,6 +59,3 @@ class DatabricksConfig(BaseWarehouseConfig):
     schema_: str | None = Field(default=None, validation_alias="schema", alias="schema")
     """Default schema. Python attribute is schema_ to avoid Pydantic conflicts.
     Env: DATABRICKS_SCHEMA."""
-
-    def _adbc_driver_key(self) -> str:
-        return "databricks"

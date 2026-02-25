@@ -114,9 +114,6 @@ class SnowflakeConfig(BaseWarehouseConfig):
     store_temp_creds: bool = False
     """Cache ID token for SSO. Env: SNOWFLAKE_STORE_TEMP_CREDS."""
 
-    def _adbc_driver_key(self) -> str:
-        return "snowflake"
-
     @model_validator(mode="after")
     def check_private_key_exclusion(self) -> Self:
         """Raise ValidationError if both private_key_path and private_key_pem are set."""

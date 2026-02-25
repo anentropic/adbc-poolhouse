@@ -5,8 +5,9 @@ from __future__ import annotations
 # TODO(teradata): Verify all field names against the installed Columnar ADBC
 # Teradata driver when available. Fields below are triangulated from the
 # Teradata JDBC driver and teradatasql Python driver parameter names.
-# The Columnar ADBC driver docs page (docs.adbc-drivers.org/drivers/teradata)
-# returned 404 at research time (2026-02-24).
+# As of 2026-02-25, Teradata is not listed in the ADBC Driver Foundry
+# (docs.adbc-drivers.org); the driver may be distributed separately or
+# not yet released. Verify field names before production use.
 from pydantic import SecretStr  # noqa: TC002
 from pydantic_settings import SettingsConfigDict
 
@@ -17,18 +18,16 @@ class TeradataConfig(BaseWarehouseConfig):
     """
     Teradata warehouse configuration.
 
-    Uses the Columnar ADBC Teradata driver (Foundry-distributed, not on PyPI).
+    Uses the Columnar ADBC Teradata driver.
 
     .. warning::
-        Field names are triangulated from the Teradata JDBC driver and
-        teradatasql Python driver documentation. The Columnar ADBC Teradata
-        driver documentation was unavailable at research time. Verify field
-        names against the installed driver before use in production.
+        As of 2026-02-25, Teradata is not listed in the ADBC Driver Foundry
+        (docs.adbc-drivers.org). The driver may be distributed separately or
+        not yet released. Field names are triangulated from the Teradata JDBC
+        driver and teradatasql Python driver documentation; verify against the
+        actual installed driver before production use.
 
     Pool tuning fields are inherited and loaded from TERADATA_* env vars.
-
-    Note: This driver is distributed via the ADBC Driver Foundry, not PyPI.
-    See project Phase 7 documentation for Foundry installation instructions.
     """
 
     model_config = SettingsConfigDict(env_prefix="TERADATA_")
@@ -78,6 +77,3 @@ class TeradataConfig(BaseWarehouseConfig):
     Source: Inferred from Foundry driver URI patterns; unconfirmed for Teradata.
     Verify against Columnar ADBC driver.
     Env: TERADATA_URI."""
-
-    def _adbc_driver_key(self) -> str:
-        return "teradata"
