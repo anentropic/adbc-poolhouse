@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-02-23)
 
 **Core value:** One config in, one pool out — `create_pool(SnowflakeConfig(...))` returns a ready-to-use SQLAlchemy QueuePool in a single call.
-**Current focus:** Phase 5 — Pool Factory and DuckDB Integration
+**Current focus:** Phase 6 — Snowflake Integration
 
 ## Current Position
 
-Phase: 5 of 7 (Pool Factory and DuckDB Integration) - Complete
-Plan: 2 of 2 in phase 5 complete
-Status: Phase 5 Complete — Plan 05-02 complete (create_pool() factory; Arrow cleanup; public exports)
-Last activity: 2026-02-24 — Plan 05-02 executed (create_pool() with ADBC source+clone pattern; Arrow cursor cleanup on reset event; public API exports; 16 new tests; 86 total tests green)
+Phase: 6 of 7 (Snowflake Integration) - Complete
+Plan: 1 of 1 in phase 6 complete
+Status: Phase 6 Complete — Plan 06-01 complete (Snowflake syrupy snapshot tests; SnowflakeArrowSnapshotSerializer; skip-on-no-creds fixtures)
+Last activity: 2026-02-25 — Plan 06-01 executed (SnowflakeArrowSnapshotSerializer strips non-deterministic Arrow metadata; snowflake_pool session fixture with skip logic; snowflake_snapshot function fixture; 2 integration tests; CONTRIBUTING.md; pyproject.toml marker config)
 
-Progress: [██████████] 87%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 7
+- Total plans completed: 8
 - Average duration: ~3 min
-- Total execution time: ~24 min
+- Total execution time: ~28 min
 
 **By Phase:**
 
@@ -32,6 +32,7 @@ Progress: [██████████] 87%
 | 03-config-layer | 7 | ~28 min | ~4 min |
 | 04-translation-and-driver-detection | 5 | ~19 min | ~4 min |
 | 05-pool-factory-and-duckdb-integration | 2 | ~6 min | ~3 min |
+| 06-snowflake-integration | 1 | ~4 min | ~4 min |
 
 **Recent Trend:**
 - Last 5 plans: 1-8 min
@@ -90,6 +91,10 @@ Recent decisions affecting current work:
 - [Phase 05]: pool._adbc_source attached dynamically so callers can close source after pool.dispose()
 - [Phase 05]: reset event (not checkin) for Arrow cleanup — reset fires on all return paths including invalidation; checkin receives None on invalidation
 - [Phase 05]: TDD RED+GREEN combined in one commit — basedpyright strict mode (includes tests/) fails on unknown imports; RED-only commit blocked by pre-commit hooks
+- [06-01]: SnapshotAssertion import in TYPE_CHECKING block — ruff TC002 requires third-party imports used only as type annotations to be deferred; valid with from __future__ import annotations active
+- [06-01]: pyarrow annotated with # type: ignore[import-untyped] — no stubs available; internal arrow attribute accesses use # type: ignore[union-attr] throughout serialize()
+- [06-01]: addopts + --override-ini="addopts=" pattern — addopts excludes snowflake marker from default runs; --override-ini="addopts=" clears it for recording/replay sessions
+- [06-01]: Defensive stripping of non-deterministic meta keys — current adbc-driver-snowflake 1.10.0 may not emit queryId/elapsedTime/timestamp fields; strip implemented as roadmap-specified safety measure
 
 ### Pending Todos
 
@@ -98,10 +103,10 @@ None yet.
 ### Blockers/Concerns
 
 - Phase 4 (Driver Detection): Foundry driver path discovery mechanism in `adbc_driver_manager` is sparsely documented — needs implementation-time research against actual Foundry-installed driver paths (ADBC Driver Foundry launched Oct 2025)
-- Phase 6 (Snowflake Snapshots): Custom syrupy serializer design needs validation against real Snowflake ADBC driver response format — metadata field names and Arrow schema structure must be verified before finalising serializer
+- Phase 6 (Snowflake Snapshots): Snapshot recording requires real Snowflake credentials — snapshots not yet recorded; run `pytest --override-ini="addopts=" -m snowflake --snapshot-update` to record
 
 ## Session Continuity
 
-Last session: 2026-02-24
-Stopped at: Completed 05-02-PLAN.md — create_pool() factory with ADBC source+clone pattern; Arrow cursor cleanup on reset event; public API exports (create_pool, PoolhouseError, ConfigurationError); 16 new tests; 86 total tests green; Phase 5 complete
+Last session: 2026-02-25
+Stopped at: Completed 06-01-PLAN.md — Snowflake syrupy snapshot infrastructure; SnowflakeArrowSnapshotSerializer; skip-on-no-creds fixtures; 2 integration tests; CONTRIBUTING.md; pyproject.toml marker config; Phase 6 complete
 Resume file: None

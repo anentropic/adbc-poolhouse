@@ -67,7 +67,7 @@ Isolates all type suppressions to dedicated internal modules.
 
 - [x] **TEST-01**: DuckDB end-to-end integration tests: pool creation, connection checkout, query execution, pool disposal (no credentials required)
 - [x] **TEST-02**: `DuckDBConfig(database=":memory:", pool_size=2)` raises `ValueError` (isolation validator test)
-- [ ] **TEST-03**: Snowflake `syrupy` snapshot tests with a custom `SnowflakeArrowSnapshotSerializer` that strips non-deterministic fields (`queryId`, timestamps, `elapsedTime`) before serialization — recorded locally with real credentials, replayed in CI against committed snapshots
+- [x] **TEST-03**: Snowflake `syrupy` snapshot tests with a custom `SnowflakeArrowSnapshotSerializer` that strips non-deterministic fields (`queryId`, timestamps, `elapsedTime`) before serialization — recorded locally with real credentials, replayed in CI against committed snapshots
 - [x] **TEST-04**: Unit tests for all config models: field validation, `SecretStr` handling, `env_prefix` isolation, `model_validator` behaviour
 - [x] **TEST-05**: Unit tests for all parameter translators: given a config instance, assert the exact ADBC kwargs dict produced
 - [x] **TEST-06**: Unit tests for driver detection with `unittest.mock.patch`: three paths — (a) PyPI package found via `find_spec`, (b) PyPI missing, Foundry path loaded via `adbc_driver_manager`, (c) both missing, correct `ImportError` with install instructions raised
@@ -158,7 +158,7 @@ Isolates all type suppressions to dedicated internal modules.
 | TEST-01 | Phase 5 | Complete |
 | TEST-02 | Phase 5 | Complete |
 | TEST-07 | Phase 5 | Complete |
-| TEST-03 | Phase 6 | Pending |
+| TEST-03 | Phase 6 | Complete |
 | TOOL-01 | Phase 7 | Pending |
 | TOOL-02 | Phase 7 | Pending |
 | DOCS-01 | Phase 7 | Pending |
