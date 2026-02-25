@@ -3,7 +3,7 @@
 **Defined:** 2026-02-23
 **Core Value:** One config in, one pool out — `create_pool(SnowflakeConfig(...))` returns a ready-to-use SQLAlchemy QueuePool in a single call.
 
-## v1 Requirements
+## v0.1 Requirements
 
 ### Setup
 
@@ -11,7 +11,7 @@ Pre-implementation fixes and dependency declarations.
 
 - [x] **SETUP-01**: Fix `pythonVersion = "3.14"` to `"3.11"` in `[tool.basedpyright]` section of `pyproject.toml`
 - [x] **SETUP-02**: Add runtime dependencies to `pyproject.toml`: `pydantic-settings>=2.0.0`, `sqlalchemy>=2.0.0`, `adbc-driver-manager>=1.0.0` (open lower bounds only — no upper bound caps; tight `<Y` bounds cause unnecessary consumer dep conflicts for common transitive deps)
-- [x] **SETUP-03**: Add per-warehouse optional extras for PyPI-available drivers only: `[duckdb]` (via `duckdb>=0.9.1` package — `adbc_driver_duckdb` is bundled inside the `duckdb` wheel since 0.9.1), `[snowflake]`, `[bigquery]`, `[postgresql]`, `[flightsql]`, `[all]`. Foundry-distributed backends (Databricks, Redshift, Trino, MSSQL) are NOT given extras in v1 — those drivers are not on PyPI and will be documented in Phase 7.
+- [x] **SETUP-03**: Add per-warehouse optional extras for PyPI-available drivers only: `[duckdb]` (via `duckdb>=0.9.1` package — `adbc_driver_duckdb` is bundled inside the `duckdb` wheel since 0.9.1), `[snowflake]`, `[bigquery]`, `[postgresql]`, `[flightsql]`, `[all]`. Foundry-distributed backends (Databricks, Redshift, Trino, MSSQL) are NOT given extras in v0.1 — those drivers are not on PyPI and will be documented in Phase 7.
 - [x] **SETUP-04**: Add `syrupy>=4.0` and `coverage[toml]` to dev dependencies (`unittest.mock` is stdlib — no additional mock dependency needed)
 - [x] **SETUP-05**: Add `detect-secrets` to `.pre-commit-config.yaml` (must be active before any Snowflake snapshot commits)
 
@@ -102,7 +102,7 @@ Isolates all type suppressions to dedicated internal modules.
 
 ### Warehouses
 
-- **WARE-V2-01**: BigQuery Foundry driver variant (currently available as both Apache and Foundry; Apache in v1, Foundry variant deferred)
+- **WARE-V2-01**: BigQuery Foundry driver variant (currently available as both Apache and Foundry; Apache in v0.1, Foundry variant deferred)
 
 ---
 
@@ -170,7 +170,7 @@ Isolates all type suppressions to dedicated internal modules.
 | DIST-03 | Phase 7 | Pending |
 
 **Coverage:**
-- v1 requirements: 44 total
+- v0.1 requirements: 44 total
 - Mapped to phases: 44
 - Unmapped: 0
 
