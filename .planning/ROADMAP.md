@@ -113,7 +113,10 @@ Plans:
   1. Snowflake integration tests pass in CI by replaying committed snapshots — no Snowflake credentials required in CI
   2. Snapshot files contain no credential residue (no account identifiers, usernames, or tokens visible in committed snapshot data)
   3. `SnowflakeArrowSnapshotSerializer` strips `queryId`, timestamps, and `elapsedTime` before serialization — snapshot update with a new Snowflake account produces identical snapshot content (non-deterministic fields absent)
-**Plans**: TBD
+**Plans**: 1 plan
+
+Plans:
+- [ ] 06-01-PLAN.md — SnowflakeArrowSnapshotSerializer + conftest fixtures + integration tests + CONTRIBUTING.md recording workflow
 
 ### Phase 7: Documentation and PyPI Publication
 **Goal**: The library is documented, pip-installable, and live on PyPI — and the docs-author skill + CLAUDE.md quality gate are in place so all future phases keep documentation current as a completion requirement
@@ -154,5 +157,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | 3. Config Layer | 7/7 | Complete   | 2026-02-24 |
 | 4. Translation and Driver Detection | 5/5 | Complete   | 2026-02-24 |
 | 5. Pool Factory and DuckDB Integration | 2/2 | Complete   | 2026-02-24 |
-| 6. Snowflake Integration | 0/TBD | Not started | - |
+| 6. Snowflake Integration | 0/1 | Not started | - |
 | 7. Documentation and PyPI Publication | 0/TBD | Not started | - |
