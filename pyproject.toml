@@ -52,6 +52,12 @@ docs = [
     "mkdocs-section-index>=0.3.0",
 ]
 
+[tool.pytest.ini_options]
+markers = [
+    "snowflake: requires real Snowflake credentials (use pytest --override-ini='addopts=' -m snowflake to run)",
+]
+addopts = "-m 'not snowflake'"
+
 [tool.basedpyright]
 pythonVersion = "3.11"
 typeCheckingMode = "strict"

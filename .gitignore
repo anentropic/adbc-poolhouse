@@ -139,6 +139,9 @@ celerybeat.pid
 # Environments
 .env
 .envrc
+# Snowflake credentials (never commit)
+.env.snowflake
+*.env.snowflake
 .venv
 env/
 venv/
