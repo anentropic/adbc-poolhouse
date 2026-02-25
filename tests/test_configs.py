@@ -15,7 +15,6 @@ from adbc_poolhouse import (
     PostgreSQLConfig,
     RedshiftConfig,
     SnowflakeConfig,
-    TeradataConfig,
     TrinoConfig,
     WarehouseConfig,
 )
@@ -149,7 +148,7 @@ class TestApacheBackendConfigs:
 
 
 class TestFoundryBackendConfigs:
-    """Smoke tests for Databricks, Redshift, Trino, MSSQL, Teradata."""
+    """Smoke tests for Databricks, Redshift, Trino, MSSQL."""
 
     def test_databricks_default_construction(self) -> None:
         db = DatabricksConfig()
@@ -178,8 +177,3 @@ class TestFoundryBackendConfigs:
         m = MSSQLConfig()
         assert m.trust_server_certificate is False
         assert isinstance(m, WarehouseConfig)
-
-    def test_teradata_default_construction(self) -> None:
-        td = TeradataConfig()
-        assert td.host is None
-        assert isinstance(td, WarehouseConfig)

@@ -39,7 +39,6 @@ from adbc_poolhouse._mssql_config import MSSQLConfig
 from adbc_poolhouse._postgresql_config import PostgreSQLConfig
 from adbc_poolhouse._redshift_config import RedshiftConfig
 from adbc_poolhouse._snowflake_config import SnowflakeConfig
-from adbc_poolhouse._teradata_config import TeradataConfig
 from adbc_poolhouse._trino_config import TrinoConfig
 
 if TYPE_CHECKING:
@@ -63,7 +62,6 @@ _FOUNDRY_DRIVERS: dict[type, tuple[str, str]] = {
     RedshiftConfig: ("redshift", "redshift"),
     TrinoConfig: ("trino", "trino"),
     MSSQLConfig: ("mssql", "mssql"),
-    TeradataConfig: ("teradata", "teradata"),  # LOW confidence name
 }
 
 

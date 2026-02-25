@@ -28,8 +28,6 @@ from adbc_poolhouse._redshift_config import RedshiftConfig
 from adbc_poolhouse._redshift_translator import translate_redshift
 from adbc_poolhouse._snowflake_config import SnowflakeConfig
 from adbc_poolhouse._snowflake_translator import translate_snowflake
-from adbc_poolhouse._teradata_config import TeradataConfig
-from adbc_poolhouse._teradata_translator import translate_teradata
 from adbc_poolhouse._translators import translate_config
 from adbc_poolhouse._trino_config import TrinoConfig
 from adbc_poolhouse._trino_translator import translate_trino
@@ -251,26 +249,6 @@ class TestMSSQLTranslator:
         """Uri set → URI-first: returns only {'uri': ...}, ignores decomposed fields."""
         result = translate_mssql(MSSQLConfig(uri="mssql://host/db"))
         assert result == {"uri": "mssql://host/db"}
-
-
-class TestTeradataTranslator:
-    """
-    Unit tests for translate_teradata().
-
-    # LOW confidence — TeradataConfig fields triangulated from non-authoritative sources
-    (Teradata JDBC and teradatasql Python driver docs; Columnar ADBC Teradata driver
-    docs returned 404 at research time).
-    """
-
-    def test_no_uri_no_host_empty(self) -> None:
-        """TeradataConfig() with no fields → empty dict (all fields Optional)."""
-        result = translate_teradata(TeradataConfig())
-        assert result == {}
-
-    def test_host_included(self) -> None:
-        """Host set → maps to 'host' key (LOW confidence key name)."""
-        result = translate_teradata(TeradataConfig(host="td-host.example.com"))
-        assert result["host"] == "td-host.example.com"
 
 
 class TestTranslateConfig:

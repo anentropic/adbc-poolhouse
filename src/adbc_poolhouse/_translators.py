@@ -2,7 +2,7 @@
 Translate any warehouse config to ADBC driver kwargs.
 
 This module is the dispatch coordinator for Phase 4. It imports all
-10 per-warehouse translator functions and exposes a single
+9 per-warehouse translator functions and exposes a single
 ``translate_config()`` entry point for Phase 5.
 
 Internal only — not exported from ``__init__.py``.
@@ -28,8 +28,6 @@ from adbc_poolhouse._redshift_config import RedshiftConfig
 from adbc_poolhouse._redshift_translator import translate_redshift
 from adbc_poolhouse._snowflake_config import SnowflakeConfig
 from adbc_poolhouse._snowflake_translator import translate_snowflake
-from adbc_poolhouse._teradata_config import TeradataConfig
-from adbc_poolhouse._teradata_translator import translate_teradata
 from adbc_poolhouse._trino_config import TrinoConfig
 from adbc_poolhouse._trino_translator import translate_trino
 
@@ -69,8 +67,6 @@ def translate_config(config: WarehouseConfig) -> dict[str, str]:
         return translate_redshift(config)
     if isinstance(config, SnowflakeConfig):
         return translate_snowflake(config)
-    if isinstance(config, TeradataConfig):
-        return translate_teradata(config)
     if isinstance(config, TrinoConfig):
         return translate_trino(config)
     raise TypeError(f"Unsupported config type: {type(config).__name__}")

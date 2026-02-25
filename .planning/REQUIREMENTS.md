@@ -11,7 +11,7 @@ Pre-implementation fixes and dependency declarations.
 
 - [x] **SETUP-01**: Fix `pythonVersion = "3.14"` to `"3.11"` in `[tool.basedpyright]` section of `pyproject.toml`
 - [x] **SETUP-02**: Add runtime dependencies to `pyproject.toml`: `pydantic-settings>=2.0.0`, `sqlalchemy>=2.0.0`, `adbc-driver-manager>=1.0.0` (open lower bounds only — no upper bound caps; tight `<Y` bounds cause unnecessary consumer dep conflicts for common transitive deps)
-- [x] **SETUP-03**: Add per-warehouse optional extras for PyPI-available drivers only: `[duckdb]` (via `duckdb>=0.9.1` package — `adbc_driver_duckdb` is bundled inside the `duckdb` wheel since 0.9.1), `[snowflake]`, `[bigquery]`, `[postgresql]`, `[flightsql]`, `[all]`. Foundry-distributed backends (Databricks, Redshift, Trino, MSSQL, Teradata) are NOT given extras in v1 — those drivers are not on PyPI and will be documented in Phase 7.
+- [x] **SETUP-03**: Add per-warehouse optional extras for PyPI-available drivers only: `[duckdb]` (via `duckdb>=0.9.1` package — `adbc_driver_duckdb` is bundled inside the `duckdb` wheel since 0.9.1), `[snowflake]`, `[bigquery]`, `[postgresql]`, `[flightsql]`, `[all]`. Foundry-distributed backends (Databricks, Redshift, Trino, MSSQL) are NOT given extras in v1 — those drivers are not on PyPI and will be documented in Phase 7.
 - [x] **SETUP-04**: Add `syrupy>=4.0` and `coverage[toml]` to dev dependencies (`unittest.mock` is stdlib — no additional mock dependency needed)
 - [x] **SETUP-05**: Add `detect-secrets` to `.pre-commit-config.yaml` (must be active before any Snowflake snapshot commits)
 
@@ -24,7 +24,7 @@ Typed, validated, environment-variable-friendly warehouse configuration models.
 - [x] **CFG-03**: `SnowflakeConfig` — Pydantic `BaseSettings` subclass covering all auth methods supported by the installed `adbc-driver-snowflake` (verify against driver source, do not guess); `env_prefix="SNOWFLAKE_"`
 - [x] **CFG-04**: `SnowflakeConfig` private key: separate `private_key_path: Path | None` and `private_key_pem: SecretStr | None` fields with a mutual exclusivity validator (a plain `str` field is ambiguous between a file path and PEM content)
 - [x] **CFG-05**: Config models for all remaining Apache ADBC backends: `BigQueryConfig`, `PostgreSQLConfig`, `FlightSQLConfig` — each a `BaseSettings` subclass with appropriate `env_prefix`, fields verified against driver docs/source
-- [x] **CFG-06**: Config models for all Foundry-distributed backends: `DatabricksConfig`, `RedshiftConfig`, `TrinoConfig`, `MSSQLConfig` (covering Fabric/Synapse variants), `TeradataConfig` — each a `BaseSettings` subclass with appropriate `env_prefix`, fields verified against driver docs/source
+- [x] **CFG-06**: Config models for all Foundry-distributed backends: `DatabricksConfig`, `RedshiftConfig`, `TrinoConfig`, `MSSQLConfig` (covering Fabric/Synapse variants) — each a `BaseSettings` subclass with appropriate `env_prefix`, fields verified against driver docs/source
 - [x] **CFG-07**: All config models: consumer can pass pool tuning kwargs (`pool_size`, `max_overflow`, `timeout`, `recycle`) directly on the config model as optional fields with the library's defaults
 
 ### Translation Layer
@@ -34,7 +34,7 @@ Maps config model fields to ADBC driver kwargs for `adbc_driver_manager.dbapi.co
 - [x] **TRANS-01**: Translator for `DuckDBConfig` → DuckDB ADBC driver kwargs
 - [x] **TRANS-02**: Translator for `SnowflakeConfig` → Snowflake ADBC driver kwargs (all auth methods produce correct kwargs)
 - [x] **TRANS-03**: Translators for all remaining Apache backends (`BigQueryConfig`, `PostgreSQLConfig`, `FlightSQLConfig`)
-- [x] **TRANS-04**: Translators for all Foundry backends (`DatabricksConfig`, `RedshiftConfig`, `TrinoConfig`, `MSSQLConfig`, `TeradataConfig`)
+- [x] **TRANS-04**: Translators for all Foundry backends (`DatabricksConfig`, `RedshiftConfig`, `TrinoConfig`, `MSSQLConfig`)
 - [x] **TRANS-05**: All translators are pure functions with no ADBC driver imports (importable even when the target driver is not installed)
 
 ### Driver Detection

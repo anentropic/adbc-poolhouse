@@ -11,7 +11,6 @@ from adbc_poolhouse._pool_factory import create_pool
 from adbc_poolhouse._postgresql_config import PostgreSQLConfig
 from adbc_poolhouse._redshift_config import RedshiftConfig
 from adbc_poolhouse._snowflake_config import SnowflakeConfig
-from adbc_poolhouse._teradata_config import TeradataConfig
 from adbc_poolhouse._trino_config import TrinoConfig
 
 __all__ = [
@@ -27,7 +26,6 @@ __all__ = [
     "PostgreSQLConfig",
     "RedshiftConfig",
     "SnowflakeConfig",
-    "TeradataConfig",
     "TrinoConfig",
     "create_pool",
 ]

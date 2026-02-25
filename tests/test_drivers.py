@@ -24,7 +24,6 @@ from adbc_poolhouse._drivers import resolve_driver
 from adbc_poolhouse._duckdb_config import DuckDBConfig
 from adbc_poolhouse._redshift_config import RedshiftConfig
 from adbc_poolhouse._snowflake_config import SnowflakeConfig
-from adbc_poolhouse._teradata_config import TeradataConfig
 
 
 class TestResolveDuckDB:
@@ -95,14 +94,6 @@ class TestResolveFoundryDriver:
             result = resolve_driver(RedshiftConfig())
         mock_find.assert_not_called()
         assert result == "redshift"
-
-    def test_teradata_returns_short_name(self) -> None:
-        """Foundry: Teradata returns 'teradata' (LOW confidence driver name)."""
-        # LOW confidence: driver name 'teradata' inferred from pattern
-        with patch("importlib.util.find_spec") as mock_find:
-            result = resolve_driver(TeradataConfig())
-        mock_find.assert_not_called()
-        assert result == "teradata"
 
 
 class TestResolveDriverEdgeCases:
