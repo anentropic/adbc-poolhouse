@@ -128,7 +128,14 @@ Plans:
   3. The quickstart guide produces a working DuckDB pool in a fresh virtualenv following the documented steps exactly
   4. The release workflow generates a changelog via `git-cliff` and validates `py.typed` presence in the wheel before publishing
   5. The docs-author skill exists at `.claude/skills/adbc-poolhouse-docs-author/SKILL.md` and `CLAUDE.md` instructs plan-phase to include it for all plans in phases ≥ 7 (documentation is a quality gate, not an optional task)
-**Plans**: TBD
+**Plans**: 5 plans
+
+Plans:
+- [ ] 07-01-PLAN.md — Create docs-author skill (TOOL-01) + CLAUDE.md quality gate (TOOL-02)
+- [ ] 07-02-PLAN.md — Google-style docstrings on all public classes and exception hierarchy (DOCS-01)
+- [ ] 07-03-PLAN.md — Write all guide pages, quickstart, changelog placeholder, restructure mkdocs.yml nav (DOCS-02, DOCS-03, DOCS-04)
+- [ ] 07-04-PLAN.md — Fix release.yml bugs, add TestPyPI + smoke-test + deploy-docs jobs (DIST-02, DIST-03)
+- [ ] 07-05-PLAN.md — Final integration verification + human registers PyPI OIDC trusted publishers (DIST-01)
 
 ## Quality Gates
 
@@ -158,4 +165,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | 4. Translation and Driver Detection | 5/5 | Complete   | 2026-02-24 |
 | 5. Pool Factory and DuckDB Integration | 2/2 | Complete   | 2026-02-24 |
 | 6. Snowflake Integration | 0/1 | Not started | - |
-| 7. Documentation and PyPI Publication | 0/TBD | Not started | - |
+| 7. Documentation and PyPI Publication | 0/5 | Not started | - |
