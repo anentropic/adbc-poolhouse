@@ -17,9 +17,16 @@ class WarehouseConfig(Protocol):
     """
 
     pool_size: int
+    """Number of connections to keep open in the pool."""
+
     max_overflow: int
+    """Connections allowed above pool_size when the pool is exhausted."""
+
     timeout: int
+    """Seconds to wait for a connection before raising TimeoutError."""
+
     recycle: int
+    """Seconds before a connection is closed and replaced."""
 
     def _adbc_entrypoint(self) -> str | None: ...
 
@@ -37,9 +44,16 @@ class BaseWarehouseConfig(BaseSettings):
     """
 
     pool_size: int = 5
+    """Number of connections to keep open in the pool. Default: 5."""
+
     max_overflow: int = 3
+    """Connections allowed above pool_size when pool is exhausted. Default: 3."""
+
     timeout: int = 30
+    """Seconds to wait for a connection before raising TimeoutError. Default: 30."""
+
     recycle: int = 3600
+    """Seconds before a connection is closed and replaced. Default: 3600."""
 
     def _adbc_entrypoint(self) -> str | None:
         """

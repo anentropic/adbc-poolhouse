@@ -22,7 +22,7 @@ class MSSQLConfig(BaseWarehouseConfig):
     Pool tuning fields are inherited and loaded from MSSQL_* env vars.
 
     Note: This driver is distributed via the ADBC Driver Foundry, not PyPI.
-    See project Phase 7 documentation for Foundry installation instructions.
+    See the installation guide for Foundry setup instructions.
     """
 
     model_config = SettingsConfigDict(env_prefix="MSSQL_")
