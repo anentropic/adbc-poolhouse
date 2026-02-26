@@ -76,9 +76,9 @@ Isolates all type suppressions to dedicated internal modules.
 ### Documentation
 
 - [x] **DOCS-01**: API reference auto-generated via `mkdocstrings` — all public symbols documented with Google-style docstrings
-- [ ] **DOCS-02**: Quickstart guide — install + first working pool in under 5 minutes
-- [ ] **DOCS-03**: Consumer patterns — two complete examples: (a) Semantic ORM direct config pattern, (b) dbt-open-sl profiles.yml shim pattern
-- [ ] **DOCS-04**: Pool lifecycle guide — when and how to call `pool.dispose()`, fixture teardown pattern for tests, common mistake examples
+- [x] **DOCS-02**: Quickstart guide — install + first working pool in under 5 minutes
+- [x] **DOCS-03**: Consumer patterns — two complete examples: (a) Semantic ORM direct config pattern, (b) dbt-open-sl profiles.yml shim pattern
+- [x] **DOCS-04**: Pool lifecycle guide — when and how to call `pool.dispose()`, fixture teardown pattern for tests, common mistake examples
 
 ### Distribution
 
@@ -162,9 +162,9 @@ Isolates all type suppressions to dedicated internal modules.
 | TOOL-01 | Phase 7 | Complete |
 | TOOL-02 | Phase 7 | Complete |
 | DOCS-01 | Phase 7 | Complete |
-| DOCS-02 | Phase 7 | Pending |
-| DOCS-03 | Phase 7 | Pending |
-| DOCS-04 | Phase 7 | Pending |
+| DOCS-02 | Phase 7 | Complete |
+| DOCS-03 | Phase 7 | Complete |
+| DOCS-04 | Phase 7 | Complete |
 | DIST-01 | Phase 7 | Pending |
 | DIST-02 | Phase 7 | Complete |
 | DIST-03 | Phase 7 | Complete |
