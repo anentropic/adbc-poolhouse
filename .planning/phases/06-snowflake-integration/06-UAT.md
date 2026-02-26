@@ -1,5 +1,5 @@
 ---
-status: complete
+status: diagnosed
 phase: 06-snowflake-integration
 source: [06-01-SUMMARY.md]
 started: 2026-02-25T16:10:00Z
@@ -49,9 +49,13 @@ skipped: 0
 ## Gaps
 
 - truth: "Running `pytest --collect-only -q | grep snowflake` shows test_connection_health and test_arrow_round_trip as collected items"
-  status: failed
+  status: resolved
   reason: "User reported: saw only unit tests with snowflake in the name (test_drivers, test_translators) — integration tests not visible"
   severity: minor
   test: 2
-  artifacts: []
-  missing: []
+  root_cause: "addopts = \"-m 'not snowflake'\" applies to all pytest invocations including --collect-only, so @pytest.mark.snowflake tests are deselected before output is printed — expected pytest behavior, not a bug"
+  artifacts:
+    - path: "pyproject.toml"
+      issue: "marker description did not document the --override-ini='addopts=' workaround"
+  missing:
+    - "Updated marker description string to include both run and list commands"

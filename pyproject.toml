@@ -54,7 +54,7 @@ docs = [
 
 [tool.pytest.ini_options]
 markers = [
-    "snowflake: requires real Snowflake credentials (use pytest --override-ini='addopts=' -m snowflake to run)",
+    "snowflake: requires real Snowflake credentials (run: pytest --override-ini='addopts=' -m snowflake; list: pytest --collect-only --override-ini='addopts=')",
 ]
 addopts = "-m 'not snowflake'"
 
