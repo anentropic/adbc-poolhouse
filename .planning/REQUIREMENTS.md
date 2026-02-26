@@ -88,8 +88,8 @@ Isolates all type suppressions to dedicated internal modules.
 
 ### Project Tooling
 
-- [ ] **TOOL-01**: Project-specific docs writing skill at `.claude/skills/adbc-poolhouse-docs-author/SKILL.md` — adapted from the cubano docs author skill (content TBD before docs phase begins)
-- [ ] **TOOL-02**: `CLAUDE.md` instruction: for all plans in phases ≥ 7 (not only plans labelled as documentation tasks), include `@.claude/skills/adbc-poolhouse-docs-author/SKILL.md` in `<execution_context>` — documentation is a quality gate for every phase from Phase 7 onwards
+- [x] **TOOL-01**: Project-specific docs writing skill at `.claude/skills/adbc-poolhouse-docs-author/SKILL.md` — adapted from the cubano docs author skill (content TBD before docs phase begins)
+- [x] **TOOL-02**: `CLAUDE.md` instruction: for all plans in phases ≥ 7 (not only plans labelled as documentation tasks), include `@.claude/skills/adbc-poolhouse-docs-author/SKILL.md` in `<execution_context>` — documentation is a quality gate for every phase from Phase 7 onwards
 
 ---
 
@@ -159,8 +159,8 @@ Isolates all type suppressions to dedicated internal modules.
 | TEST-02 | Phase 5 | Complete |
 | TEST-07 | Phase 5 | Complete |
 | TEST-03 | Phase 6 | Complete |
-| TOOL-01 | Phase 7 | Pending |
-| TOOL-02 | Phase 7 | Pending |
+| TOOL-01 | Phase 7 | Complete |
+| TOOL-02 | Phase 7 | Complete |
 | DOCS-01 | Phase 7 | Pending |
 | DOCS-02 | Phase 7 | Pending |
 | DOCS-03 | Phase 7 | Pending |
