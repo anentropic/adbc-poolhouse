@@ -47,7 +47,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.11", "3.14"]
+        python-version: ["3.11", "3.12"]
     steps:
       - name: Set up uv
         uses: astral-sh/setup-uv@v7
@@ -64,7 +64,7 @@ jobs:
         run: |
           uv venv --python ${{ matrix.python-version }} test-env-wheel
           uv pip install --python test-env-wheel/bin/python dist/*.whl
-          test-env-wheel/bin/python -c "import {{ cookiecutter.package_name }}; print('Wheel installation OK')"
+          test-env-wheel/bin/python -c "import adbc_poolhouse; print('Wheel installation OK')"
 
       - name: Test sdist installation
         run: |
@@ -75,6 +75,16 @@ jobs:
       - name: Check py.typed marker in wheel
         run: |
           unzip -l dist/*.whl | grep "adbc_poolhouse/py.typed" || (echo "ERROR: py.typed marker missing" && exit 1)
+
+      - name: Check wheel version matches git tag
+        run: |
+          WHEEL_VERSION=$(unzip -p dist/*.whl "*/METADATA" | grep "^Version:" | cut -d' ' -f2)
+          TAG_VERSION=${GITHUB_REF_NAME#v}
+          if [ "$WHEEL_VERSION" != "$TAG_VERSION" ]; then
+            echo "ERROR: Wheel version ($WHEEL_VERSION) does not match git tag ($TAG_VERSION)"
+            exit 1
+          fi
+          echo "Version check OK: $WHEEL_VERSION"
 
   changelog:
     name: Generate changelog
@@ -100,9 +110,51 @@ jobs:
           name: changelog
           path: CHANGELOG.md
 
-  publish:
-    name: Publish to PyPI
+  publish-testpypi:
+    name: Publish to TestPyPI
     needs: [validate, changelog]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: testpypi
+      url: https://test.pypi.org/p/adbc-poolhouse
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Download distributions
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - name: Publish to TestPyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+
+  smoke-test-testpypi:
+    name: Smoke-test from TestPyPI
+    needs: [publish-testpypi]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: false
+      - name: Install from TestPyPI and smoke-test
+        run: |
+          uv venv smoke-env
+          uv pip install \
+            --python smoke-env/bin/python \
+            --index-url https://test.pypi.org/simple/ \
+            --extra-index-url https://pypi.org/simple/ \
+            adbc-poolhouse
+          smoke-env/bin/python -c "from adbc_poolhouse import create_pool, DuckDBConfig; print('TestPyPI smoke OK')"
+
+  publish-pypi:
+    name: Publish to PyPI
+    needs: [smoke-test-testpypi]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     environment:
@@ -120,3 +172,40 @@ jobs:
 
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
+
+  deploy-docs:
+    name: Deploy docs to GitHub Pages
+    needs: [publish-pypi]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    concurrency:
+      group: docs-deploy
+      cancel-in-progress: true
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+      - name: Sync docs dependencies
+        run: uv sync --locked --group docs
+      - name: Build docs
+        run: uv run mkdocs build --strict
+      - name: Upload pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site/
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
