@@ -23,7 +23,7 @@ class PostgreSQLConfig(BaseWarehouseConfig):
 
     uri: str | None = None
     """libpq connection URI. Env: POSTGRESQL_URI.
-    Format: postgresql://[user[:password]@][host][:port][/dbname][?params]"""
+    Format: ``postgresql://[user[:password]@][host][:port][/dbname][?params]``"""
 
     use_copy: bool = True
     """Use PostgreSQL COPY protocol for bulk query execution (driver default:

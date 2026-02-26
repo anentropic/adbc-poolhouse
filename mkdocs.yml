@@ -86,6 +86,11 @@ markdown_extensions:
       permalink: true
 
 nav:
-  - Home: index.md
+  - Getting Started: index.md
+  - Guides:
+    - Pool Lifecycle: guides/pool-lifecycle.md
+    - Consumer Patterns: guides/consumer-patterns.md
+    - Configuration Reference: guides/configuration.md
+    - Snowflake Guide: guides/snowflake.md
   - API Reference: reference/
   - Changelog: changelog.md

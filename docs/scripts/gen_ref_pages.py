@@ -16,9 +16,23 @@ def main():
 
         parts = tuple(module_path.parts)
 
-        # Skip __init__, __main__, conftest, and private modules
-        if parts[-1] in ("__init__", "__main__", "conftest"):
+        # Include the top-level package __init__ as the main API reference page.
+        # All other __init__, __main__, and conftest files are skipped.
+        if parts[-1] in ("__main__", "conftest"):
             continue
+        if parts[-1] == "__init__":
+            if len(parts) == 2:  # e.g. ("adbc_poolhouse", "__init__")
+                # Generate a reference page for the top-level package
+                pkg_parts = parts[:-1]  # ("adbc_poolhouse",)
+                pkg_doc_path = Path(*pkg_parts).with_suffix(".md")
+                full_pkg_doc_path = Path("reference", pkg_doc_path)
+                nav[pkg_parts] = pkg_doc_path.as_posix()
+                with mkdocs_gen_files.open(full_pkg_doc_path, "w") as fd:
+                    ident = ".".join(pkg_parts)
+                    fd.write(f"# `{ident}`\n\n::: {ident}\n")
+                mkdocs_gen_files.set_edit_path(full_pkg_doc_path, path)
+            continue
+
         if any(part.startswith("_") for part in parts):
             continue
 

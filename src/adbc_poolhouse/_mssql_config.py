@@ -28,8 +28,8 @@ class MSSQLConfig(BaseWarehouseConfig):
     model_config = SettingsConfigDict(env_prefix="MSSQL_")
 
     uri: str | None = None
-    """Connection URI: mssql://user:pass@host[:port][/instance][?params]  # pragma: allowlist secret
-    Also accepts sqlserver:// scheme. Env: MSSQL_URI."""
+    """Connection URI. Format: ``mssql://user:pass@host[:port][/instance][?params]``  # pragma: allowlist secret
+    Also accepts the ``sqlserver://`` scheme. Env: MSSQL_URI."""  # noqa: E501
 
     host: str | None = None
     """Hostname or IP address. Alternative to URI-based connection.

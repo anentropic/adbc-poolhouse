@@ -24,7 +24,7 @@ class TrinoConfig(BaseWarehouseConfig):
     model_config = SettingsConfigDict(env_prefix="TRINO_")
 
     uri: str | None = None
-    """Connection URI: trino://[user[:password]@]host[:port][/catalog[/schema]][?params]
+    """Connection URI. Format: ``trino://[user[:password]@]host[:port][/catalog[/schema]][?params]``
     Env: TRINO_URI."""
 
     host: str | None = None
