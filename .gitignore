@@ -158,6 +158,8 @@ venv.bak/
 
 # mkdocs documentation
 /site
+# gen-files plugin generates these at build time (virtual filesystem artifacts)
+docs/src/reference/
 
 # mypy
 .mypy_cache/
