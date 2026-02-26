@@ -83,8 +83,8 @@ Isolates all type suppressions to dedicated internal modules.
 ### Distribution
 
 - [ ] **DIST-01**: PyPI publication via OIDC trusted publisher — register on PyPI before first release using exact workflow filename
-- [ ] **DIST-02**: Release workflow validates `py.typed` presence in built wheel (`zipinfo dist/*.whl | grep py.typed`)
-- [ ] **DIST-03**: Release workflow generates changelog via `git-cliff` (`.cliff.toml` already present)
+- [x] **DIST-02**: Release workflow validates `py.typed` presence in built wheel (`zipinfo dist/*.whl | grep py.typed`)
+- [x] **DIST-03**: Release workflow generates changelog via `git-cliff` (`.cliff.toml` already present)
 
 ### Project Tooling
 
@@ -166,8 +166,8 @@ Isolates all type suppressions to dedicated internal modules.
 | DOCS-03 | Phase 7 | Pending |
 | DOCS-04 | Phase 7 | Pending |
 | DIST-01 | Phase 7 | Pending |
-| DIST-02 | Phase 7 | Pending |
-| DIST-03 | Phase 7 | Pending |
+| DIST-02 | Phase 7 | Complete |
+| DIST-03 | Phase 7 | Complete |
 
 **Coverage:**
 - v0.1 requirements: 44 total
