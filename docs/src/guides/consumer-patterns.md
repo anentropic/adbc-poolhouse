@@ -1,6 +1,6 @@
 # Consumer patterns
 
-Two patterns for integrating adbc-poolhouse into an application: FastAPI with SQLAlchemy ORM, and loading credentials from a dbt profiles file.
+Patterns for integrating adbc-poolhouse into an application.
 
 ## FastAPI with SQLAlchemy ORM
 
@@ -40,36 +40,45 @@ engine = create_engine("duckdb://", creator=pool.connect, poolclass=NullPool)
 
 For Snowflake or other warehouses, replace `DuckDBConfig` with the matching config class. The lifespan pattern is the same.
 
-## dbt profiles.yml shim
+## Loading credentials from dbt
 
-If your project already has a dbt `profiles.yml`, you can read credentials from it directly and build the matching adbc-poolhouse config. This avoids duplicating connection details.
+If your project has a dbt `profiles.yml`, you can load credentials from it using dbt-core's profile API. This handles Jinja templating — including `env_var()` calls — so it works correctly where plain YAML parsing would not.
 
 ```python
-import yaml
-from pathlib import Path
+from dbt.config.profile import Profile, read_profile
+from dbt.config.renderer import ProfileRenderer
 from adbc_poolhouse import SnowflakeConfig, create_pool
 
-# Load dbt profile
-profiles_path = Path.home() / ".dbt" / "profiles.yml"
-with profiles_path.open() as f:
-    profiles = yaml.safe_load(f)
+raw_profiles = read_profile("~/.dbt")
+renderer = ProfileRenderer(cli_vars={})
 
-creds = profiles["my_project"]["outputs"]["dev"]
+profile = Profile.from_raw_profiles(
+    raw_profiles=raw_profiles,
+    profile_name="my_project",  # matches `profile:` in dbt_project.yml
+    renderer=renderer,
+    target_override="dev",  # None uses the profile's default target
+)
+
+creds = profile.credentials  # SnowflakeCredentials, Jinja already resolved
 
 config = SnowflakeConfig(
-    account=creds["account"],
-    user=creds["user"],
-    password=creds["password"],
-    database=creds["database"],
-    schema_=creds["schema"],
+    account=creds.account,
+    user=creds.user,
+    password=creds.password,
+    database=creds.database,
+    schema_=creds.schema,
+    warehouse=creds.warehouse,
+    role=creds.role,
 )
 pool = create_pool(config)
 ```
 
-This requires `pyyaml`, which is not bundled with adbc-poolhouse. Install it separately:
+`Profile.from_raw_profiles` is available in dbt-core 1.0 and later. It is part of dbt-core's internal API, not a documented public contract, but it has been stable across the 1.x series.
 
 ```bash
-pip install pyyaml
+pip install dbt-core
+# or install your adapter, which pulls in dbt-core:
+pip install dbt-snowflake
 ```
 
 For production deployments, load credentials from environment variables instead of from the profiles file. `SnowflakeConfig` reads all fields from environment variables using the `SNOWFLAKE_` prefix — see [Configuration reference](configuration.md) for details.

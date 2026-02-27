@@ -99,13 +99,7 @@ export SNOWFLAKE_DATABASE=MY_DB
 config = SnowflakeConfig()  # reads from env
 ```
 
-## Snapshot testing in CI
-
-Snowflake tests use [Syrupy](https://github.com/syrupy-project/syrupy) snapshots. Real credentials are required to record snapshots locally; the recorded snapshots are committed to the repository and replayed in CI without credentials.
-
-To record snapshots, see the workflow in [CONTRIBUTING.md](https://github.com/anentropic/adbc-poolhouse/blob/main/CONTRIBUTING.md).
-
 ## See also
 
 - [Configuration reference](configuration.md) — env_prefix, pool tuning, secret fields
-- [Consumer patterns](consumer-patterns.md) — dbt profiles.yml shim pattern
+- [Consumer patterns](consumer-patterns.md) — dbt profile integration
