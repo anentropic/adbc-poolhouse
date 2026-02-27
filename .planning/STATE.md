@@ -25,7 +25,7 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 Phase: 7 of 7 (Documentation and PyPI Publication) - In Progress
 Plan: 07-06 (next — release tag push)
 Status: Plan 07-05 complete (integration verification passed + OIDC trusted publishers registered on PyPI and TestPyPI); ready for 07-06
-Last activity: 2026-02-27 — Plan 07-05 complete (DIST-01 satisfied: trusted publishers registered; GitHub environments and Pages configured)
+Last activity: 2026-02-27 - Completed quick task 1: check (with `gh run list` and related commands) and fix CI failures
 
 Progress: [███░░░░░░░] 30%
 
@@ -129,6 +129,12 @@ Recent decisions affecting current work:
 ### Pending Todos
 
 None yet.
+
+### Quick Tasks Completed
+
+| # | Description | Date | Commit | Status | Directory |
+|---|-------------|------|--------|--------|-----------|
+| 1 | check (with `gh run list` and related commands) and fix CI failures | 2026-02-27 | 50db351 | Needs Review | [1-check-with-gh-run-list-and-related-comma](.planning/quick/1-check-with-gh-run-list-and-related-comma/) |
 
 ### Blockers/Concerns
 
