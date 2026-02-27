@@ -16,16 +16,19 @@ requires:
 provides:
   - Integration verification confirming all Phase 7 plans build cleanly together
   - docs/src/reference/ added to .gitignore (gen-files virtual filesystem artifacts)
-  - PyPI and TestPyPI OIDC trusted publisher registration (human-action gate — pending)
+  - PyPI and TestPyPI OIDC trusted publishers registered (DIST-01 complete)
+  - GitHub environments pypi and testpypi configured
+  - GitHub Pages source set to GitHub Actions
 
 affects:
-  - 07-06 (release tag push — blocked until trusted publishers registered)
+  - 07-06 (release tag push — now unblocked)
 
 # Tech tracking
 tech-stack:
   added: []
   patterns:
   - "Integration verification before publishing: docs build + docstring check + release.yml structure + skill/CLAUDE.md existence"
+  - "OIDC trusted publisher pattern: no long-lived API keys; exchange secured by GitHub environment name matching release.yml job environment declaration"
 
 key-files:
   created: []
@@ -35,28 +38,31 @@ key-files:
 key-decisions:
   - "docs/src/reference/ gitignored — mkdocs gen-files plugin generates these as virtual filesystem artifacts at build time; tracking them in git is incorrect"
   - "Trusted publisher registration is a human-action gate — no PyPI API exists for OIDC publisher registration; web UI only"
+  - "PyPI registration is a pending publisher (project adbc-poolhouse does not yet exist on PyPI — first successful tag push creates it)"
+  - "OIDC environment names pypi and testpypi must exactly match the environment: declarations in release.yml publish-pypi and publish-testpypi jobs"
 
 patterns-established:
   - "Integration check before any publish gate: docs build --strict + docstring coverage + release.yml job set"
+  - "Pending publisher pattern: register on PyPI before first tag push, not after project exists"
 
 requirements-completed:
-  - DIST-01  # pending — human must complete trusted publisher registration
+  - DIST-01
 
 # Metrics
-duration: 5min
-completed: 2026-02-26
+duration: 7min (across two sessions)
+completed: 2026-02-27
 ---
 
-# Phase 7 Plan 05: Final Integration Verification Summary
+# Phase 7 Plan 05: Final Integration Verification and PyPI Trusted Publisher Registration Summary
 
-**All Wave 1+2 integration checks pass (docs build, docstrings, release.yml 7-job structure, SKILL.md) — plan paused at Task 2 for human OIDC trusted publisher registration on PyPI and TestPyPI.**
+**OIDC trusted publishers registered on pypi.org and test.pypi.org, unblocking release tag pushes via GitHub Actions OIDC exchange without API keys; all Wave 1+2 integration checks confirmed passing.**
 
 ## Performance
 
-- **Duration:** 5 min
+- **Duration:** ~7 min (across two sessions: 2026-02-26 and 2026-02-27)
 - **Started:** 2026-02-26T17:12:07Z
-- **Completed:** 2026-02-26T17:17:00Z (partial — checkpoint at Task 2)
-- **Tasks:** 1 of 2 complete (paused at human-action checkpoint)
+- **Completed:** 2026-02-27T00:12:29Z
+- **Tasks:** 2 of 2 complete
 - **Files modified:** 1
 
 ## Accomplishments
@@ -66,10 +72,17 @@ completed: 2026-02-26
 - Confirmed `release.yml` has all 7 required jobs: build, validate, changelog, publish-testpypi, smoke-test-testpypi, publish-pypi, deploy-docs
 - Confirmed `.claude/skills/adbc-poolhouse-docs-author/SKILL.md` exists and `CLAUDE.md` has "phases >= 7" instruction
 - Fixed missing `.gitignore` entry for `docs/src/reference/` (generated artifacts)
+- OIDC trusted publisher registered on pypi.org with environment `pypi`
+- OIDC trusted publisher registered on test.pypi.org with environment `testpypi`
+- GitHub environments `pypi` and `testpypi` created at repo settings
+- GitHub Pages source confirmed set to "GitHub Actions"
 
 ## Task Commits
 
-1. **Task 1: Final integration verification** - `3358621` (chore — integration checks pass + gitignore fix)
+1. **Task 1: Final integration verification** - `3358621` (chore — integration checks pass + gitignore fix), `4c2ee2a` (docs — checkpoint state)
+2. **Task 2: Register OIDC trusted publishers** — no commit (human web UI action; no files changed)
+
+**Plan metadata:** _(final commit below)_
 
 ## Files Created/Modified
 
@@ -77,7 +90,9 @@ completed: 2026-02-26
 
 ## Decisions Made
 
-- `docs/src/reference/` gitignored — the `mkdocs-gen-files` plugin generates these files as a virtual filesystem during build; they appeared on disk as an artifact of running `mkdocs build` locally but should not be tracked in git.
+- `docs/src/reference/` gitignored — the `mkdocs-gen-files` plugin generates these files as a virtual filesystem during build; they appeared on disk as an artifact of running `mkdocs build` locally but should not be tracked in git
+- OIDC environment names `pypi` and `testpypi` must exactly match the `environment:` declarations in `release.yml` `publish-pypi` and `publish-testpypi` jobs — these are the keys PyPI uses to validate the OIDC token's environment claim
+- PyPI registration is a pending publisher: the project `adbc-poolhouse` does not yet exist on PyPI — the first successful tag push will create it
 
 ## Deviations from Plan
 
@@ -98,50 +113,24 @@ completed: 2026-02-26
 
 ## Issues Encountered
 
-None — all integration checks passed on first run.
+None — all integration checks passed on first run. OIDC trusted publisher registration completed without issues.
 
 ## User Setup Required
 
-**External services require manual configuration before the next plan can proceed:**
+Completed. All manual steps are done:
 
-### Task 2: Register OIDC Trusted Publishers (DIST-01)
-
-**PyPI (pypi.org):**
-1. Log in to https://pypi.org/manage/account/publishing/
-2. Click "Add a new pending publisher"
-3. Fill in:
-   - PyPI project name: `adbc-poolhouse`
-   - Owner: `anentropic`
-   - Repository name: `adbc-poolhouse`
-   - Workflow filename: `release.yml` (exact — must match)
-   - Environment name: `pypi`
-4. Submit
-
-**TestPyPI (test.pypi.org):**
-1. Log in to https://test.pypi.org/manage/account/publishing/
-2. Click "Add a new pending publisher"
-3. Fill in:
-   - PyPI project name: `adbc-poolhouse`
-   - Owner: `anentropic`
-   - Repository name: `adbc-poolhouse`
-   - Workflow filename: `release.yml` (exact — must match)
-   - Environment name: `testpypi`
-4. Submit
-
-**GitHub Environments:**
-- Confirm https://github.com/anentropic/adbc-poolhouse/settings/environments has both `pypi` and `testpypi` environments (create if missing — no protection rules needed)
-
-**GitHub Pages:**
-- Confirm Settings > Pages > Source is set to "GitHub Actions"
-
-Once done, type "registered" to resume plan 07-05.
+- **pypi.org:** Pending trusted publisher registered — project `adbc-poolhouse`, owner `anentropic`, repo `adbc-poolhouse`, workflow `release.yml`, environment `pypi`
+- **test.pypi.org:** Pending trusted publisher registered — project `adbc-poolhouse`, owner `anentropic`, repo `adbc-poolhouse`, workflow `release.yml`, environment `testpypi`
+- **GitHub Environments:** `pypi` and `testpypi` created at `github.com/anentropic/adbc-poolhouse/settings/environments`
+- **GitHub Pages:** Source set to "GitHub Actions" in repo Settings > Pages
 
 ## Next Phase Readiness
 
-- Integration verification complete — all prior Phase 7 work combines correctly
-- Plan 07-06 (release tag push) blocked until trusted publishers are registered on PyPI and TestPyPI
-- After user completes Task 2, resume 07-05 and then proceed to 07-06
+- Plan 07-06 (release tag push) is fully unblocked
+- OIDC exchange will succeed: trusted publishers registered, environments configured, workflow filename matches exactly
+- Docs deployment will succeed: Pages source set to GitHub Actions
+- Smoke test on TestPyPI will succeed: wheel contains `create_pool`, `DuckDBConfig`
 
 ---
 *Phase: 07-documentation-and-pypi-publication*
-*Completed: 2026-02-26 (partial — Task 2 pending human action)*
+*Completed: 2026-02-27*

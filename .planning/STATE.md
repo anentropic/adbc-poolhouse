@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-last_updated: "2026-02-26T17:32:10.181Z"
+last_updated: "2026-02-27T00:14:27.118Z"
 progress:
   total_phases: 7
   completed_phases: 7
@@ -23,9 +23,9 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 ## Current Position
 
 Phase: 7 of 7 (Documentation and PyPI Publication) - In Progress
-Plan: 07-05 paused at Task 2 (human-action checkpoint: register PyPI/TestPyPI trusted publishers)
-Status: Plan 07-05 Task 1 complete (integration verification passed); awaiting human OIDC publisher registration before proceeding to Plan 07-06
-Last activity: 2026-02-26 — Plan 07-05 Task 1 executed (integration checks passed; docs/src/reference/ gitignored)
+Plan: 07-06 (next — release tag push)
+Status: Plan 07-05 complete (integration verification passed + OIDC trusted publishers registered on PyPI and TestPyPI); ready for 07-06
+Last activity: 2026-02-27 — Plan 07-05 complete (DIST-01 satisfied: trusted publishers registered; GitHub environments and Pages configured)
 
 Progress: [███░░░░░░░] 30%
 
@@ -57,6 +57,7 @@ Progress: [███░░░░░░░] 30%
 | Phase 07 P02 | 2 | 2 tasks | 6 files |
 | Phase 07 P03 | 60 | 2 tasks | 9 files |
 | Phase 07 P05 | 5 | 1 tasks | 1 files |
+| Phase 07 P05 | 7 | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -123,6 +124,7 @@ Recent decisions affecting current work:
 - [Phase 07]: gen_ref_pages.py extended to generate reference page for adbc_poolhouse package __init__ — all private modules filtered meant empty reference/ section; fix generates reference/adbc_poolhouse.md from public namespace
 - [Phase 07]: URI docstrings in MSSQLConfig, PostgreSQLConfig, TrinoConfig backtick-quoted — mkdocs_autorefs treated path segments as cross-reference targets in strict mode
 - [Phase 07]: docs/src/reference/ gitignored — mkdocs gen-files plugin generates virtual filesystem artifacts at build time; tracking in git is incorrect
+- [Phase 07]: PyPI/TestPyPI OIDC trusted publishers registered with environment names pypi/testpypi matching release.yml job environment declarations — DIST-01 complete
 
 ### Pending Todos
 
@@ -135,6 +137,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-26
-Stopped at: Plan 07-05 Task 2 — human-action checkpoint: register OIDC trusted publishers on PyPI and TestPyPI
+Last session: 2026-02-27
+Stopped at: Completed 07-05-PLAN.md — plan 07-06 ready
 Resume file: None

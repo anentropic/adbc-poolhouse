@@ -82,7 +82,7 @@ Isolates all type suppressions to dedicated internal modules.
 
 ### Distribution
 
-- [ ] **DIST-01**: PyPI publication via OIDC trusted publisher — register on PyPI before first release using exact workflow filename
+- [x] **DIST-01**: PyPI publication via OIDC trusted publisher — register on PyPI before first release using exact workflow filename
 - [x] **DIST-02**: Release workflow validates `py.typed` presence in built wheel (`zipinfo dist/*.whl | grep py.typed`)
 - [x] **DIST-03**: Release workflow generates changelog via `git-cliff` (`.cliff.toml` already present)
 
@@ -165,7 +165,7 @@ Isolates all type suppressions to dedicated internal modules.
 | DOCS-02 | Phase 7 | Complete |
 | DOCS-03 | Phase 7 | Complete |
 | DOCS-04 | Phase 7 | Complete |
-| DIST-01 | Phase 7 | Pending |
+| DIST-01 | Phase 7 | Complete |
 | DIST-02 | Phase 7 | Complete |
 | DIST-03 | Phase 7 | Complete |
 
