@@ -48,5 +48,4 @@ def main():
         nav_file.writelines(nav.build_literate_nav())
 
 
-if __name__ == "__main__":
-    main()
+main()
