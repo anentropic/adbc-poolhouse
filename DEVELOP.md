@@ -100,24 +100,33 @@ Automated via ruff isort (I rules) - runs as part of `ruff format`
 
 ```
 adbc-poolhouse/
-├── src/adbc_poolhouse/      # Package source code
+├── src/adbc_poolhouse/      # Package source (internal modules prefixed with _)
 │   ├── __init__.py             # Public API exports
 │   └── py.typed                # PEP 561 type marker
 ├── tests/                       # Test suite
 │   ├── conftest.py             # Shared fixtures
 │   └── __init__.py
+├── docs/                        # Documentation source
+│   ├── src/                     # Markdown pages
+│   └── scripts/                 # mkdocs hooks (gen_ref_pages.py)
 ├── .github/                     # GitHub configuration
 │   ├── workflows/
 │   │   ├── ci.yml              # CI/CD pipeline
+│   │   ├── docs.yml            # Documentation deployment
 │   │   ├── pr.yml              # PR coverage reporting
 │   │   └── release.yml         # PyPI release pipeline
 │   └── dependabot.yml          # Dependency updates
 ├── pyproject.toml              # Build and tool configuration
+├── mkdocs.yml                  # Documentation site config
+├── justfile                    # Common dev tasks (just build, just serve)
+├── uv.lock                     # Locked dependencies (committed)
 ├── .python-version             # Python version pin (pyenv/asdf)
-├── .pre-commit-config.yaml     # Pre-commit hooks
-├── .cliff.toml                 # Changelog generation
+├── .pre-commit-config.yaml     # Pre-commit hooks (prek)
+├── .cliff.toml                 # Changelog generation (git-cliff)
+├── .secrets.baseline           # detect-secrets baseline
 ├── LICENSE                     # MIT
 ├── README.md                   # User documentation
+├── CONTRIBUTING.md             # Contributing guide
 └── DEVELOP.md                  # This file
 ```
 
@@ -127,6 +136,20 @@ adbc-poolhouse/
 - Use pytest for test discovery and execution
 - Fixtures defined in `tests/conftest.py` for reuse
 - Test naming convention: `test_<specific_behavior>`
+
+### Snowflake integration tests
+
+Tests requiring real credentials are gated behind the `snowflake` pytest marker and excluded from default runs.
+
+```bash
+# Run Snowflake tests (requires SNOWFLAKE_* env vars)
+uv run pytest --override-ini="addopts=" -m snowflake
+
+# Record or update snapshots
+uv run pytest --override-ini="addopts=" -m snowflake --snapshot-update
+```
+
+Snapshots are committed to `tests/` and replayed in CI without credentials.
 
 ## Building and Distribution
 
@@ -163,7 +186,7 @@ Version is defined in `pyproject.toml` only:
 
 ```toml
 [project]
-version = "0.1.0"
+version = "1.0.1"
 ```
 
 Not duplicated in `__init__.py` - maintain single source of truth.
@@ -189,12 +212,27 @@ Then update your code and run quality gates.
 uv sync --upgrade --dev
 ```
 
-### Export type stubs
+### Build and serve docs
 
 ```bash
-# If creating stubs for distribution
-# Place in src/adbc_poolhouse/py.typed (marker only)
-# or src/adbc_poolhouse/*.pyi (stub files)
+# Build docs site (strict mode)
+just build
+
+# Start dev server with hot-reload
+just serve
+
+# Custom port
+just serve 8001
+```
+
+### Generate changelog
+
+```bash
+# Preview unreleased commits
+git cliff --unreleased
+
+# Write full changelog to file
+git cliff --output CHANGELOG.md
 ```
 
 ## Troubleshooting

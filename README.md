@@ -1,5 +1,9 @@
 # adbc-poolhouse
 
+[ [Docs](https://anentropic.github.io/adbc-poolhouse/) ]
+
+Connection pooling for ADBC drivers from typed warehouse configs.
+
 One config in, one pool out — `create_pool(SnowflakeConfig(...))` returns a ready-to-use SQLAlchemy QueuePool.
 
 ## Installation
@@ -34,7 +38,15 @@ close_pool(pool)
 
 ## Supported warehouses
 
-DuckDB, Snowflake, BigQuery, PostgreSQL, FlightSQL, Databricks, Redshift, Trino, MSSQL / Azure SQL / Fabric.
+- DuckDB
+- Snowflake
+- BigQuery
+- PostgreSQL
+- FlightSQL
+- Databricks
+- Redshift
+- Trino
+- MSSQL / Azure SQL / Fabric
 
 ## Links
 
