@@ -150,6 +150,21 @@ This gate is enforced via `CLAUDE.md`: plan-phase includes `@.claude/skills/adbc
 
 The docs-author skill and CLAUDE.md instruction are established in Phase 7 (TOOL-01, TOOL-02).
 
+### Phase 8: review and improve docs
+
+**Goal:** Public API cleanup (close_pool, managed_pool) and comprehensive per-warehouse guide pages — eliminate private attribute exposure in docs, fill ADBC driver install gap, add pool tuning docs, wire git-cliff changelog
+**Requirements**: TBD
+**Depends on:** Phase 7
+**Plans:** 6 plans
+
+Plans:
+- [ ] 08-01-PLAN.md — Add close_pool() and managed_pool() to _pool_factory.py and __init__.py
+- [ ] 08-02-PLAN.md — Update existing docs (index.md, pool-lifecycle.md, configuration.md, consumer-patterns.md) with new API and content gaps
+- [ ] 08-03-PLAN.md — Generate docs/src/changelog.md via git-cliff
+- [ ] 08-04-PLAN.md — Create PyPI warehouse guide pages (duckdb, bigquery, postgresql, flightsql)
+- [ ] 08-05-PLAN.md — Create Foundry warehouse guide pages (databricks, redshift, trino, mssql, teradata stub)
+- [ ] 08-06-PLAN.md — Update mkdocs.yml nav with Warehouse Guides section and verify mkdocs build --strict
+
 ---
 
 ## Progress
@@ -166,3 +181,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | 5. Pool Factory and DuckDB Integration | 2/2 | Complete   | 2026-02-24 |
 | 6. Snowflake Integration | 0/1 | Not started | - |
 | 7. Documentation and PyPI Publication | 5/5 | Complete   | 2026-02-27 |
+| 8. Review and Improve Docs | 0/6 | Not started | - |
