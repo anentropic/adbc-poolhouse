@@ -91,6 +91,16 @@ nav:
     - Pool Lifecycle: guides/pool-lifecycle.md
     - Consumer Patterns: guides/consumer-patterns.md
     - Configuration Reference: guides/configuration.md
-    - Snowflake Guide: guides/snowflake.md
+    - Warehouse Guides:
+      - Snowflake: guides/snowflake.md
+      - DuckDB: guides/duckdb.md
+      - BigQuery: guides/bigquery.md
+      - PostgreSQL: guides/postgresql.md
+      - FlightSQL: guides/flightsql.md
+      - Databricks: guides/databricks.md
+      - Redshift: guides/redshift.md
+      - Trino: guides/trino.md
+      - MSSQL: guides/mssql.md
+      - Teradata: guides/teradata.md
   - API Reference: reference/
   - Changelog: changelog.md
