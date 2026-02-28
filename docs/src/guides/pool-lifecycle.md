@@ -1,6 +1,6 @@
 # Pool lifecycle
 
-`create_pool` returns a SQLAlchemy `QueuePool`. Internally it holds one ADBC source connection plus a pool of cloned connections derived from it. The source connection is attached to the pool as `pool._adbc_source` so you can close it after draining the pool.
+`create_pool` returns a SQLAlchemy `QueuePool`. Internally it holds one ADBC source connection plus a pool of cloned connections derived from it.
 
 ## Checking out and returning connections
 
@@ -17,14 +17,15 @@ Do not hold a connection outside a `with` block. Connections held past the `with
 
 ## Disposing the pool
 
-To shut down cleanly, call `pool.dispose()` then `pool._adbc_source.close()`:
+To shut down cleanly, call `close_pool`:
 
 ```python
-pool.dispose()
-pool._adbc_source.close()
+from adbc_poolhouse import close_pool
+
+close_pool(pool)
 ```
 
-`pool.dispose()` drains the pool and closes each pooled connection. The ADBC source connection that the pool was built from is a separate object — it stays open until you close it explicitly. Skipping `pool._adbc_source.close()` leaves a file handle or network socket open until the process exits.
+`close_pool` drains the pool, closes each pooled connection, and releases the ADBC source connection in one call. Calling `pool.dispose()` alone leaves a file handle or network socket open until the process exits.
 
 ## Pytest fixture pattern
 
@@ -39,17 +40,48 @@ from adbc_poolhouse import DuckDBConfig, create_pool
 def pool():
     p = create_pool(DuckDBConfig(database="/tmp/test.db"))
     yield p
-    p.dispose()
-    p._adbc_source.close()
+    from adbc_poolhouse import close_pool
+
+    close_pool(p)
 ```
 
 Using `scope="session"` creates one pool for the entire test session. If your tests need isolation between test functions, use `scope="function"` instead — each test gets its own pool.
 
+For scripts and short-lived processes, use `managed_pool` as a context manager instead:
+
+```python
+from adbc_poolhouse import DuckDBConfig, managed_pool
+
+with managed_pool(DuckDBConfig(database="/tmp/test.db")) as pool:
+    with pool.connect() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT 1")
+# pool is automatically closed when the with block exits
+```
+
+## Tuning the pool
+
+`create_pool` (and `managed_pool`) accept keyword arguments to tune pool behaviour. The defaults are conservative and appropriate for most use cases:
+
+| Argument | Default | Description |
+|---|---|---|
+| `pool_size` | `5` | Connections kept in the pool at all times (DuckDB defaults to `1`) |
+| `max_overflow` | `3` | Extra connections allowed above `pool_size` when demand is high |
+| `timeout` | `30` | Seconds to wait for a connection before raising `TimeoutError` |
+| `recycle` | `3600` | Seconds before a connection is closed and replaced |
+| `pre_ping` | `False` | Ping connections before checkout (disabled — does not function on standalone `QueuePool` without a SQLAlchemy dialect; use `recycle` instead) |
+
+Pass any of these to `create_pool`:
+
+```python
+pool = create_pool(config, pool_size=10, recycle=7200)
+```
+
 ## Common mistakes
 
-**Not closing `_adbc_source` after `dispose()`**
+**Calling `pool.dispose()` without `close_pool()`**
 
-`pool.dispose()` does not close the source connection. Always follow it with `pool._adbc_source.close()`.
+`pool.dispose()` drains the pool but does not close the ADBC source connection. Always use `close_pool(pool)` (or `managed_pool` as a context manager) — never call `pool.dispose()` directly.
 
 **Using `database=":memory:"` with `pool_size > 1`**
 
