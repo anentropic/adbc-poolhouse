@@ -7,13 +7,14 @@ from adbc_poolhouse._duckdb_config import DuckDBConfig
 from adbc_poolhouse._exceptions import ConfigurationError, PoolhouseError
 from adbc_poolhouse._flightsql_config import FlightSQLConfig
 from adbc_poolhouse._mssql_config import MSSQLConfig
-from adbc_poolhouse._pool_factory import create_pool
+from adbc_poolhouse._pool_factory import close_pool, create_pool, managed_pool
 from adbc_poolhouse._postgresql_config import PostgreSQLConfig
 from adbc_poolhouse._redshift_config import RedshiftConfig
 from adbc_poolhouse._snowflake_config import SnowflakeConfig
 from adbc_poolhouse._trino_config import TrinoConfig
 
 __all__ = [
+    "close_pool",
     "ConfigurationError",
     "PoolhouseError",
     "WarehouseConfig",
@@ -22,6 +23,7 @@ __all__ = [
     "DatabricksConfig",
     "DuckDBConfig",
     "FlightSQLConfig",
+    "managed_pool",
     "MSSQLConfig",
     "PostgreSQLConfig",
     "RedshiftConfig",
