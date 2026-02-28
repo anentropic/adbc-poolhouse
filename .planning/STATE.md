@@ -1,33 +1,33 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.0
-milestone_name: milestone
-status: unknown
-last_updated: "2026-02-28T00:31:19.608Z"
+milestone: v1.1
+milestone_name: Backend Expansion & Debt Cleanup
+status: active
+last_updated: "2026-02-28T22:00:00.000Z"
 progress:
-  total_phases: 8
-  completed_phases: 8
-  total_plans: 29
-  completed_plans: 29
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-02-23)
+See: .planning/PROJECT.md (updated 2026-02-28)
 
 **Core value:** One config in, one pool out — `create_pool(SnowflakeConfig(...))` returns a ready-to-use SQLAlchemy QueuePool in a single call.
-**Current focus:** Phase 8 — Review and Improve Docs
+**Current focus:** v1.1.0 — Backend Expansion & Debt Cleanup (defining requirements)
 
 ## Current Position
 
-Phase: 8 of 8 (Review and Improve Docs) - Complete
-Plan: 08-06 complete — Phase 8 Complete
-Status: All 6 plans complete. mkdocs.yml nav updated with Warehouse Guides sub-section; all 10 warehouse guide pages linked; strict build passes.
-Last activity: 2026-02-28 - Completed quick task 7: improve README and add project homepage documentation links to PyPI
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements for v1.1.0
+Last activity: 2026-02-28 — Milestone v1.1.0 started
 
-Progress: [██████████] 100%
+Progress: [░░░░░░░░░░] 0%
 
 ## Performance Metrics
 

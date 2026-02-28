@@ -8,6 +8,15 @@ A focused Python library that takes a typed warehouse configuration and returns 
 
 One config in, one pool out — `create_pool(SnowflakeConfig(...))` returns a ready-to-use SQLAlchemy QueuePool in a single call.
 
+## Current Milestone: v1.1.0 — Backend Expansion & Debt Cleanup
+
+**Goal:** Harden the existing backend surface (fix silent failures, remove dead code), add developer tooling for Foundry driver management, and expand ADBC backend coverage based on research findings.
+
+**Target features:**
+- Tech debt cleanup: DatabricksConfig decomposed-field gap, remove AdbcCreatorFn and _adbc_driver_key() dead code, verify Teradata field names
+- Foundry driver tooling: justfile recipes to install `dbc` CLI and install/verify all supported Foundry drivers
+- New ADBC backends: research-driven additions to config, translation, and docs layers
+
 ## Requirements
 
 ### Validated
@@ -18,20 +27,22 @@ One config in, one pool out — `create_pool(SnowflakeConfig(...))` returns a re
 - ✓ CI: GitHub Actions, Python 3.11 + 3.14 matrix — existing
 - ✓ Cliff.toml changelog generation — existing
 
+### Validated
+
+- ✓ Full config + translation layer for 9 warehouses (DuckDB, Snowflake, BigQuery, PostgreSQL, FlightSQL, Databricks, Redshift, Trino, MSSQL) — v1.0
+- ✓ `create_pool()`, `close_pool()`, `managed_pool()` public API — v1.0
+- ✓ Driver detection: PyPI path (find_spec) + Foundry path (adbc_driver_manager) — v1.0
+- ✓ Full documentation site (mkdocs-material + mkdocstrings) + per-warehouse guides — v1.0
+- ✓ PyPI publication at `pip install adbc-poolhouse` via OIDC trusted publisher — v1.0
+
 ### Active
 
-- [ ] Pydantic BaseSettings config models for DuckDB and Snowflake
-- [ ] Parameter translation layer (config fields → ADBC driver kwargs) for DuckDB and Snowflake
-- [ ] Driver detection: try PyPI package import, fall back to `adbc_driver_manager`
-- [ ] Helpful error messages when required ADBC driver is not installed
-- [ ] `create_pool(config, **pool_kwargs)` factory function as primary public API
-- [ ] Pool defaults: size=5, max_overflow=3, timeout=30s, pre_ping=True, recycle=3600s
-- [ ] Overridable pool settings via kwargs to `create_pool()`
-- [ ] DuckDB integration tests (in-process, no credentials needed)
-- [ ] Snowflake snapshot tests via syrupy (recorded locally with real creds, replayed in CI)
-- [ ] Full API reference via mkdocstrings (auto-generated from Google-style docstrings)
-- [ ] Usage guide: quickstart + both consumer patterns (Semantic ORM and dbt-open-sl shim)
-- [ ] PyPI publication at `pip install adbc-poolhouse`
+- [ ] Fix DatabricksConfig decomposed-field gap (host/http_path/token silently produce empty dict when URI absent)
+- [ ] Remove AdbcCreatorFn unused type alias from _pool_types.py
+- [ ] Remove _adbc_driver_key() dead abstract method from BaseWarehouseConfig and all 10 subclasses
+- [ ] Verify Teradata field names against real Columnar ADBC Teradata driver
+- [ ] Justfile recipes for Foundry driver management: install dbc CLI, install and verify supported drivers
+- [ ] New ADBC backends (to be scoped after research)
 
 ### Out of Scope
 
@@ -77,4 +88,4 @@ Snowflake integration tests use syrupy snapshots: recorded locally against a rea
 | PyPI as v1 "done" bar | Library is only useful when consumers can install it | — Pending |
 
 ---
-*Last updated: 2026-02-23 after initialization*
+*Last updated: 2026-02-28 after v1.1.0 milestone start*
