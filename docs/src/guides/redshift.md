@@ -45,7 +45,7 @@ pool = create_pool(config)
 ```bash
 export REDSHIFT_HOST=my-cluster.us-east-1.redshift.amazonaws.com
 export REDSHIFT_USER=me
-export REDSHIFT_PASSWORD=s3cret
+export REDSHIFT_PASSWORD=s3cret  # pragma: allowlist secret
 export REDSHIFT_DATABASE=mydb
 ```
 

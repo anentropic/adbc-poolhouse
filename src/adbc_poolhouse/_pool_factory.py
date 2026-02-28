@@ -22,6 +22,8 @@ from adbc_poolhouse._drivers import resolve_driver
 from adbc_poolhouse._translators import translate_config
 
 if TYPE_CHECKING:
+    import collections.abc
+
     from adbc_poolhouse._base_config import WarehouseConfig
 
 
@@ -48,10 +50,9 @@ def create_pool(
     closed automatically, releasing Arrow record batch reader memory (POOL-04).
 
     The source connection is attached to the pool as ``pool._adbc_source``.
-    Callers must close it after ``pool.dispose()``::
+    To shut down cleanly, call :func:`close_pool`::
 
-        pool.dispose()
-        pool._adbc_source.close()
+        close_pool(pool)
 
     Args:
         config: A warehouse config model instance (e.g. ``DuckDBConfig``).
@@ -90,6 +91,78 @@ def create_pool(
     event.listen(pool, "reset", _release_arrow_allocators)
 
     return pool
+
+
+def close_pool(pool: sqlalchemy.pool.QueuePool) -> None:
+    """
+    Dispose a pool and close its underlying ADBC source connection.
+
+    Replaces the two-step pattern ``pool.dispose()`` followed by
+    ``pool._adbc_source.close()``. Always call this instead of calling
+    ``pool.dispose()`` directly to avoid leaving the ADBC source connection open.
+
+    Args:
+        pool: A pool returned by :func:`create_pool`.
+
+    Example:
+        from adbc_poolhouse import DuckDBConfig, create_pool, close_pool
+
+        pool = create_pool(DuckDBConfig(database='/tmp/wh.db'))
+        # ... use pool ...
+        close_pool(pool)
+    """
+    pool.dispose()
+    pool._adbc_source.close()  # type: ignore[attr-defined]
+
+
+@contextlib.contextmanager
+def managed_pool(
+    config: WarehouseConfig,
+    *,
+    pool_size: int = 5,
+    max_overflow: int = 3,
+    timeout: int = 30,
+    recycle: int = 3600,
+    pre_ping: bool = False,
+) -> collections.abc.Iterator[sqlalchemy.pool.QueuePool]:
+    """
+    Context manager that creates a pool and closes it on exit.
+
+    The pool is created when the ``with`` block is entered and closed
+    (via :func:`close_pool`) when the block exits, whether it exits normally
+    or raises an exception.
+
+    Args:
+        config: A warehouse config model instance (e.g. ``DuckDBConfig``).
+        pool_size: Number of connections to keep in the pool. Default: 5.
+        max_overflow: Extra connections allowed above pool_size. Default: 3.
+        timeout: Seconds to wait for a connection before raising. Default: 30.
+        recycle: Seconds before a connection is recycled. Default: 3600.
+        pre_ping: Whether to ping connections before checkout. Default: False.
+
+    Yields:
+        A configured ``sqlalchemy.pool.QueuePool``.
+
+    Example:
+        from adbc_poolhouse import DuckDBConfig, managed_pool
+
+        with managed_pool(DuckDBConfig(database='/tmp/wh.db')) as pool:
+            with pool.connect() as conn:
+                cursor = conn.cursor()
+                cursor.execute('SELECT 1')
+    """
+    pool = create_pool(
+        config,
+        pool_size=pool_size,
+        max_overflow=max_overflow,
+        timeout=timeout,
+        recycle=recycle,
+        pre_ping=pre_ping,
+    )
+    try:
+        yield pool
+    finally:
+        close_pool(pool)
 
 
 def _release_arrow_allocators(
