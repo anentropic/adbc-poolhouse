@@ -25,7 +25,7 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 Phase: 8 of 8 (Review and Improve Docs) - Complete
 Plan: 08-06 complete — Phase 8 Complete
 Status: All 6 plans complete. mkdocs.yml nav updated with Warehouse Guides sub-section; all 10 warehouse guide pages linked; strict build passes.
-Last activity: 2026-02-28 - Completed quick task 2: add a justfile with recipes for build and serve docs
+Last activity: 2026-02-28 - Completed quick task 4: move managed_pool example under Disposing the pool
 
 Progress: [██████████] 100%
 
@@ -153,6 +153,7 @@ None yet.
 | 1 | check (with `gh run list` and related commands) and fix CI failures | 2026-02-27 | 50db351 | Needs Review | [1-check-with-gh-run-list-and-related-comma](.planning/quick/1-check-with-gh-run-list-and-related-comma/) |
 | 2 | add a justfile with recipes for build and serve | 2026-02-28 | 9c91b4a | Complete | [2-add-a-justfile-with-recipes-for-build-an](.planning/quick/2-add-a-justfile-with-recipes-for-build-an/) |
 | 3 | docs guides foundry drivers need a link | 2026-02-28 | 061de45 | Complete | [3-docs-guides-foundry-drivers-need-a-link-](.planning/quick/3-docs-guides-foundry-drivers-need-a-link-/) |
+| 4 | move managed_pool example under Disposing the pool | 2026-02-28 | 763db80 | Complete | [4-move-managed-pool-example-under-disposin](.planning/quick/4-move-managed-pool-example-under-disposin/) |
 
 ### Blockers/Concerns
 
@@ -162,5 +163,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-28
-Stopped at: Completed quick task 3 — Foundry installation guide hyperlinks added to all five Foundry driver pages
+Stopped at: Completed quick task 4 — managed_pool example moved under Disposing the pool in pool-lifecycle.md
 Resume file: None
