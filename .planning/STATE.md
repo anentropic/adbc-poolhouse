@@ -156,5 +156,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-28
-Stopped at: Completed 08-05-PLAN.md — plan 08-06 ready
+Stopped at: Completed 08-04-PLAN.md — per-warehouse guide pages (DuckDB, BigQuery, PostgreSQL, FlightSQL)
 Resume file: None
