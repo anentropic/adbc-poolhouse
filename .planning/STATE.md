@@ -23,9 +23,9 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 ## Current Position
 
 Phase: 8 of 8 (Review and Improve Docs) - In Progress
-Plan: 08-05 complete — 08-06 next
-Status: Plan 08-05 complete (five Foundry warehouse guide pages created: Databricks, Redshift, Trino, MSSQL, Teradata stub)
-Last activity: 2026-02-28 - Completed plan 08-05: Foundry warehouse guide pages
+Plan: 08-01 complete — 08-02 next
+Status: Plan 08-01 complete (close_pool and managed_pool public API implemented and exported); 08-02 through 08-06 pending
+Last activity: 2026-02-28 - Completed plan 08-01: close_pool and managed_pool public API
 
 Progress: [████░░░░░░] 40%
 
@@ -156,5 +156,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-28
-Stopped at: Completed 08-04-PLAN.md — per-warehouse guide pages (DuckDB, BigQuery, PostgreSQL, FlightSQL)
+Stopped at: Completed 08-01-PLAN.md — close_pool and managed_pool public API; plan 08-02 ready
 Resume file: None
