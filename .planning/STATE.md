@@ -25,7 +25,7 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 Phase: 8 of 8 (Review and Improve Docs) - Complete
 Plan: 08-06 complete — Phase 8 Complete
 Status: All 6 plans complete. mkdocs.yml nav updated with Warehouse Guides sub-section; all 10 warehouse guide pages linked; strict build passes.
-Last activity: 2026-02-28 - Completed quick task 5: mkdocs hot-reload fix (--dirtyreload + 127.0.0.1)
+Last activity: 2026-02-28 - Completed quick task 7: improve README and add project homepage documentation links to PyPI
 
 Progress: [██████████] 100%
 
@@ -156,7 +156,7 @@ None yet.
 | 4 | move managed_pool example under Disposing the pool | 2026-02-28 | 763db80 | Complete | [4-move-managed-pool-example-under-disposin](.planning/quick/4-move-managed-pool-example-under-disposin/) |
 | 5 | mkdocs hot-reload not working | 2026-02-28 | 32d6a6d | Needs Review | [5-mkdocs-hot-reload-not-working](.planning/quick/5-mkdocs-hot-reload-not-working/) |
 | 5 | mkdocs hot-reload not working — add --dirtyreload | 2026-02-28 | 32d6a6d | Complete | [5-mkdocs-hot-reload-not-working](.planning/quick/5-mkdocs-hot-reload-not-working/) |
-| 7 | improve README and add project homepage | 2026-02-28 | 19e9733 | Complete | [7-improve-readme-and-add-project-homepage-](.planning/quick/7-improve-readme-and-add-project-homepage-/) |
+| 7 | improve README and add project homepage documentation links to PyPI | 2026-02-28 | 19e9733 | Verified | [7-improve-readme-and-add-project-homepage-](.planning/quick/7-improve-readme-and-add-project-homepage-/) |
 
 ### Blockers/Concerns
 
