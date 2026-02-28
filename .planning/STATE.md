@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-last_updated: "2026-02-28T00:21:47.140Z"
+last_updated: "2026-02-28T00:27:31.009Z"
 progress:
   total_phases: 8
-  completed_phases: 7
+  completed_phases: 8
   total_plans: 29
-  completed_plans: 28
+  completed_plans: 29
 ---
 
 # Project State
@@ -22,12 +22,12 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 
 ## Current Position
 
-Phase: 8 of 8 (Review and Improve Docs) - In Progress
-Plan: 08-02 complete — 08-03 next
-Status: Plan 08-02 complete (four docs pages updated to use close_pool API; _adbc_source eliminated from all user-facing docs); 08-03 through 08-06 pending
-Last activity: 2026-02-28 - Completed plan 08-02: updated docs pages to close_pool API
+Phase: 8 of 8 (Review and Improve Docs) - Complete
+Plan: 08-06 complete — Phase 8 Complete
+Status: All 6 plans complete. mkdocs.yml nav updated with Warehouse Guides sub-section; all 10 warehouse guide pages linked; strict build passes.
+Last activity: 2026-02-28 - Completed plan 08-06: added Warehouse Guides nav sub-section to mkdocs.yml
 
-Progress: [█████░░░░░] 50%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
@@ -62,6 +62,7 @@ Progress: [█████░░░░░] 50%
 | Phase 08-review-and-improve-docs P04 | 3 | 2 tasks | 4 files |
 | Phase 08-review-and-improve-docs P01 | 3 | 2 tasks | 2 files |
 | Phase 08-review-and-improve-docs P02 | 106 | 3 tasks | 4 files |
+| Phase 08-review-and-improve-docs P06 | 1 | 1 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -139,6 +140,7 @@ Recent decisions affecting current work:
 - [Phase 08-review-and-improve-docs]: managed_pool spells out all five kwargs explicitly (not **kwargs) — basedpyright strict rejects untyped kwargs forwarding to typed parameters
 - [Phase 08-review-and-improve-docs]: close_pool and managed_pool inserted into __all__ in alphabetical order (close_pool before ConfigurationError, managed_pool before MSSQLConfig)
 - [Phase 08-review-and-improve-docs]: max_overflow default corrected from 10 to 3 in configuration.md (aligns with code)
+- [Phase 08-review-and-improve-docs]: Snowflake moved from flat Guides list into Warehouse Guides sub-section — consistent with all other warehouse guides
 
 ### Pending Todos
 
@@ -158,5 +160,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-28
-Stopped at: Completed 08-02-PLAN.md — updated four docs pages to use close_pool API; plan 08-03 next
+Stopped at: Completed 08-06-PLAN.md — mkdocs.yml nav updated with Warehouse Guides sub-section; all 10 warehouse guides linked in site navigation; strict build passes; Phase 8 complete
 Resume file: None

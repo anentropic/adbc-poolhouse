@@ -155,7 +155,7 @@ The docs-author skill and CLAUDE.md instruction are established in Phase 7 (TOOL
 **Goal:** Public API cleanup (close_pool, managed_pool) and comprehensive per-warehouse guide pages — eliminate private attribute exposure in docs, fill ADBC driver install gap, add pool tuning docs, wire git-cliff changelog
 **Requirements**: TBD
 **Depends on:** Phase 7
-**Plans:** 5/6 plans executed
+**Plans:** 6/6 plans complete
 
 Plans:
 - [ ] 08-01-PLAN.md — Add close_pool() and managed_pool() to _pool_factory.py and __init__.py
@@ -181,4 +181,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | 5. Pool Factory and DuckDB Integration | 2/2 | Complete   | 2026-02-24 |
 | 6. Snowflake Integration | 0/1 | Not started | - |
 | 7. Documentation and PyPI Publication | 5/5 | Complete   | 2026-02-27 |
-| 8. Review and Improve Docs | 5/6 | In Progress|  |
+| 8. Review and Improve Docs | 6/6 | Complete   | 2026-02-28 |
