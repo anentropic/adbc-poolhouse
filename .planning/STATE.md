@@ -25,7 +25,7 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 Phase: 8 of 8 (Review and Improve Docs) - Complete
 Plan: 08-06 complete — Phase 8 Complete
 Status: All 6 plans complete. mkdocs.yml nav updated with Warehouse Guides sub-section; all 10 warehouse guide pages linked; strict build passes.
-Last activity: 2026-02-28 - Completed plan 08-06: added Warehouse Guides nav sub-section to mkdocs.yml
+Last activity: 2026-02-28 - Completed quick task 2: add a justfile with recipes for build and serve docs
 
 Progress: [██████████] 100%
 
