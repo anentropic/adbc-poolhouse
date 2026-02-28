@@ -5,6 +5,9 @@ repo_url: https://github.com/anentropic/adbc-poolhouse
 repo_name: anentropic/adbc-poolhouse
 edit_uri: edit/main/docs/src/
 docs_dir: docs/src
+watch:
+  - src/adbc_poolhouse
+  - docs/src
 
 theme:
   name: material
