@@ -12,7 +12,7 @@ Create the pool at application startup and dispose it at shutdown using FastAPI'
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from sqlalchemy import create_engine
-from adbc_poolhouse import DuckDBConfig, create_pool
+from adbc_poolhouse import DuckDBConfig, create_pool, close_pool
 
 pool = None
 
@@ -22,8 +22,7 @@ async def lifespan(app: FastAPI):
     global pool
     pool = create_pool(DuckDBConfig(database="/data/warehouse.db"))
     yield
-    pool.dispose()
-    pool._adbc_source.close()
+    close_pool(pool)
 
 
 app = FastAPI(lifespan=lifespan)

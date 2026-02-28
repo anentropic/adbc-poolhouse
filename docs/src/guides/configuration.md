@@ -41,9 +41,10 @@ All config classes inherit pool tuning fields from `BaseWarehouseConfig`. These 
 | Field | Default | Description |
 |---|---|---|
 | `pool_size` | `5` | Number of connections to keep open (DuckDB defaults to `1`) |
-| `max_overflow` | `10` | Extra connections allowed when pool is full |
+| `max_overflow` | `3` | Extra connections allowed when pool is full |
 | `timeout` | `30` | Seconds to wait for a connection before raising |
 | `recycle` | `3600` | Seconds before a connection is closed and replaced |
+| `pre_ping` | `False` | Ping connections before checkout. Disabled by default — does not function on standalone `QueuePool` without a SQLAlchemy dialect; use `recycle` for connection health. |
 
 To override pool size via environment variable:
 
