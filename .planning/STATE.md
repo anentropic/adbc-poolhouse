@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-last_updated: "2026-02-28T00:13:20.760Z"
+last_updated: "2026-02-28T00:13:37.070Z"
 progress:
   total_phases: 8
   completed_phases: 7
@@ -59,6 +59,8 @@ Progress: [████░░░░░░] 40%
 | Phase 07 P05 | 5 | 1 tasks | 1 files |
 | Phase 07 P05 | 7 | 2 tasks | 1 files |
 | Phase 08-review-and-improve-docs P05 | 3 | 2 tasks | 8 files |
+| Phase 08-review-and-improve-docs P04 | 3 | 2 tasks | 4 files |
+| Phase 08-review-and-improve-docs P01 | 3 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -129,6 +131,12 @@ Recent decisions affecting current work:
 - [Phase 08-review-and-improve-docs]: pragma allowlist secret required on bash export lines (not just Python strings) when example passwords are present — detect-secrets catches both
 - [Phase 08-review-and-improve-docs]: collections.abc moved to TYPE_CHECKING block in _pool_factory.py — only used as return type annotation, not needed at runtime with __future__ annotations
 - [Phase 08-03]: git-cliff 2.12.0 requires --config flag to reference .cliff.toml (searches for cliff.toml without leading dot by default); --unreleased covers all commits when repo has no tags
+- [Phase 08-04]: DuckDB guide covers file-backed vs in-memory distinction and pool_size=1 cap for :memory:
+- [Phase 08-04]: BigQuery guide covers all four auth_type values including Application Default Credentials as the default
+- [Phase 08-04]: Per-warehouse guide pattern: install pip/uv, connection/auth examples, env var prefix, See also
+- [Phase 08-review-and-improve-docs]: collections.abc import placed in TYPE_CHECKING block — ruff TC003 with from __future__ import annotations; annotation is a lazy string at runtime
+- [Phase 08-review-and-improve-docs]: managed_pool spells out all five kwargs explicitly (not **kwargs) — basedpyright strict rejects untyped kwargs forwarding to typed parameters
+- [Phase 08-review-and-improve-docs]: close_pool and managed_pool inserted into __all__ in alphabetical order (close_pool before ConfigurationError, managed_pool before MSSQLConfig)
 
 ### Pending Todos
 
