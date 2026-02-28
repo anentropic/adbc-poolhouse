@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-last_updated: "2026-02-27T11:46:44.993Z"
+last_updated: "2026-02-28T00:13:20.760Z"
 progress:
-  total_phases: 7
+  total_phases: 8
   completed_phases: 7
-  total_plans: 23
-  completed_plans: 23
+  total_plans: 29
+  completed_plans: 27
 ---
 
 # Project State
@@ -18,16 +18,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-02-23)
 
 **Core value:** One config in, one pool out — `create_pool(SnowflakeConfig(...))` returns a ready-to-use SQLAlchemy QueuePool in a single call.
-**Current focus:** Phase 7 — Documentation and PyPI Publication
+**Current focus:** Phase 8 — Review and Improve Docs
 
 ## Current Position
 
-Phase: 7 of 7 (Documentation and PyPI Publication) - In Progress
-Plan: 07-06 (next — release tag push)
-Status: Plan 07-05 complete (integration verification passed + OIDC trusted publishers registered on PyPI and TestPyPI); ready for 07-06
-Last activity: 2026-02-27 - Completed quick task 1: check (with `gh run list` and related commands) and fix CI failures
+Phase: 8 of 8 (Review and Improve Docs) - In Progress
+Plan: 08-05 complete — 08-06 next
+Status: Plan 08-05 complete (five Foundry warehouse guide pages created: Databricks, Redshift, Trino, MSSQL, Teradata stub)
+Last activity: 2026-02-28 - Completed plan 08-05: Foundry warehouse guide pages
 
-Progress: [███░░░░░░░] 30%
+Progress: [████░░░░░░] 40%
 
 ## Performance Metrics
 
@@ -58,6 +58,7 @@ Progress: [███░░░░░░░] 30%
 | Phase 07 P03 | 60 | 2 tasks | 9 files |
 | Phase 07 P05 | 5 | 1 tasks | 1 files |
 | Phase 07 P05 | 7 | 2 tasks | 1 files |
+| Phase 08-review-and-improve-docs P05 | 3 | 2 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -125,6 +126,9 @@ Recent decisions affecting current work:
 - [Phase 07]: URI docstrings in MSSQLConfig, PostgreSQLConfig, TrinoConfig backtick-quoted — mkdocs_autorefs treated path segments as cross-reference targets in strict mode
 - [Phase 07]: docs/src/reference/ gitignored — mkdocs gen-files plugin generates virtual filesystem artifacts at build time; tracking in git is incorrect
 - [Phase 07]: PyPI/TestPyPI OIDC trusted publishers registered with environment names pypi/testpypi matching release.yml job environment declarations — DIST-01 complete
+- [Phase 08-review-and-improve-docs]: pragma allowlist secret required on bash export lines (not just Python strings) when example passwords are present — detect-secrets catches both
+- [Phase 08-review-and-improve-docs]: collections.abc moved to TYPE_CHECKING block in _pool_factory.py — only used as return type annotation, not needed at runtime with __future__ annotations
+- [Phase 08-03]: git-cliff 2.12.0 requires --config flag to reference .cliff.toml (searches for cliff.toml without leading dot by default); --unreleased covers all commits when repo has no tags
 
 ### Pending Todos
 
@@ -143,6 +147,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-27
-Stopped at: Completed 07-05-PLAN.md — plan 07-06 ready
+Last session: 2026-02-28
+Stopped at: Completed 08-05-PLAN.md — plan 08-06 ready
 Resume file: None
