@@ -156,6 +156,7 @@ None yet.
 | 4 | move managed_pool example under Disposing the pool | 2026-02-28 | 763db80 | Complete | [4-move-managed-pool-example-under-disposin](.planning/quick/4-move-managed-pool-example-under-disposin/) |
 | 5 | mkdocs hot-reload not working | 2026-02-28 | 32d6a6d | Needs Review | [5-mkdocs-hot-reload-not-working](.planning/quick/5-mkdocs-hot-reload-not-working/) |
 | 5 | mkdocs hot-reload not working — add --dirtyreload | 2026-02-28 | 32d6a6d | Complete | [5-mkdocs-hot-reload-not-working](.planning/quick/5-mkdocs-hot-reload-not-working/) |
+| 7 | improve README and add project homepage | 2026-02-28 | 19e9733 | Complete | [7-improve-readme-and-add-project-homepage-](.planning/quick/7-improve-readme-and-add-project-homepage-/) |
 
 ### Blockers/Concerns
 
@@ -165,5 +166,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-28
-Stopped at: Completed quick task 5 — added --dirtyreload to justfile serve recipe for faster mkdocs hot-reload
+Stopped at: Completed quick task 7 — improved README.md with tagline, DuckDB example, warehouse list, and links; added [project.urls] to pyproject.toml for PyPI sidebar
 Resume file: None
