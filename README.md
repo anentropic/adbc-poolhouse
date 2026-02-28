@@ -1,6 +1,6 @@
 # adbc-poolhouse
 
-Connection pooling for ADBC drivers from typed warehouse configs
+One config in, one pool out — `create_pool(SnowflakeConfig(...))` returns a ready-to-use SQLAlchemy QueuePool.
 
 ## Installation
 
@@ -8,33 +8,40 @@ Connection pooling for ADBC drivers from typed warehouse configs
 pip install adbc-poolhouse
 ```
 
-## Development
+Driver extras are available for each supported warehouse (DuckDB, Snowflake, BigQuery, PostgreSQL, FlightSQL). See the [documentation](https://anentropic.github.io/adbc-poolhouse/) for the full list.
 
-### Quality Gates
+## Quick example
 
-Before committing, all code must pass:
+The example below uses DuckDB — no credentials or running server required.
 
-```bash
-prek run --all-files  # Runs typecheck, lint, format, test
+```python
+from adbc_poolhouse import DuckDBConfig, create_pool, close_pool
+
+# File-backed database (connections share the same file)
+config = DuckDBConfig(database="/tmp/warehouse.db")
+pool = create_pool(config)
+
+with pool.connect() as conn:
+    cursor = conn.cursor()
+    cursor.execute("SELECT 42 AS answer")
+    row = cursor.fetchone()
+    print(row)  # (42,)
+
+close_pool(pool)
 ```
 
-Or run individually:
-```bash
-uv run basedpyright  # Type checking (strict mode)
-uv run ruff check    # Linting
-uv run ruff format --check  # Formatting
-uv run pytest        # Tests
-```
+`pool.connect()` checks out a connection from the pool and returns it when the `with` block exits. `close_pool(pool)` drains the pool and closes the underlying ADBC source connection.
 
-### Setup
+## Supported warehouses
 
-```bash
-# Install dependencies
-uv sync --dev
+DuckDB, Snowflake, BigQuery, PostgreSQL, FlightSQL, Databricks, Redshift, Trino, MSSQL / Azure SQL / Fabric.
 
-# Install git hooks
-prek install
-```
+## Links
+
+- [Documentation](https://anentropic.github.io/adbc-poolhouse/)
+- [Changelog](https://anentropic.github.io/adbc-poolhouse/changelog/)
+- [Source](https://github.com/anentropic/adbc-poolhouse)
+- [PyPI](https://pypi.org/project/adbc-poolhouse/)
 
 ## License
 
