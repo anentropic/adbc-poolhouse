@@ -152,6 +152,7 @@ None yet.
 |---|-------------|------|--------|--------|-----------|
 | 1 | check (with `gh run list` and related commands) and fix CI failures | 2026-02-27 | 50db351 | Needs Review | [1-check-with-gh-run-list-and-related-comma](.planning/quick/1-check-with-gh-run-list-and-related-comma/) |
 | 2 | add a justfile with recipes for build and serve | 2026-02-28 | 9c91b4a | Complete | [2-add-a-justfile-with-recipes-for-build-an](.planning/quick/2-add-a-justfile-with-recipes-for-build-an/) |
+| 3 | docs guides foundry drivers need a link | 2026-02-28 | 061de45 | Complete | [3-docs-guides-foundry-drivers-need-a-link-](.planning/quick/3-docs-guides-foundry-drivers-need-a-link-/) |
 
 ### Blockers/Concerns
 
@@ -161,5 +162,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-28
-Stopped at: Completed quick task 2 — justfile added with build and serve recipes
+Stopped at: Completed quick task 3 — Foundry installation guide hyperlinks added to all five Foundry driver pages
 Resume file: None
