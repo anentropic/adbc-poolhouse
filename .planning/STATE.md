@@ -25,7 +25,7 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 Phase: 8 of 8 (Review and Improve Docs) - Complete
 Plan: 08-06 complete — Phase 8 Complete
 Status: All 6 plans complete. mkdocs.yml nav updated with Warehouse Guides sub-section; all 10 warehouse guide pages linked; strict build passes.
-Last activity: 2026-02-28 - Completed quick task 4: move managed_pool example under Disposing the pool
+Last activity: 2026-02-28 - Completed quick task 5: mkdocs hot-reload fix (--dirtyreload + 127.0.0.1)
 
 Progress: [██████████] 100%
 
@@ -154,6 +154,7 @@ None yet.
 | 2 | add a justfile with recipes for build and serve | 2026-02-28 | 9c91b4a | Complete | [2-add-a-justfile-with-recipes-for-build-an](.planning/quick/2-add-a-justfile-with-recipes-for-build-an/) |
 | 3 | docs guides foundry drivers need a link | 2026-02-28 | 061de45 | Complete | [3-docs-guides-foundry-drivers-need-a-link-](.planning/quick/3-docs-guides-foundry-drivers-need-a-link-/) |
 | 4 | move managed_pool example under Disposing the pool | 2026-02-28 | 763db80 | Complete | [4-move-managed-pool-example-under-disposin](.planning/quick/4-move-managed-pool-example-under-disposin/) |
+| 5 | mkdocs hot-reload not working | 2026-02-28 | 32d6a6d | Needs Review | [5-mkdocs-hot-reload-not-working](.planning/quick/5-mkdocs-hot-reload-not-working/) |
 | 5 | mkdocs hot-reload not working — add --dirtyreload | 2026-02-28 | 32d6a6d | Complete | [5-mkdocs-hot-reload-not-working](.planning/quick/5-mkdocs-hot-reload-not-working/) |
 
 ### Blockers/Concerns
