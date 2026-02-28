@@ -1,7 +1,7 @@
 # Trino guide
 
 The Trino ADBC driver is distributed via the ADBC Driver Foundry, not PyPI.
-Follow your Foundry installation guide to install it before using `TrinoConfig`.
+Follow the [Foundry installation guide](https://arrow.apache.org/adbc/current/driver/installation.html) to install it before using `TrinoConfig`.
 
 `adbc-poolhouse` does not need a separate extra for Trino:
 

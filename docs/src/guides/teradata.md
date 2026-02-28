@@ -5,6 +5,7 @@
     what will be available when support is added.
 
 The Teradata ADBC driver is distributed via the ADBC Driver Foundry, not PyPI.
+Follow the [Foundry installation guide](https://arrow.apache.org/adbc/current/driver/installation.html) to install it before using `TeradataConfig`.
 
 Teradata support — including `TeradataConfig` and the matching ADBC driver integration
 — is planned for a future release. Track progress or request prioritisation on the
