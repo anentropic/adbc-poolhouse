@@ -27,6 +27,18 @@ close_pool(pool)
 
 `close_pool` drains the pool, closes each pooled connection, and releases the ADBC source connection in one call. Calling `pool.dispose()` alone leaves a file handle or network socket open until the process exits.
 
+For scripts and short-lived processes, use `managed_pool` as a context manager instead:
+
+```python
+from adbc_poolhouse import DuckDBConfig, managed_pool
+
+with managed_pool(DuckDBConfig(database="/tmp/test.db")) as pool:
+    with pool.connect() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT 1")
+# pool is automatically closed when the with block exits
+```
+
 ## Pytest fixture pattern
 
 For test suites, create the pool once per session and dispose it in the fixture teardown:
@@ -46,18 +58,6 @@ def pool():
 ```
 
 Using `scope="session"` creates one pool for the entire test session. If your tests need isolation between test functions, use `scope="function"` instead — each test gets its own pool.
-
-For scripts and short-lived processes, use `managed_pool` as a context manager instead:
-
-```python
-from adbc_poolhouse import DuckDBConfig, managed_pool
-
-with managed_pool(DuckDBConfig(database="/tmp/test.db")) as pool:
-    with pool.connect() as conn:
-        cursor = conn.cursor()
-        cursor.execute("SELECT 1")
-# pool is automatically closed when the with block exits
-```
 
 ## Tuning the pool
 
