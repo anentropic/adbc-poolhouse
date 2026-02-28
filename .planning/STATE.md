@@ -154,6 +154,7 @@ None yet.
 | 2 | add a justfile with recipes for build and serve | 2026-02-28 | 9c91b4a | Complete | [2-add-a-justfile-with-recipes-for-build-an](.planning/quick/2-add-a-justfile-with-recipes-for-build-an/) |
 | 3 | docs guides foundry drivers need a link | 2026-02-28 | 061de45 | Complete | [3-docs-guides-foundry-drivers-need-a-link-](.planning/quick/3-docs-guides-foundry-drivers-need-a-link-/) |
 | 4 | move managed_pool example under Disposing the pool | 2026-02-28 | 763db80 | Complete | [4-move-managed-pool-example-under-disposin](.planning/quick/4-move-managed-pool-example-under-disposin/) |
+| 5 | mkdocs hot-reload not working — add --dirtyreload | 2026-02-28 | 32d6a6d | Complete | [5-mkdocs-hot-reload-not-working](.planning/quick/5-mkdocs-hot-reload-not-working/) |
 
 ### Blockers/Concerns
 
@@ -163,5 +164,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-28
-Stopped at: Completed quick task 4 — managed_pool example moved under Disposing the pool in pool-lifecycle.md
+Stopped at: Completed quick task 5 — added --dirtyreload to justfile serve recipe for faster mkdocs hot-reload
 Resume file: None
