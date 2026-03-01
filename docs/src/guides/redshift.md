@@ -12,7 +12,7 @@ pip install adbc-poolhouse
 ## Connection
 
 `RedshiftConfig` supports provisioned clusters (standard SQL auth and IAM) and
-Redshift Serverless. Specify the connection as a URI or via decomposed fields.
+Redshift Serverless. Specify the connection as a URI or via individual fields.
 
 ### URI
 
@@ -25,7 +25,7 @@ config = RedshiftConfig(
 pool = create_pool(config)
 ```
 
-### Decomposed fields
+### Individual fields
 
 ```python
 config = RedshiftConfig(

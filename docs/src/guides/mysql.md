@@ -12,7 +12,7 @@ pip install adbc-poolhouse
 ## Connection
 
 `MySQLConfig` connects to a MySQL server. You must specify the connection in one of two
-ways: a full URI or decomposed fields (`host` and `user` together, with optional
+ways: a full URI or individual fields (`host` and `user` together, with optional
 `password`, `database`, and `port`).
 
 Construction raises `ConfigurationError` if neither mode is fully specified.
@@ -28,7 +28,7 @@ config = MySQLConfig(
 pool = create_pool(config)
 ```
 
-### Decomposed fields
+### Individual fields
 
 ```python
 from adbc_poolhouse import MySQLConfig, create_pool

@@ -11,7 +11,7 @@ pip install adbc-poolhouse
 
 ## Connection
 
-`TrinoConfig` supports URI-based or decomposed field connection specification.
+`TrinoConfig` supports URI-based or individual field connection specification.
 
 ### URI
 
@@ -24,7 +24,7 @@ config = TrinoConfig(
 pool = create_pool(config)
 ```
 
-### Decomposed fields
+### Individual fields
 
 ```python
 config = TrinoConfig(

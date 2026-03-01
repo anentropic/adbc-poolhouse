@@ -25,7 +25,7 @@ config = MSSQLConfig(
 pool = create_pool(config)
 ```
 
-### Decomposed fields
+### Individual fields
 
 ```python
 from adbc_poolhouse import MSSQLConfig, create_pool
