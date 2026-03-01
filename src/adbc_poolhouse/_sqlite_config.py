@@ -24,10 +24,6 @@ class SQLiteConfig(BaseWarehouseConfig):
     database=':memory:' is almost always unintended (connection state
     races across a single shared DB), so it is rejected by a validator.
 
-    Args:
-        database: File path or ':memory:'. Default ':memory:'.
-        pool_size: Number of connections in the pool. Default 1.
-
     Example:
         SQLiteConfig(database='/data/warehouse.db', pool_size=5)
         SQLiteConfig()  # in-memory, pool_size=1 enforced by validator
