@@ -12,6 +12,33 @@ pip install adbc-poolhouse
 `MSSQLConfig` covers Microsoft SQL Server, Azure SQL Database, Azure SQL Managed
 Instance, Azure Synapse Analytics, and Azure Fabric SQL endpoint.
 
+## Connection
+
+### URI mode
+
+```python
+from adbc_poolhouse import MSSQLConfig, create_pool
+
+config = MSSQLConfig(
+    uri="sqlserver://me:s3cret@myserver.database.windows.net:1433?database=mydb",  # pragma: allowlist secret
+)
+pool = create_pool(config)
+```
+
+### Decomposed fields
+
+```python
+from adbc_poolhouse import MSSQLConfig, create_pool
+
+config = MSSQLConfig(
+    host="myserver.database.windows.net",
+    user="me",
+    password="s3cret",  # pragma: allowlist secret
+    database="mydb",
+)
+pool = create_pool(config)
+```
+
 ## Loading from environment variables
 
 `MSSQLConfig` reads all fields from environment variables with the `MSSQL_` prefix:
@@ -24,12 +51,13 @@ export MSSQL_DATABASE=mydb
 ```
 
 ```python
-from adbc_poolhouse import MSSQLConfig
+from adbc_poolhouse import MSSQLConfig, create_pool
 
 config = MSSQLConfig()  # reads from env
+pool = create_pool(config)
 ```
 
 ## See also
 
 - [Configuration reference](configuration.md) — env_prefix, pool tuning, Foundry backends
-- [API Reference](../reference/) — full MSSQLConfig field listing
+- [Pool lifecycle](pool-lifecycle.md) — close_pool, pytest fixtures
