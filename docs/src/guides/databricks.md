@@ -12,10 +12,12 @@ pip install adbc-poolhouse
 ## Connection
 
 `DatabricksConfig` connects to a Databricks SQL warehouse or all-purpose cluster
-using a personal access token (PAT). Specify the connection as a URI or via
-decomposed fields.
+using a personal access token (PAT). You must specify the connection in one of two
+ways: a full URI or decomposed fields (`host`, `http_path`, and `token` together).
 
-### URI
+Construction raises `ConfigurationError` if neither mode is fully specified.
+
+### URI mode
 
 ```python
 from adbc_poolhouse import DatabricksConfig, create_pool
@@ -28,28 +30,40 @@ pool = create_pool(config)
 
 ### Decomposed fields
 
+Set `host`, `http_path`, and `token` together. The driver constructs the URI
+internally, percent-encoding the token so that special characters (`+`, `=`, `/`)
+do not corrupt the connection string.
+
 ```python
+from pydantic import SecretStr
+from adbc_poolhouse import DatabricksConfig, create_pool
+
 config = DatabricksConfig(
     host="adb-xxx.azuredatabricks.net",
     http_path="/sql/1.0/warehouses/abc123",
-    token="dapi...",  # pragma: allowlist secret
+    token=SecretStr("dapi..."),  # pragma: allowlist secret
 )
 pool = create_pool(config)
 ```
 
 ## Loading from environment variables
 
-`DatabricksConfig` reads all fields from environment variables with the `DATABRICKS_` prefix:
+`DatabricksConfig` reads all fields from environment variables with the `DATABRICKS_` prefix.
+For decomposed mode, all three variables must be set at the same time — setting only
+`DATABRICKS_HOST` or `DATABRICKS_TOKEN` alone causes `ConfigurationError` at construction.
 
 ```bash
 export DATABRICKS_HOST=adb-xxx.azuredatabricks.net
 export DATABRICKS_HTTP_PATH=/sql/1.0/warehouses/abc123
-export DATABRICKS_TOKEN=dapi...
+export DATABRICKS_TOKEN=dapi...  # pragma: allowlist secret
 ```
 
 ```python
-config = DatabricksConfig()  # reads from env
+config = DatabricksConfig()  # reads host, http_path, and token from env
+pool = create_pool(config)
 ```
+
+For URI mode, set `DATABRICKS_URI` instead of the three individual variables.
 
 ## See also
 
