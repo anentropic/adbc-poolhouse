@@ -1,7 +1,7 @@
 # MSSQL guide
 
 The MSSQL ADBC driver is distributed via the ADBC Driver Foundry, not PyPI.
-Follow the [Foundry installation guide](https://arrow.apache.org/adbc/current/driver/installation.html) to install it before using `MSSQLConfig`.
+Follow the [Foundry installation guide](https://arrow.apache.org/adbc/current/driver/installation.html) to install it before using [`MSSQLConfig`][adbc_poolhouse.MSSQLConfig].
 
 `adbc-poolhouse` does not need a separate extra for MSSQL:
 
@@ -9,7 +9,7 @@ Follow the [Foundry installation guide](https://arrow.apache.org/adbc/current/dr
 pip install adbc-poolhouse
 ```
 
-`MSSQLConfig` covers Microsoft SQL Server, Azure SQL Database, Azure SQL Managed
+[`MSSQLConfig`][adbc_poolhouse.MSSQLConfig] covers Microsoft SQL Server, Azure SQL Database, Azure SQL Managed
 Instance, Azure Synapse Analytics, and Azure Fabric SQL endpoint.
 
 ## Connection
@@ -41,7 +41,7 @@ pool = create_pool(config)
 
 ## Loading from environment variables
 
-`MSSQLConfig` reads all fields from environment variables with the `MSSQL_` prefix:
+[`MSSQLConfig`][adbc_poolhouse.MSSQLConfig] reads all fields from environment variables with the `MSSQL_` prefix:
 
 ```bash
 export MSSQL_HOST=myserver.database.windows.net

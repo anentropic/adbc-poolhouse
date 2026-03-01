@@ -14,7 +14,7 @@ uv add "adbc-poolhouse[bigquery]"
 
 ## Auth methods
 
-`BigQueryConfig` supports four auth methods via `auth_type`.
+[`BigQueryConfig`][adbc_poolhouse.BigQueryConfig] supports four auth methods via `auth_type`.
 
 ### Application Default Credentials
 
@@ -64,7 +64,7 @@ config = BigQueryConfig(
 
 ## Loading from environment variables
 
-`BigQueryConfig` reads all fields from environment variables with the `BIGQUERY_` prefix:
+[`BigQueryConfig`][adbc_poolhouse.BigQueryConfig] reads all fields from environment variables with the `BIGQUERY_` prefix:
 
 ```bash
 export BIGQUERY_PROJECT_ID=my-gcp-project

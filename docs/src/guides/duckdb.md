@@ -14,7 +14,7 @@ uv add "adbc-poolhouse[duckdb]"
 
 ## Connection
 
-`DuckDBConfig` supports file-backed and in-memory databases.
+[`DuckDBConfig`][adbc_poolhouse.DuckDBConfig] supports file-backed and in-memory databases.
 
 For a pool with more than one connection, use a file path. Each in-memory connection gets its own isolated database — sharing state across connections is not possible with `:memory:`.
 
@@ -45,7 +45,7 @@ pool = create_pool(config)
 
 ## Loading from environment variables
 
-`DuckDBConfig` reads all fields from environment variables with the `DUCKDB_` prefix:
+[`DuckDBConfig`][adbc_poolhouse.DuckDBConfig] reads all fields from environment variables with the `DUCKDB_` prefix:
 
 ```bash
 export DUCKDB_DATABASE=/data/warehouse.db

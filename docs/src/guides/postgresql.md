@@ -44,7 +44,7 @@ pool = create_pool(config)
 
 ## Loading from environment variables
 
-`PostgreSQLConfig` reads fields from environment variables with the `POSTGRESQL_` prefix:
+[`PostgreSQLConfig`][adbc_poolhouse.PostgreSQLConfig] reads fields from environment variables with the `POSTGRESQL_` prefix:
 
 ```bash
 export POSTGRESQL_HOST=db.example.com

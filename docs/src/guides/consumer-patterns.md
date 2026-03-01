@@ -37,7 +37,7 @@ from sqlalchemy.pool import NullPool
 engine = create_engine("duckdb://", creator=pool.connect, poolclass=NullPool)
 ```
 
-For Snowflake or other warehouses, replace `DuckDBConfig` with the matching config class. The lifespan pattern is the same.
+For Snowflake or other warehouses, replace [`DuckDBConfig`][adbc_poolhouse.DuckDBConfig] with the matching config class. The lifespan pattern is the same.
 
 ## Loading credentials from dbt
 
@@ -80,7 +80,7 @@ pip install dbt-core
 pip install dbt-snowflake
 ```
 
-For production deployments, load credentials from environment variables instead of from the profiles file. `SnowflakeConfig` reads all fields from environment variables using the `SNOWFLAKE_` prefix — see [Configuration reference](configuration.md) for details.
+For production deployments, load credentials from environment variables instead of from the profiles file. [`SnowflakeConfig`][adbc_poolhouse.SnowflakeConfig] reads all fields from environment variables using the `SNOWFLAKE_` prefix — see [Configuration reference](configuration.md) for details.
 
 ## See also
 

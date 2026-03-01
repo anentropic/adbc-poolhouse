@@ -15,7 +15,7 @@ pip install adbc-poolhouse
 using a personal access token (PAT). You must specify the connection in one of two
 ways: a full URI or individual fields (`host`, `http_path`, and `token` together).
 
-Construction raises `ConfigurationError` if neither mode is fully specified.
+Construction raises [`ConfigurationError`][adbc_poolhouse.ConfigurationError] if neither mode is fully specified.
 
 ### URI mode
 
@@ -50,7 +50,7 @@ pool = create_pool(config)
 
 `DatabricksConfig` reads all fields from environment variables with the `DATABRICKS_` prefix.
 For individual field mode, all three variables must be set at the same time — setting only
-`DATABRICKS_HOST` or `DATABRICKS_TOKEN` alone causes `ConfigurationError` at construction.
+`DATABRICKS_HOST` or `DATABRICKS_TOKEN` alone causes [`ConfigurationError`][adbc_poolhouse.ConfigurationError] at construction.
 
 ```bash
 export DATABRICKS_HOST=adb-xxx.azuredatabricks.net

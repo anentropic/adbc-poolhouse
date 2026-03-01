@@ -1,7 +1,7 @@
 # Redshift guide
 
 The Redshift ADBC driver is distributed via the ADBC Driver Foundry, not PyPI.
-Follow the [Foundry installation guide](https://arrow.apache.org/adbc/current/driver/installation.html) to install it before using `RedshiftConfig`.
+Follow the [Foundry installation guide](https://arrow.apache.org/adbc/current/driver/installation.html) to install it before using [`RedshiftConfig`][adbc_poolhouse.RedshiftConfig].
 
 `adbc-poolhouse` does not need a separate extra for Redshift:
 
@@ -11,7 +11,7 @@ pip install adbc-poolhouse
 
 ## Connection
 
-`RedshiftConfig` supports provisioned clusters (standard SQL auth and IAM) and
+[`RedshiftConfig`][adbc_poolhouse.RedshiftConfig] supports provisioned clusters (standard SQL auth and IAM) and
 Redshift Serverless. Specify the connection as a URI or via individual fields.
 
 ### URI
@@ -40,7 +40,7 @@ pool = create_pool(config)
 
 ## Loading from environment variables
 
-`RedshiftConfig` reads all fields from environment variables with the `REDSHIFT_` prefix:
+[`RedshiftConfig`][adbc_poolhouse.RedshiftConfig] reads all fields from environment variables with the `REDSHIFT_` prefix:
 
 ```bash
 export REDSHIFT_HOST=my-cluster.us-east-1.redshift.amazonaws.com

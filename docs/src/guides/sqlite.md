@@ -14,7 +14,7 @@ uv add "adbc-poolhouse[sqlite]"
 
 ## Connection
 
-`SQLiteConfig` supports file-backed and in-memory databases.
+[`SQLiteConfig`][adbc_poolhouse.SQLiteConfig] supports file-backed and in-memory databases.
 
 For a pool with more than one connection, use a file path. In-memory SQLite is shared across all connections in the pool — unlike DuckDB, where each connection gets its own isolated database.
 
@@ -38,7 +38,7 @@ pool = create_pool(config)
 
 ## Loading from environment variables
 
-`SQLiteConfig` reads all fields from environment variables with the `SQLITE_` prefix:
+[`SQLiteConfig`][adbc_poolhouse.SQLiteConfig] reads all fields from environment variables with the `SQLITE_` prefix:
 
 ```bash
 export SQLITE_DATABASE=/data/warehouse.db

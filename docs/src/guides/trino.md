@@ -1,7 +1,7 @@
 # Trino guide
 
 The Trino ADBC driver is distributed via the ADBC Driver Foundry, not PyPI.
-Follow the [Foundry installation guide](https://arrow.apache.org/adbc/current/driver/installation.html) to install it before using `TrinoConfig`.
+Follow the [Foundry installation guide](https://arrow.apache.org/adbc/current/driver/installation.html) to install it before using [`TrinoConfig`][adbc_poolhouse.TrinoConfig].
 
 `adbc-poolhouse` does not need a separate extra for Trino:
 
@@ -11,7 +11,7 @@ pip install adbc-poolhouse
 
 ## Connection
 
-`TrinoConfig` supports URI-based or individual field connection specification.
+[`TrinoConfig`][adbc_poolhouse.TrinoConfig] supports URI-based or individual field connection specification.
 
 ### URI
 
@@ -39,7 +39,7 @@ pool = create_pool(config)
 
 ## Loading from environment variables
 
-`TrinoConfig` reads all fields from environment variables with the `TRINO_` prefix:
+[`TrinoConfig`][adbc_poolhouse.TrinoConfig] reads all fields from environment variables with the `TRINO_` prefix:
 
 ```bash
 export TRINO_HOST=trino.example.com

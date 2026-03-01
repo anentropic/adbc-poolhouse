@@ -1,7 +1,7 @@
 # MySQL guide
 
 The MySQL ADBC driver is distributed via the ADBC Driver Foundry, not PyPI.
-Follow the [Foundry installation guide](https://arrow.apache.org/adbc/current/driver/installation.html) to install it before using `MySQLConfig`.
+Follow the [Foundry installation guide](https://arrow.apache.org/adbc/current/driver/installation.html) to install it before using [`MySQLConfig`][adbc_poolhouse.MySQLConfig].
 
 `adbc-poolhouse` does not need a separate extra for MySQL:
 
@@ -11,11 +11,11 @@ pip install adbc-poolhouse
 
 ## Connection
 
-`MySQLConfig` connects to a MySQL server. You must specify the connection in one of two
+[`MySQLConfig`][adbc_poolhouse.MySQLConfig] connects to a MySQL server. You must specify the connection in one of two
 ways: a full URI or individual fields (`host` and `user` together, with optional
 `password`, `database`, and `port`).
 
-Construction raises `ConfigurationError` if neither mode is fully specified.
+Construction raises [`ConfigurationError`][adbc_poolhouse.ConfigurationError] if neither mode is fully specified.
 
 ### URI mode
 
@@ -46,7 +46,7 @@ pool = create_pool(config)
 
 ## Loading from environment variables
 
-`MySQLConfig` reads all fields from environment variables with the `MYSQL_` prefix:
+[`MySQLConfig`][adbc_poolhouse.MySQLConfig] reads all fields from environment variables with the `MYSQL_` prefix:
 
 ```bash
 export MYSQL_HOST=localhost

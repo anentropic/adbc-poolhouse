@@ -8,17 +8,17 @@ Each config class reads its fields from environment variables with a prefix matc
 
 | Config class | env_prefix |
 |---|---|
-| `DuckDBConfig` | `DUCKDB_` |
-| `SQLiteConfig` | `SQLITE_` |
-| `SnowflakeConfig` | `SNOWFLAKE_` |
-| `BigQueryConfig` | `BIGQUERY_` |
-| `PostgreSQLConfig` | `POSTGRESQL_` |
-| `FlightSQLConfig` | `FLIGHTSQL_` |
-| `DatabricksConfig` | `DATABRICKS_` |
-| `RedshiftConfig` | `REDSHIFT_` |
-| `TrinoConfig` | `TRINO_` |
-| `MSSQLConfig` | `MSSQL_` |
-| `MySQLConfig` | `MYSQL_` |
+| [`DuckDBConfig`][adbc_poolhouse.DuckDBConfig] | `DUCKDB_` |
+| [`SQLiteConfig`][adbc_poolhouse.SQLiteConfig] | `SQLITE_` |
+| [`SnowflakeConfig`][adbc_poolhouse.SnowflakeConfig] | `SNOWFLAKE_` |
+| [`BigQueryConfig`][adbc_poolhouse.BigQueryConfig] | `BIGQUERY_` |
+| [`PostgreSQLConfig`][adbc_poolhouse.PostgreSQLConfig] | `POSTGRESQL_` |
+| [`FlightSQLConfig`][adbc_poolhouse.FlightSQLConfig] | `FLIGHTSQL_` |
+| [`DatabricksConfig`][adbc_poolhouse.DatabricksConfig] | `DATABRICKS_` |
+| [`RedshiftConfig`][adbc_poolhouse.RedshiftConfig] | `REDSHIFT_` |
+| [`TrinoConfig`][adbc_poolhouse.TrinoConfig] | `TRINO_` |
+| [`MSSQLConfig`][adbc_poolhouse.MSSQLConfig] | `MSSQL_` |
+| [`MySQLConfig`][adbc_poolhouse.MySQLConfig] | `MYSQL_` |
 
 For example, setting `SNOWFLAKE_ACCOUNT=myorg-myaccount` in the environment is equivalent to passing `account="myorg-myaccount"` to `SnowflakeConfig(...)`.
 
@@ -38,7 +38,7 @@ pool = create_pool(config)
 
 ## Pool tuning
 
-All config classes inherit pool tuning fields from `BaseWarehouseConfig`. These also load from environment variables using the same warehouse prefix:
+All config classes inherit pool tuning fields from [`BaseWarehouseConfig`][adbc_poolhouse.BaseWarehouseConfig]. These also load from environment variables using the same warehouse prefix:
 
 | Field | Default | Description |
 |---|---|---|
@@ -69,7 +69,7 @@ Call `.get_secret_value()` when you need the raw string — for example, passing
 
 ## Foundry-distributed backends
 
-`DatabricksConfig`, `MySQLConfig`, `RedshiftConfig`, `TrinoConfig`, and `MSSQLConfig` are present in the package but their ADBC drivers are not available on PyPI. They are distributed through the ADBC Driver Foundry. If you use one of these backends, follow the installation guide for your Foundry setup to get the correct driver package installed.
+[`DatabricksConfig`][adbc_poolhouse.DatabricksConfig], [`MySQLConfig`][adbc_poolhouse.MySQLConfig], [`RedshiftConfig`][adbc_poolhouse.RedshiftConfig], [`TrinoConfig`][adbc_poolhouse.TrinoConfig], and [`MSSQLConfig`][adbc_poolhouse.MSSQLConfig] are present in the package but their ADBC drivers are not available on PyPI. They are distributed through the ADBC Driver Foundry. If you use one of these backends, follow the installation guide for your Foundry setup to get the correct driver package installed.
 
 ## See also
 

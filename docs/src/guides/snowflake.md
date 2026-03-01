@@ -14,7 +14,7 @@ uv add "adbc-poolhouse[snowflake]"
 
 ## Auth methods
 
-`SnowflakeConfig` supports four auth methods: password, JWT private key, OAuth, and external browser. Set the fields matching your method; unset fields are omitted from the connection.
+[`SnowflakeConfig`][adbc_poolhouse.SnowflakeConfig] supports four auth methods: password, JWT private key, OAuth, and external browser. Set the fields matching your method; unset fields are omitted from the connection.
 
 ### Password
 
@@ -33,7 +33,7 @@ pool = create_pool(config)
 
 ### JWT private key
 
-Use either a file path or PEM content — not both. Providing both raises `ConfigurationError`.
+Use either a file path or PEM content — not both. Providing both raises [`ConfigurationError`][adbc_poolhouse.ConfigurationError].
 
 ```python
 from pathlib import Path
@@ -86,7 +86,7 @@ config = SnowflakeConfig(
 
 ## Loading from environment variables
 
-`SnowflakeConfig` reads all fields from environment variables with the `SNOWFLAKE_` prefix:
+[`SnowflakeConfig`][adbc_poolhouse.SnowflakeConfig] reads all fields from environment variables with the `SNOWFLAKE_` prefix:
 
 ```bash
 export SNOWFLAKE_ACCOUNT=myorg-myaccount
