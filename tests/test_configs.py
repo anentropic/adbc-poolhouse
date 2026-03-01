@@ -150,14 +150,23 @@ class TestApacheBackendConfigs:
 class TestFoundryBackendConfigs:
     """Smoke tests for Databricks, Redshift, Trino, MSSQL."""
 
-    def test_databricks_default_construction(self) -> None:
-        db = DatabricksConfig()
+    def test_databricks_no_args_raises(self) -> None:
+        """DatabricksConfig() with no connection spec raises ValidationError."""
+        with pytest.raises(ValidationError):
+            DatabricksConfig()
+
+    def test_databricks_uri_constructs(self) -> None:
+        """DatabricksConfig with uri= constructs successfully."""
+        db = DatabricksConfig(
+            uri=SecretStr("databricks://token:dapi@host:443/sql/1.0/warehouses/abc")
+        )  # pragma: allowlist secret
         assert db.pool_size == 5
-        assert db.token is None
         assert isinstance(db, WarehouseConfig)
 
     def test_databricks_token_is_secret_str(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.setenv("DATABRICKS_TOKEN", "dapi123")
+        monkeypatch.setenv("DATABRICKS_HOST", "adb-xxx.azuredatabricks.net")
+        monkeypatch.setenv("DATABRICKS_HTTP_PATH", "/sql/1.0/warehouses/abc")
+        monkeypatch.setenv("DATABRICKS_TOKEN", "dapi123")  # pragma: allowlist secret
         db = DatabricksConfig()
         assert isinstance(db.token, SecretStr)
         assert "dapi123" not in repr(db)

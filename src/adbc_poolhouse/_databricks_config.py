@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
-from pydantic import Field, SecretStr
+from typing import Self
+
+from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import SettingsConfigDict
 
 from adbc_poolhouse._base_config import BaseWarehouseConfig
+from adbc_poolhouse._exceptions import ConfigurationError  # noqa: TC001
 
 
 class DatabricksConfig(BaseWarehouseConfig):
@@ -16,9 +19,13 @@ class DatabricksConfig(BaseWarehouseConfig):
     PyPI). Install via the ADBC Driver Foundry.
 
     Supports PAT (personal access token) and OAuth (U2M and M2M) auth.
-    Connection must be specified as a full URI. Individual fields (host,
-    http_path, token) are stored for potential future decomposed-field
-    translation but are not currently passed to the driver.
+    Supports two connection modes:
+
+    - URI mode: set ``uri`` with the full DSN string.
+    - Decomposed mode: set ``host``, ``http_path``, and ``token`` together.
+
+    At least one mode must be fully specified — construction raises
+    ``ConfigurationError`` if neither is provided.
 
     Pool tuning fields are inherited and loaded from DATABRICKS_* env vars.
 
@@ -59,3 +66,17 @@ class DatabricksConfig(BaseWarehouseConfig):
     schema_: str | None = Field(default=None, validation_alias="schema", alias="schema")
     """Default schema. Python attribute is schema_ to avoid Pydantic conflicts.
     Env: DATABRICKS_SCHEMA."""
+
+    @model_validator(mode="after")
+    def check_connection_spec(self) -> Self:
+        """Raise ConfigurationError if neither uri nor all minimum decomposed fields are set."""
+        has_uri = self.uri is not None
+        has_decomposed = (
+            self.host is not None and self.http_path is not None and self.token is not None
+        )
+        if not has_uri and not has_decomposed:
+            raise ConfigurationError(
+                "DatabricksConfig requires either 'uri' or all three of "
+                "'host', 'http_path', and 'token'. Got none of these."
+            )
+        return self
