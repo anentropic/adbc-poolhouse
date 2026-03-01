@@ -115,6 +115,41 @@ class TestNoGlobalState:
             assert not isinstance(val, sqlalchemy.pool.QueuePool)
 
 
+class TestDatabricksPoolFactory:
+    """Mock pool-factory wiring tests for Databricks decomposed-field mode."""
+
+    def test_decomposed_fields_wiring(self) -> None:
+        """Decomposed Databricks config passes URL-encoded URI to create_adbc_connection."""
+        from unittest.mock import MagicMock, patch
+
+        from pydantic import SecretStr
+
+        from adbc_poolhouse import DatabricksConfig, create_pool
+
+        config = DatabricksConfig(
+            host="host",
+            http_path="/sql/1.0/warehouses/abc",
+            token=SecretStr("dapi+test=value/path"),  # pragma: allowlist secret
+        )
+        mock_conn = MagicMock()
+        mock_conn.adbc_clone = MagicMock(return_value=MagicMock())
+
+        with patch(
+            "adbc_poolhouse._pool_factory.create_adbc_connection",
+            return_value=mock_conn,
+        ) as mock_factory:
+            pool = create_pool(config)
+            pool.dispose()
+
+        expected_uri = "databricks://token:dapi%2Btest%3Dvalue%2Fpath@host:443/sql/1.0/warehouses/abc"  # pragma: allowlist secret  # noqa: E501
+        mock_factory.assert_called_once()
+        call_args = mock_factory.call_args
+        # create_adbc_connection(driver_path, kwargs, entrypoint=entrypoint)
+        # kwargs is the second positional argument (index 1)
+        actual_kwargs = call_args.args[1]
+        assert actual_kwargs.get("uri") == expected_uri
+
+
 class TestExceptionHierarchy:
     """Exception hierarchy: PoolhouseError, ConfigurationError, DuckDBConfig bounds."""
 

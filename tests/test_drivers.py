@@ -83,8 +83,12 @@ class TestResolveFoundryDriver:
 
     def test_databricks_returns_short_name_without_find_spec(self) -> None:
         """Foundry: resolve_driver returns driver name without calling find_spec."""
+        from pydantic import SecretStr
+
+        _dbx_uri = "databricks://token:dapi@host:443/wh/abc"  # pragma: allowlist secret
+        config = DatabricksConfig(uri=SecretStr(_dbx_uri))
         with patch("importlib.util.find_spec") as mock_find:
-            result = resolve_driver(DatabricksConfig())
+            result = resolve_driver(config)
         mock_find.assert_not_called()
         assert result == "databricks"
 

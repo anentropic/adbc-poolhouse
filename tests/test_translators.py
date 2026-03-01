@@ -175,16 +175,40 @@ class TestFlightSQLTranslator:
 class TestDatabricksTranslator:
     """Unit tests for translate_databricks()."""
 
-    def test_no_uri_empty(self) -> None:
-        """DatabricksConfig() with no uri → empty dict."""
-        result = translate_databricks(DatabricksConfig())
-        assert result == {}
-
-    def test_uri_secret_extracted(self) -> None:
-        """Uri is SecretStr — get_secret_value() is called, plain string in output."""
+    def test_uri_mode_secret_extracted(self) -> None:
+        """URI mode: SecretStr extracted, returned as plain string."""
         secret_uri = SecretStr("databricks://host/catalog")  # pragma: allowlist secret
         result = translate_databricks(DatabricksConfig(uri=secret_uri))
         assert result == {"uri": "databricks://host/catalog"}
+
+    def test_decomposed_fields_url_encoded_token(self) -> None:
+        """Decomposed mode: token with special chars is percent-encoded."""
+        config = DatabricksConfig(
+            host="host",
+            http_path="/sql/1.0/warehouses/abc",
+            token=SecretStr("dapi+test=value/path"),  # pragma: allowlist secret
+        )
+        result = translate_databricks(config)
+        expected = "databricks://token:dapi%2Btest%3Dvalue%2Fpath@host:443/sql/1.0/warehouses/abc"  # pragma: allowlist secret  # noqa: E501
+        assert result == {"uri": expected}
+
+    def test_decomposed_fields_plain_token(self) -> None:
+        """Decomposed mode: token with no special chars passes through cleanly."""
+        config = DatabricksConfig(
+            host="adb-xxx.azuredatabricks.net",
+            http_path="/sql/1.0/warehouses/abc123",
+            token=SecretStr("dapitoken"),  # pragma: allowlist secret
+        )
+        result = translate_databricks(config)
+        expected = "databricks://token:dapitoken@adb-xxx.azuredatabricks.net:443/sql/1.0/warehouses/abc123"  # pragma: allowlist secret  # noqa: E501
+        assert result == {"uri": expected}
+
+    def test_no_args_raises_validation_error(self) -> None:
+        """DatabricksConfig() with no args raises ValidationError; silent empty dict path closed."""
+        from pydantic import ValidationError
+
+        with pytest.raises(ValidationError):
+            DatabricksConfig()
 
 
 class TestRedshiftTranslator:
