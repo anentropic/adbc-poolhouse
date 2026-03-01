@@ -276,6 +276,62 @@ class TestRedshiftTranslator:
         result = translate_redshift(RedshiftConfig(uri="redshift://host:5439/mydb"))
         assert result == {"uri": "redshift://host:5439/mydb"}
 
+    def test_individual_fields_builds_redshift_uri(self) -> None:
+        """Individual fields → builds a redshift:// URI."""
+        result = translate_redshift(
+            RedshiftConfig(host="rs.example.com", user="admin", database="analytics")
+        )
+        assert result == {"uri": "redshift://admin@rs.example.com/analytics"}
+
+    def test_password_url_encoded(self) -> None:
+        """Password with special chars is URL-encoded in the URI."""
+        result = translate_redshift(
+            RedshiftConfig(
+                host="rs.example.com",
+                user="admin",
+                password=SecretStr("p+a=b/c"),  # pragma: allowlist secret
+                database="analytics",
+            )
+        )
+        assert result["uri"] == (
+            "redshift://admin:p%2Ba%3Db%2Fc@rs.example.com/analytics"  # pragma: allowlist secret
+        )
+
+    def test_iam_fields_included_as_separate_kwargs(self) -> None:
+        """IAM/cluster fields appear as separate kwargs alongside uri."""
+        result = translate_redshift(
+            RedshiftConfig(
+                uri="redshift://host:5439/mydb",
+                cluster_type="redshift-iam",
+                cluster_identifier="my-cluster",
+                aws_region="us-east-1",
+            )
+        )
+        assert result["uri"] == "redshift://host:5439/mydb"
+        assert result["redshift.cluster_type"] == "redshift-iam"
+        assert result["redshift.cluster_identifier"] == "my-cluster"
+        assert result["aws_region"] == "us-east-1"
+
+    def test_uri_takes_precedence_over_individual_fields(self) -> None:
+        """When uri is set, individual fields are not used to build URI."""
+        result = translate_redshift(
+            RedshiftConfig(
+                uri="redshift://override@host/db",
+                host="ignored",
+                user="ignored",
+            )
+        )
+        assert result["uri"] == "redshift://override@host/db"
+
+    def test_aws_secret_access_key_extracted(self) -> None:
+        """aws_secret_access_key SecretStr value is extracted via get_secret_value()."""
+        result = translate_redshift(
+            RedshiftConfig(
+                aws_secret_access_key=SecretStr("mysecretkey"),  # pragma: allowlist secret
+            )
+        )
+        assert result["aws_secret_access_key"] == "mysecretkey"  # pragma: allowlist secret
+
 
 class TestTrinoTranslator:
     """
@@ -339,6 +395,53 @@ class TestTranslateConfig:
         """translate_config() dispatches SnowflakeConfig to translate_snowflake()."""
         config = SnowflakeConfig(account="a")
         assert translate_config(config) == translate_snowflake(config)
+
+    def test_bigquery_dispatch(self) -> None:
+        """translate_config() dispatches BigQueryConfig to translate_bigquery()."""
+        config = BigQueryConfig()
+        assert translate_config(config) == translate_bigquery(config)
+
+    def test_postgresql_dispatch(self) -> None:
+        """translate_config() dispatches PostgreSQLConfig to translate_postgresql()."""
+        config = PostgreSQLConfig()
+        assert translate_config(config) == translate_postgresql(config)
+
+    def test_flightsql_dispatch(self) -> None:
+        """translate_config() dispatches FlightSQLConfig to translate_flightsql()."""
+        config = FlightSQLConfig()
+        assert translate_config(config) == translate_flightsql(config)
+
+    def test_databricks_dispatch(self) -> None:
+        """translate_config() dispatches DatabricksConfig to translate_databricks()."""
+        config = DatabricksConfig(
+            uri=SecretStr("databricks://token:dapi@host:443/wh/abc")  # pragma: allowlist secret
+        )
+        assert translate_config(config) == translate_databricks(config)
+
+    def test_redshift_dispatch(self) -> None:
+        """translate_config() dispatches RedshiftConfig to translate_redshift()."""
+        config = RedshiftConfig()
+        assert translate_config(config) == translate_redshift(config)
+
+    def test_trino_dispatch(self) -> None:
+        """translate_config() dispatches TrinoConfig to translate_trino()."""
+        config = TrinoConfig()
+        assert translate_config(config) == translate_trino(config)
+
+    def test_mssql_dispatch(self) -> None:
+        """translate_config() dispatches MSSQLConfig to translate_mssql()."""
+        config = MSSQLConfig()
+        assert translate_config(config) == translate_mssql(config)
+
+    def test_mysql_dispatch(self) -> None:
+        """translate_config() dispatches MySQLConfig to translate_mysql()."""
+        config = MySQLConfig(host="h", user="u", database="db")
+        assert translate_config(config) == translate_mysql(config)
+
+    def test_sqlite_dispatch(self) -> None:
+        """translate_config() dispatches SQLiteConfig to translate_sqlite()."""
+        config = SQLiteConfig()
+        assert translate_config(config) == translate_sqlite(config)
 
     def test_unsupported_type_raises_type_error(self) -> None:
         """translate_config() with unknown type raises TypeError."""

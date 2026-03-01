@@ -148,6 +148,12 @@ class TestApacheBackendConfigs:
         bq = BigQueryConfig()
         assert bq.pool_size == 7
 
+    def test_flightsql_env_prefix_pool_size(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """FLIGHTSQL_POOL_SIZE env var sets pool_size via env_prefix."""
+        monkeypatch.setenv("FLIGHTSQL_POOL_SIZE", "6")
+        f = FlightSQLConfig()
+        assert f.pool_size == 6
+
 
 class TestPostgreSQLConfig:
     """Unit tests for PostgreSQLConfig — individual fields and env prefix."""
@@ -347,3 +353,121 @@ class TestMySQLConfig:
         monkeypatch.setenv("MYSQL_POOL_SIZE", "7")
         c = MySQLConfig()
         assert c.pool_size == 7
+
+
+class TestRedshiftConfig:
+    """Unit tests for RedshiftConfig — individual fields, SecretStr, and env prefix."""
+
+    def test_uri_mode_constructs(self) -> None:
+        """RedshiftConfig with uri= constructs successfully."""
+        c = RedshiftConfig(uri="redshift://host:5439/mydb")
+        assert c.uri == "redshift://host:5439/mydb"
+        assert isinstance(c, WarehouseConfig)
+
+    def test_individual_fields_construct(self) -> None:
+        """RedshiftConfig with host/user/database constructs correctly."""
+        c = RedshiftConfig(host="rs.example.com", user="admin", database="analytics")
+        assert c.host == "rs.example.com"
+        assert c.user == "admin"
+        assert c.database == "analytics"
+        assert c.port is None
+        assert isinstance(c, WarehouseConfig)
+
+    def test_password_is_secret_str(self) -> None:
+        """Password field is SecretStr — repr does not expose value."""
+        c = RedshiftConfig(
+            host="rs.example.com",
+            user="admin",
+            password=SecretStr("hunter2"),  # pragma: allowlist secret
+            database="analytics",
+        )
+        assert "hunter2" not in repr(c)
+
+    def test_aws_secret_access_key_is_secret_str(self) -> None:
+        """aws_secret_access_key is SecretStr — repr does not expose value."""
+        c = RedshiftConfig(
+            aws_access_key_id="AKIAIOSFODNN7EXAMPLE",  # pragma: allowlist secret
+            aws_secret_access_key=SecretStr(
+                "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"  # pragma: allowlist secret
+            ),
+        )
+        assert "wJalrXUtnFEMI" not in repr(c)
+
+    def test_env_prefix_loads_connection_fields(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """REDSHIFT_HOST, REDSHIFT_USER, REDSHIFT_DATABASE load via env_prefix."""
+        monkeypatch.setenv("REDSHIFT_HOST", "envhost")
+        monkeypatch.setenv("REDSHIFT_USER", "envuser")
+        monkeypatch.setenv("REDSHIFT_DATABASE", "envdb")
+        c = RedshiftConfig()
+        assert c.host == "envhost"
+        assert c.user == "envuser"
+        assert c.database == "envdb"
+
+    def test_env_prefix_pool_size(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """REDSHIFT_POOL_SIZE env var sets pool_size via env_prefix."""
+        monkeypatch.setenv("REDSHIFT_POOL_SIZE", "4")
+        c = RedshiftConfig()
+        assert c.pool_size == 4
+
+
+class TestTrinoConfig:
+    """Unit tests for TrinoConfig — URI mode, SecretStr, schema alias, and env prefix."""
+
+    def test_uri_mode_constructs(self) -> None:
+        """TrinoConfig with uri= constructs successfully."""
+        c = TrinoConfig(uri="trino://user@host:8080/catalog")
+        assert c.uri == "trino://user@host:8080/catalog"
+        assert isinstance(c, WarehouseConfig)
+
+    def test_password_is_secret_str(self) -> None:
+        """Password field is SecretStr — repr does not expose value."""
+        c = TrinoConfig(password=SecretStr("secret"))  # pragma: allowlist secret
+        assert "secret" not in repr(c)
+
+    def test_schema_alias_via_model_validate(self) -> None:
+        """schema_ is set via model_validate({'schema': 'PUBLIC'}) to avoid keyword conflict."""
+        c = TrinoConfig.model_validate({"schema": "PUBLIC"})
+        assert c.schema_ == "PUBLIC"
+
+    def test_env_prefix_loads_host(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """TRINO_HOST env var loads via env_prefix."""
+        monkeypatch.setenv("TRINO_HOST", "trino-host")
+        c = TrinoConfig()
+        assert c.host == "trino-host"
+
+    def test_env_prefix_pool_size(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """TRINO_POOL_SIZE env var sets pool_size via env_prefix."""
+        monkeypatch.setenv("TRINO_POOL_SIZE", "9")
+        c = TrinoConfig()
+        assert c.pool_size == 9
+
+
+class TestMSSQLConfig:
+    """Unit tests for MSSQLConfig — URI mode, SecretStr, and env prefix."""
+
+    def test_uri_mode_constructs(self) -> None:
+        """MSSQLConfig with uri= constructs successfully."""
+        c = MSSQLConfig(uri="mssql://user:pass@host/mydb")  # pragma: allowlist secret
+        assert c.uri == "mssql://user:pass@host/mydb"  # pragma: allowlist secret
+        assert isinstance(c, WarehouseConfig)
+
+    def test_password_is_secret_str(self) -> None:
+        """Password field is SecretStr — repr does not expose value."""
+        c = MSSQLConfig(
+            host="sql.example.com",
+            user="sa",
+            password=SecretStr("hunter2"),  # pragma: allowlist secret
+        )
+        assert "hunter2" not in repr(c)
+
+    def test_env_prefix_loads_host(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """MSSQL_HOST env var loads via env_prefix."""
+        monkeypatch.setenv("MSSQL_HOST", "sql-host")
+        c = MSSQLConfig()
+        assert c.host == "sql-host"
+
+    def test_env_prefix_pool_size(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """MSSQL_POOL_SIZE env var sets pool_size via env_prefix."""
+        monkeypatch.setenv("MSSQL_POOL_SIZE", "12")
+        c = MSSQLConfig()
+        assert c.pool_size == 12

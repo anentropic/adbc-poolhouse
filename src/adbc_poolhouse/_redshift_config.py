@@ -29,6 +29,21 @@ class RedshiftConfig(BaseWarehouseConfig):
     Use redshift:///dbname for automatic endpoint discovery.
     Env: REDSHIFT_URI."""
 
+    host: str | None = None
+    """Redshift cluster hostname. Alternative to URI. Env: REDSHIFT_HOST."""
+
+    port: int | None = None
+    """Port number. Default: 5439. Env: REDSHIFT_PORT."""
+
+    user: str | None = None
+    """Database username. Env: REDSHIFT_USER."""
+
+    password: SecretStr | None = None
+    """Database password. Env: REDSHIFT_PASSWORD."""
+
+    database: str | None = None
+    """Target database name. Env: REDSHIFT_DATABASE."""
+
     cluster_type: str | None = None
     """Cluster variant: 'redshift' (standard), 'redshift-iam', or
     'redshift-serverless'. Env: REDSHIFT_CLUSTER_TYPE."""

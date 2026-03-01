@@ -19,11 +19,18 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from adbc_poolhouse._bigquery_config import BigQueryConfig
 from adbc_poolhouse._databricks_config import DatabricksConfig
 from adbc_poolhouse._drivers import resolve_driver
 from adbc_poolhouse._duckdb_config import DuckDBConfig
+from adbc_poolhouse._flightsql_config import FlightSQLConfig
+from adbc_poolhouse._mssql_config import MSSQLConfig
+from adbc_poolhouse._mysql_config import MySQLConfig
+from adbc_poolhouse._postgresql_config import PostgreSQLConfig
 from adbc_poolhouse._redshift_config import RedshiftConfig
 from adbc_poolhouse._snowflake_config import SnowflakeConfig
+from adbc_poolhouse._sqlite_config import SQLiteConfig
+from adbc_poolhouse._trino_config import TrinoConfig
 
 
 class TestResolveDuckDB:
@@ -77,6 +84,30 @@ class TestResolvePyPIDriver:
             result = resolve_driver(SnowflakeConfig(account="a"))
         assert result == "/path/to/adbc_driver_snowflake.so"
 
+    def test_path2_bigquery_missing_returns_package_name(self) -> None:
+        """Path 2: find_spec None -> returns 'adbc_driver_bigquery'."""
+        with patch("importlib.util.find_spec", return_value=None):
+            result = resolve_driver(BigQueryConfig())
+        assert result == "adbc_driver_bigquery"
+
+    def test_path2_postgresql_missing_returns_package_name(self) -> None:
+        """Path 2: find_spec None -> returns 'adbc_driver_postgresql'."""
+        with patch("importlib.util.find_spec", return_value=None):
+            result = resolve_driver(PostgreSQLConfig())
+        assert result == "adbc_driver_postgresql"
+
+    def test_path2_flightsql_missing_returns_package_name(self) -> None:
+        """Path 2: find_spec None -> returns 'adbc_driver_flightsql'."""
+        with patch("importlib.util.find_spec", return_value=None):
+            result = resolve_driver(FlightSQLConfig())
+        assert result == "adbc_driver_flightsql"
+
+    def test_path2_sqlite_missing_returns_package_name(self) -> None:
+        """Path 2: find_spec None -> returns 'adbc_driver_sqlite'."""
+        with patch("importlib.util.find_spec", return_value=None):
+            result = resolve_driver(SQLiteConfig())
+        assert result == "adbc_driver_sqlite"
+
 
 class TestResolveFoundryDriver:
     """Tests for Foundry (manifest-based) driver detection (skip find_spec)."""
@@ -98,6 +129,27 @@ class TestResolveFoundryDriver:
             result = resolve_driver(RedshiftConfig())
         mock_find.assert_not_called()
         assert result == "redshift"
+
+    def test_mysql_returns_short_name(self) -> None:
+        """Foundry: MySQL returns 'mysql' without calling find_spec."""
+        with patch("importlib.util.find_spec") as mock_find:
+            result = resolve_driver(MySQLConfig(host="h", user="u", database="db"))
+        mock_find.assert_not_called()
+        assert result == "mysql"
+
+    def test_trino_returns_short_name(self) -> None:
+        """Foundry: Trino returns 'trino' without calling find_spec."""
+        with patch("importlib.util.find_spec") as mock_find:
+            result = resolve_driver(TrinoConfig())
+        mock_find.assert_not_called()
+        assert result == "trino"
+
+    def test_mssql_returns_short_name(self) -> None:
+        """Foundry: MSSQL returns 'mssql' without calling find_spec."""
+        with patch("importlib.util.find_spec") as mock_find:
+            result = resolve_driver(MSSQLConfig())
+        mock_find.assert_not_called()
+        assert result == "mssql"
 
 
 class TestResolveDriverEdgeCases:

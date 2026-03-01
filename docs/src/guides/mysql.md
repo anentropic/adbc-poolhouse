@@ -20,10 +20,12 @@ Construction raises [`ConfigurationError`][adbc_poolhouse.ConfigurationError] if
 ### URI mode
 
 ```python
+from pydantic import SecretStr
+
 from adbc_poolhouse import MySQLConfig, create_pool
 
 config = MySQLConfig(
-    uri="root:password@tcp(localhost:3306)/mydb",  # pragma: allowlist secret
+    uri=SecretStr("root:password@tcp(localhost:3306)/mydb"),  # pragma: allowlist secret
 )
 pool = create_pool(config)
 ```
