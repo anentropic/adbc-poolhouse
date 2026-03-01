@@ -11,6 +11,7 @@ from adbc_poolhouse._pool_factory import close_pool, create_pool, managed_pool
 from adbc_poolhouse._postgresql_config import PostgreSQLConfig
 from adbc_poolhouse._redshift_config import RedshiftConfig
 from adbc_poolhouse._snowflake_config import SnowflakeConfig
+from adbc_poolhouse._sqlite_config import SQLiteConfig
 from adbc_poolhouse._trino_config import TrinoConfig
 
 __all__ = [
@@ -28,6 +29,7 @@ __all__ = [
     "PostgreSQLConfig",
     "RedshiftConfig",
     "SnowflakeConfig",
+    "SQLiteConfig",
     "TrinoConfig",
     "create_pool",
 ]
