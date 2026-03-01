@@ -22,6 +22,8 @@ from adbc_poolhouse._flightsql_config import FlightSQLConfig
 from adbc_poolhouse._flightsql_translator import translate_flightsql
 from adbc_poolhouse._mssql_config import MSSQLConfig
 from adbc_poolhouse._mssql_translator import translate_mssql
+from adbc_poolhouse._mysql_config import MySQLConfig
+from adbc_poolhouse._mysql_translator import translate_mysql
 from adbc_poolhouse._postgresql_config import PostgreSQLConfig
 from adbc_poolhouse._postgresql_translator import translate_postgresql
 from adbc_poolhouse._redshift_config import RedshiftConfig
@@ -63,6 +65,8 @@ def translate_config(config: WarehouseConfig) -> dict[str, str]:
         return translate_flightsql(config)
     if isinstance(config, MSSQLConfig):
         return translate_mssql(config)
+    if isinstance(config, MySQLConfig):
+        return translate_mysql(config)
     if isinstance(config, PostgreSQLConfig):
         return translate_postgresql(config)
     if isinstance(config, RedshiftConfig):

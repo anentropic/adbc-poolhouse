@@ -7,6 +7,7 @@ from adbc_poolhouse._duckdb_config import DuckDBConfig
 from adbc_poolhouse._exceptions import ConfigurationError, PoolhouseError
 from adbc_poolhouse._flightsql_config import FlightSQLConfig
 from adbc_poolhouse._mssql_config import MSSQLConfig
+from adbc_poolhouse._mysql_config import MySQLConfig
 from adbc_poolhouse._pool_factory import close_pool, create_pool, managed_pool
 from adbc_poolhouse._postgresql_config import PostgreSQLConfig
 from adbc_poolhouse._redshift_config import RedshiftConfig
@@ -26,6 +27,7 @@ __all__ = [
     "FlightSQLConfig",
     "managed_pool",
     "MSSQLConfig",
+    "MySQLConfig",
     "PostgreSQLConfig",
     "RedshiftConfig",
     "SnowflakeConfig",
