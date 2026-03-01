@@ -121,8 +121,8 @@ Isolates all type suppressions to dedicated internal modules.
 
 ### MySQL
 
-- [ ] **MYSQL-01**: `MySQLConfig` — Pydantic `BaseSettings`; `env_prefix="MYSQL_"`; URI-first with decomposed-field fallback; `model_validator` raises `ConfigurationError` when neither `uri` nor minimum decomposed fields are set
-- [ ] **MYSQL-02**: `translate_mysql()` — constructs Go DSN URI (`user:pass@tcp(host:port)/db`) from decomposed fields when `uri` absent; URL-encodes password
+- [x] **MYSQL-01**: `MySQLConfig` — Pydantic `BaseSettings`; `env_prefix="MYSQL_"`; URI-first with decomposed-field fallback; `model_validator` raises `ConfigurationError` when neither `uri` nor minimum decomposed fields are set
+- [x] **MYSQL-02**: `translate_mysql()` — constructs Go DSN URI (`user:pass@tcp(host:port)/db`) from decomposed fields when `uri` absent; URL-encodes password
 - [ ] **MYSQL-03**: MySQL registered in `_FOUNDRY_DRIVERS` dict in `_drivers.py`
 - [ ] **MYSQL-04**: Unit tests for `MySQLConfig` validation; unit tests for `translate_mysql()` asserting exact kwargs dict; mock-at-`create_adbc_connection` test asserting full pool-factory wiring
 - [ ] **MYSQL-05**: `MySQLConfig` exported from `__init__.py`; MySQL warehouse guide page in docs; API reference entry; `uv run mkdocs build --strict` passes
@@ -228,8 +228,8 @@ Isolates all type suppressions to dedicated internal modules.
 | DBC-01 | Phase 11 | Complete |
 | DBC-02 | Phase 11 | Complete |
 | DBC-03 | Phase 11 | Complete |
-| MYSQL-01 | Phase 11 | Pending |
-| MYSQL-02 | Phase 11 | Pending |
+| MYSQL-01 | Phase 11 | Complete |
+| MYSQL-02 | Phase 11 | Complete |
 | MYSQL-03 | Phase 11 | Pending |
 | MYSQL-04 | Phase 11 | Pending |
 | MYSQL-05 | Phase 11 | Pending |
