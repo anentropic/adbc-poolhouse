@@ -1,42 +1,42 @@
 # MySQL guide
 
-MySQL uses the Columnar ADBC MySQL driver, distributed via the ADBC Driver Foundry.
+The MySQL ADBC driver is distributed via the ADBC Driver Foundry, not PyPI.
+Follow the [Foundry installation guide](https://arrow.apache.org/adbc/current/driver/installation.html) to install it before using `MySQLConfig`.
 
-## Install
-
-Install the `dbc` CLI and the MySQL driver:
+`adbc-poolhouse` does not need a separate extra for MySQL:
 
 ```bash
-just install-dbc
-just install-foundry-drivers
+pip install adbc-poolhouse
 ```
-
-See the Foundry Driver Management section in [DEVELOP.md](https://github.com/anentropic/adbc-poolhouse/blob/main/DEVELOP.md) for setup details.
 
 ## Connection
 
-`MySQLConfig` supports two connection modes.
+`MySQLConfig` connects to a MySQL server. You must specify the connection in one of two
+ways: a full URI or decomposed fields (`host` and `user` together, with optional
+`password`, `database`, and `port`).
+
+Construction raises `ConfigurationError` if neither mode is fully specified.
 
 ### URI mode
 
 ```python
-from pydantic import SecretStr
 from adbc_poolhouse import MySQLConfig, create_pool
 
-config = MySQLConfig(uri=SecretStr("root:password@tcp(localhost:3306)/mydb"))
+config = MySQLConfig(
+    uri="root:password@tcp(localhost:3306)/mydb",  # pragma: allowlist secret
+)
 pool = create_pool(config)
 ```
 
 ### Decomposed fields
 
 ```python
-from pydantic import SecretStr
 from adbc_poolhouse import MySQLConfig, create_pool
 
 config = MySQLConfig(
     host="localhost",
     user="root",
-    password=SecretStr("password"),
+    password="password",  # pragma: allowlist secret
     database="mydb",
 )
 pool = create_pool(config)
@@ -51,12 +51,13 @@ pool = create_pool(config)
 ```bash
 export MYSQL_HOST=localhost
 export MYSQL_USER=root
-export MYSQL_PASSWORD=password
+export MYSQL_PASSWORD=password  # pragma: allowlist secret
 export MYSQL_DATABASE=mydb
 ```
 
 ```python
 config = MySQLConfig()  # reads from env
+pool = create_pool(config)
 ```
 
 ## See also
