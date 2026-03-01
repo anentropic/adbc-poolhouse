@@ -102,8 +102,8 @@ Isolates all type suppressions to dedicated internal modules.
 
 ### Databricks Fix
 
-- [ ] **DBX-01**: `DatabricksConfig` adds `model_validator` that raises `ConfigurationError` when neither `uri` nor all minimum decomposed fields (`host`, `http_path`, `token`) are provided — prevents the silent empty-dict failure
-- [ ] **DBX-02**: `translate_databricks()` constructs the correct Go DSN URI from decomposed fields (URL-encoded `token`) when `uri` is absent; existing unit tests extended to cover both URI mode and decomposed-field mode; mock-at-`create_adbc_connection` test asserts full kwargs passed to factory
+- [x] **DBX-01**: `DatabricksConfig` adds `model_validator` that raises `ConfigurationError` when neither `uri` nor all minimum decomposed fields (`host`, `http_path`, `token`) are provided — prevents the silent empty-dict failure
+- [x] **DBX-02**: `translate_databricks()` constructs the correct Go DSN URI from decomposed fields (URL-encoded `token`) when `uri` is absent; existing unit tests extended to cover both URI mode and decomposed-field mode; mock-at-`create_adbc_connection` test asserts full kwargs passed to factory
 
 ### Foundry Tooling
 
@@ -218,8 +218,8 @@ Isolates all type suppressions to dedicated internal modules.
 | DIST-03 | Phase 7 | Complete |
 | INFRA-01 | Phase 9 | Complete |
 | INFRA-02 | Phase 9 | Complete |
-| DBX-01 | Phase 9 | Pending |
-| DBX-02 | Phase 9 | Pending |
+| DBX-01 | Phase 9 | Complete |
+| DBX-02 | Phase 9 | Complete |
 | SQLT-01 | Phase 10 | Pending |
 | SQLT-02 | Phase 10 | Pending |
 | SQLT-03 | Phase 10 | Pending |

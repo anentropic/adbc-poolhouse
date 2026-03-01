@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-last_updated: "2026-03-01T02:11:03.853Z"
+last_updated: "2026-03-01T02:21:08.412Z"
 progress:
   total_phases: 9
-  completed_phases: 8
+  completed_phases: 9
   total_plans: 31
-  completed_plans: 30
+  completed_plans: 31
 ---
 
 # Project State
@@ -22,12 +22,12 @@ See: .planning/PROJECT.md (updated 2026-02-28)
 
 ## Current Position
 
-Phase: 09-infrastructure-and-databricks-fix (Plan 1 of 2 complete)
-Plan: 09-01 (complete), next: 09-02
-Status: In Progress — Phase 9 active
-Last activity: 2026-03-01 — 09-01 complete (adbc-driver-manager floor bump, tech-debt closure)
+Phase: 09-infrastructure-and-databricks-fix (COMPLETE — both plans done)
+Plan: 09-02 (complete), next: Phase 10
+Status: Complete — Phase 9 done, ready for Phase 10
+Last activity: 2026-03-01 — 09-02 complete (Databricks validator and decomposed-field URI)
 
-Progress: [█░░░░░░░░░] 10%
+Progress: [██████████] 100% (Phase 9 complete)
 
 ## Performance Metrics
 
@@ -64,6 +64,7 @@ Progress: [█░░░░░░░░░] 10%
 | Phase 08-review-and-improve-docs P02 | 106 | 3 tasks | 4 files |
 | Phase 08-review-and-improve-docs P06 | 1 | 1 tasks | 1 files |
 | Phase 09-infrastructure-and-databricks-fix P01 | 3 | 2 tasks | 3 files |
+| Phase 09-infrastructure-and-databricks-fix P02 | 8 | 3 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -149,6 +150,8 @@ Recent decisions affecting current work:
 - [v1.1 roadmap 2026-03-01]: Databricks fix must land in Phase 9 before MySQL/ClickHouse — those translators model themselves on the URI-first decomposed-field pattern
 - [Phase 09-01]: adbc-driver-manager floor raised from >=1.0.0 to >=1.8.0 — required for dbc CLI 0.2.0 Foundry manifest resolution (Phase 11 prerequisite)
 - [Phase 09-01]: AdbcCreatorFn and _adbc_driver_key() PROJECT.md items marked [x] with inline 'removed in v1.0' note — confirms symbols absent, clears misleading open checkboxes
+- [Phase 09-02]: urllib.parse.quote(safe='') for URL-encoding PAT tokens — quote_plus encodes spaces as '+' which corrupts tokens; safe='' ensures +, =, / are all percent-encoded
+- [Phase 09-02]: DatabricksConfig now requires uri or all three of host/http_path/token — construction raises ConfigurationError for incomplete specs; establishes URI-first decomposed-field pattern for MySQL (Phase 11) and ClickHouse (Phase 12)
 
 ### Pending Todos
 
