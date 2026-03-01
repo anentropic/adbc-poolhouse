@@ -15,6 +15,7 @@ from adbc_poolhouse import (
     PostgreSQLConfig,
     RedshiftConfig,
     SnowflakeConfig,
+    SQLiteConfig,
     TrinoConfig,
     WarehouseConfig,
 )
@@ -186,3 +187,46 @@ class TestFoundryBackendConfigs:
         m = MSSQLConfig()
         assert m.trust_server_certificate is False
         assert isinstance(m, WarehouseConfig)
+
+
+class TestSQLiteConfig:
+    def test_default_construction(self) -> None:
+        s = SQLiteConfig()
+        assert s.database == ":memory:"
+        assert s.pool_size == 1
+        assert s.max_overflow == 3
+        assert s.timeout == 30
+        assert s.recycle == 3600
+
+    def test_memory_pool_size_validator_fires(self) -> None:
+        with pytest.raises(ValidationError, match="pool_size > 1"):
+            SQLiteConfig(database=":memory:", pool_size=2)
+
+    def test_memory_pool_size_1_is_valid(self) -> None:
+        s = SQLiteConfig(database=":memory:", pool_size=1)
+        assert s.pool_size == 1
+
+    def test_file_database_pool_size_gt1_is_valid(self) -> None:
+        s = SQLiteConfig(database="/tmp/x.db", pool_size=5)
+        assert s.pool_size == 5
+
+    def test_env_prefix_database(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("SQLITE_DATABASE", "/tmp/envtest.db")
+        s = SQLiteConfig()
+        assert s.database == "/tmp/envtest.db"
+
+    def test_env_prefix_pool_size(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("SQLITE_POOL_SIZE", "8")
+        monkeypatch.setenv("SQLITE_DATABASE", "/tmp/test.db")
+        s = SQLiteConfig()
+        assert s.pool_size == 8
+
+    def test_env_prefix_isolation(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("SQLITE_POOL_SIZE", "8")
+        monkeypatch.setenv("SQLITE_DATABASE", "/tmp/test.db")
+        monkeypatch.setenv("DUCKDB_POOL_SIZE", "3")
+        s = SQLiteConfig()
+        assert s.pool_size == 8  # DUCKDB_ prefix does not affect SQLite
+
+    def test_warehouse_config_protocol(self) -> None:
+        assert isinstance(SQLiteConfig(), WarehouseConfig)

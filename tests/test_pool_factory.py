@@ -6,7 +6,13 @@ from pathlib import Path
 import pytest
 import sqlalchemy.pool
 
-from adbc_poolhouse import ConfigurationError, DuckDBConfig, PoolhouseError, create_pool
+from adbc_poolhouse import (
+    ConfigurationError,
+    DuckDBConfig,
+    PoolhouseError,
+    SQLiteConfig,
+    create_pool,
+)
 
 
 class TestCreatePoolDuckDB:
@@ -218,3 +224,43 @@ class TestExceptionHierarchy:
 
         with pytest.raises(ValidationError):
             DuckDBConfig(database="")
+
+
+class TestSQLitePoolFactory:
+    """Mock wiring and integration tests for SQLite via create_pool()."""
+
+    def test_in_memory_wiring(self) -> None:
+        """Mock: create_pool(SQLiteConfig()) passes correct kwargs to create_adbc_connection."""
+        from unittest.mock import MagicMock, patch
+
+        config = SQLiteConfig()  # database=":memory:", pool_size=1
+        mock_conn = MagicMock()
+        mock_conn.adbc_clone = MagicMock(return_value=MagicMock())
+
+        with patch(
+            "adbc_poolhouse._pool_factory.create_adbc_connection",
+            return_value=mock_conn,
+        ) as mock_factory:
+            pool = create_pool(config)
+            pool.dispose()
+
+        mock_factory.assert_called_once()
+        call_args = mock_factory.call_args
+        actual_kwargs = call_args.args[1]
+        assert actual_kwargs == {"uri": ":memory:"}
+
+    def test_sqlite_in_memory_query(self) -> None:
+        """Integration: create_pool(SQLiteConfig()) executes SELECT 42 via real SQLite driver."""
+        cfg = SQLiteConfig(database=":memory:", pool_size=1)
+        pool = create_pool(cfg)
+        try:
+            conn = pool.connect()
+            cur = conn.cursor()
+            cur.execute("SELECT 42 AS answer")
+            row = cur.fetchone()
+            assert row == (42,)
+            cur.close()
+            conn.close()
+        finally:
+            pool.dispose()
+            pool._adbc_source.close()  # type: ignore[attr-defined]

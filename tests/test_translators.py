@@ -28,6 +28,8 @@ from adbc_poolhouse._redshift_config import RedshiftConfig
 from adbc_poolhouse._redshift_translator import translate_redshift
 from adbc_poolhouse._snowflake_config import SnowflakeConfig
 from adbc_poolhouse._snowflake_translator import translate_snowflake
+from adbc_poolhouse._sqlite_config import SQLiteConfig
+from adbc_poolhouse._sqlite_translator import translate_sqlite
 from adbc_poolhouse._translators import translate_config
 from adbc_poolhouse._trino_config import TrinoConfig
 from adbc_poolhouse._trino_translator import translate_trino
@@ -292,3 +294,22 @@ class TestTranslateConfig:
         """translate_config() with unknown type raises TypeError."""
         with pytest.raises(TypeError, match="Unsupported config type"):
             translate_config("not a config")  # type: ignore[arg-type]
+
+
+class TestSQLiteTranslator:
+    """Unit tests for translate_sqlite()."""
+
+    def test_memory_database(self) -> None:
+        """SQLiteConfig() uses ':memory:' by default — maps to 'uri' key."""
+        result = translate_sqlite(SQLiteConfig())
+        assert result == {"uri": ":memory:"}
+
+    def test_file_database(self) -> None:
+        """SQLiteConfig(database=...) maps database attribute to 'uri' key."""
+        result = translate_sqlite(SQLiteConfig(database="/data/x.db"))
+        assert result == {"uri": "/data/x.db"}
+
+    def test_output_has_only_uri_key(self) -> None:
+        """translate_sqlite() returns exactly one key ('uri')."""
+        result = translate_sqlite(SQLiteConfig())
+        assert list(result.keys()) == ["uri"]
