@@ -93,6 +93,50 @@ Isolates all type suppressions to dedicated internal modules.
 
 ---
 
+## v1.1 Requirements
+
+### Infrastructure
+
+- [ ] **INFRA-01**: Bump `adbc-driver-manager` minimum to `>=1.8.0` in pyproject.toml and uv.lock (required for Foundry manifest resolution)
+- [ ] **INFRA-02**: PROJECT.md active requirements updated — stale AdbcCreatorFn and `_adbc_driver_key()` items closed (both already removed from codebase in v1.0)
+
+### Databricks Fix
+
+- [ ] **DBX-01**: `DatabricksConfig` adds `model_validator` that raises `ConfigurationError` when neither `uri` nor all minimum decomposed fields (`host`, `http_path`, `token`) are provided — prevents the silent empty-dict failure
+- [ ] **DBX-02**: `translate_databricks()` constructs the correct Go DSN URI from decomposed fields (URL-encoded `token`) when `uri` is absent; existing unit tests extended to cover both URI mode and decomposed-field mode; mock-at-`create_adbc_connection` test asserts full kwargs passed to factory
+
+### Foundry Tooling
+
+- [ ] **DBC-01**: `justfile` recipe `install-dbc` — installs `dbc` CLI binary; uses `command -v dbc` guard (not `which`, which evaluates at parse time in just)
+- [ ] **DBC-02**: `justfile` recipe `install-foundry-drivers` — runs `dbc install mysql clickhouse` with `--level env` to scope drivers to active virtualenv
+- [ ] **DBC-03**: `DEVELOP.md` updated with Foundry Driver Management section — install `dbc`, install drivers, verify with `dbc info`, uninstall
+
+### SQLite
+
+- [ ] **SQLT-01**: `SQLiteConfig` — Pydantic `BaseSettings`; `env_prefix="SQLITE_"`; `model_validator` raises `ValueError` for `uri=":memory:"` with `pool_size > 1` (same guard as DuckDB)
+- [ ] **SQLT-02**: `translate_sqlite()` — pure function mapping `SQLiteConfig` fields to adbc_driver_manager kwargs
+- [ ] **SQLT-03**: `sqlite` optional extra in pyproject.toml (`adbc-driver-sqlite>=1.0.0`); included in `[all]` meta-extra; uv.lock updated
+- [ ] **SQLT-04**: Unit tests for `SQLiteConfig` validation; unit tests for `translate_sqlite()` asserting exact kwargs dict; mock-at-`create_adbc_connection` test asserting full pool-factory wiring; integration test with in-memory SQLite database
+- [ ] **SQLT-05**: `SQLiteConfig` exported from `__init__.py`; SQLite warehouse guide page in docs; API reference entry; `uv run mkdocs build --strict` passes
+
+### MySQL
+
+- [ ] **MYSQL-01**: `MySQLConfig` — Pydantic `BaseSettings`; `env_prefix="MYSQL_"`; URI-first with decomposed-field fallback; `model_validator` raises `ConfigurationError` when neither `uri` nor minimum decomposed fields are set
+- [ ] **MYSQL-02**: `translate_mysql()` — constructs Go DSN URI (`user:pass@tcp(host:port)/db`) from decomposed fields when `uri` absent; URL-encodes password
+- [ ] **MYSQL-03**: MySQL registered in `_FOUNDRY_DRIVERS` dict in `_drivers.py`
+- [ ] **MYSQL-04**: Unit tests for `MySQLConfig` validation; unit tests for `translate_mysql()` asserting exact kwargs dict; mock-at-`create_adbc_connection` test asserting full pool-factory wiring
+- [ ] **MYSQL-05**: `MySQLConfig` exported from `__init__.py`; MySQL warehouse guide page in docs; API reference entry; `uv run mkdocs build --strict` passes
+
+### ClickHouse
+
+- [ ] **CH-01**: `ClickHouseConfig` — Pydantic `BaseSettings`; `env_prefix="CLICKHOUSE_"`; `username` field mapping to `username` driver kwarg (not `user`)
+- [ ] **CH-02**: `translate_clickhouse()` — pure function mapping `ClickHouseConfig` fields to adbc_driver_manager kwargs
+- [ ] **CH-03**: ClickHouse registered in `_FOUNDRY_DRIVERS` dict in `_drivers.py`
+- [ ] **CH-04**: Unit tests for `ClickHouseConfig` validation; unit tests for `translate_clickhouse()` asserting exact kwargs dict; mock-at-`create_adbc_connection` test asserting full pool-factory wiring
+- [ ] **CH-05**: `ClickHouseConfig` exported from `__init__.py`; ClickHouse warehouse guide page in docs; API reference entry; `uv run mkdocs build --strict` passes
+
+---
+
 ## v2 Requirements
 
 ### Testing
@@ -117,6 +161,10 @@ Isolates all type suppressions to dedicated internal modules.
 | OAuth / SSO auth logic | Delegated entirely to ADBC drivers |
 | Async connection pools | ADBC DBAPI is synchronous; async pool requires async DBAPI |
 | Automatic pool discovery / registry | Out of scope — no global state |
+| Teradata | Private Foundry registry (requires paid Columnar access) — not appropriate for open-source library |
+| ClickHouse via Apache ADBC | github.com/ClickHouse/adbc_clickhouse is WIP with many NotImplemented stubs |
+| Oracle | Private Foundry registry — same reasoning as Teradata |
+| Snowflake integration tests | Deferred pending record/replay library (replacing syrupy approach) |
 
 ---
 
