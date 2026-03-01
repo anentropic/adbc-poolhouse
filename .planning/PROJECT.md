@@ -38,8 +38,8 @@ One config in, one pool out — `create_pool(SnowflakeConfig(...))` returns a re
 ### Active
 
 - [ ] Fix DatabricksConfig decomposed-field gap (host/http_path/token silently produce empty dict when URI absent)
-- [ ] Remove AdbcCreatorFn unused type alias from _pool_types.py
-- [ ] Remove _adbc_driver_key() dead abstract method from BaseWarehouseConfig and all 10 subclasses
+- [x] Remove AdbcCreatorFn unused type alias from _pool_types.py — removed in v1.0
+- [x] Remove _adbc_driver_key() dead abstract method from BaseWarehouseConfig and all 10 subclasses — removed in v1.0
 - [ ] Verify Teradata field names against real Columnar ADBC Teradata driver
 - [ ] Justfile recipes for Foundry driver management: install dbc CLI, install and verify supported drivers
 - [ ] New ADBC backends (to be scoped after research)
