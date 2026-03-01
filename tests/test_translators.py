@@ -22,6 +22,8 @@ from adbc_poolhouse._flightsql_config import FlightSQLConfig
 from adbc_poolhouse._flightsql_translator import translate_flightsql
 from adbc_poolhouse._mssql_config import MSSQLConfig
 from adbc_poolhouse._mssql_translator import translate_mssql
+from adbc_poolhouse._mysql_config import MySQLConfig
+from adbc_poolhouse._mysql_translator import translate_mysql
 from adbc_poolhouse._postgresql_config import PostgreSQLConfig
 from adbc_poolhouse._postgresql_translator import translate_postgresql
 from adbc_poolhouse._redshift_config import RedshiftConfig
@@ -294,6 +296,57 @@ class TestTranslateConfig:
         """translate_config() with unknown type raises TypeError."""
         with pytest.raises(TypeError, match="Unsupported config type"):
             translate_config("not a config")  # type: ignore[arg-type]
+
+
+class TestMySQLTranslator:
+    """Unit tests for translate_mysql()."""
+
+    def test_uri_mode_secret_extracted(self) -> None:
+        """URI mode returns SecretStr value directly in {'uri': ...}."""
+        config = MySQLConfig(uri=SecretStr("mysql://user:pass@host/db"))  # pragma: allowlist secret
+        result = translate_mysql(config)
+        assert result == {"uri": "mysql://user:pass@host/db"}  # pragma: allowlist secret
+
+    def test_decomposed_with_password(self) -> None:
+        """Decomposed mode produces Go DSN user:pass@tcp(host:port)/db."""
+        config = MySQLConfig(
+            host="localhost",
+            user="root",
+            password=SecretStr("my-secret-pw"),  # pragma: allowlist secret
+            database="demo",
+        )
+        result = translate_mysql(config)
+        expected = "root:my-secret-pw@tcp(localhost:3306)/demo"  # pragma: allowlist secret
+        assert result == {"uri": expected}
+
+    def test_decomposed_without_password(self) -> None:
+        """Decomposed mode without password omits :pass segment entirely."""
+        config = MySQLConfig(host="localhost", user="root", database="demo")
+        result = translate_mysql(config)
+        assert result == {"uri": "root@tcp(localhost:3306)/demo"}
+
+    def test_special_chars_in_password_are_percent_encoded(self) -> None:
+        """Special chars in password are percent-encoded via quote(safe='')."""
+        config = MySQLConfig(
+            host="h",
+            user="u",
+            password=SecretStr("p+a=b/c"),  # pragma: allowlist secret
+            database="db",
+        )
+        result = translate_mysql(config)
+        assert "p%2Ba%3Db%2Fc" in result["uri"]
+
+    def test_custom_port_appears_in_uri(self) -> None:
+        """Non-default port appears in tcp(host:port) segment."""
+        config = MySQLConfig(host="host", user="user", database="db", port=5306)
+        result = translate_mysql(config)
+        assert "tcp(host:5306)" in result["uri"]
+
+    def test_output_has_only_uri_key(self) -> None:
+        """translate_mysql() always returns exactly one key ('uri')."""
+        config = MySQLConfig(host="h", user="u", database="db")
+        result = translate_mysql(config)
+        assert list(result.keys()) == ["uri"]
 
 
 class TestSQLiteTranslator:

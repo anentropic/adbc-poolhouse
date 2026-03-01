@@ -12,6 +12,7 @@ from adbc_poolhouse import (
     DuckDBConfig,
     FlightSQLConfig,
     MSSQLConfig,
+    MySQLConfig,
     PostgreSQLConfig,
     RedshiftConfig,
     SnowflakeConfig,
@@ -230,3 +231,80 @@ class TestSQLiteConfig:
 
     def test_warehouse_config_protocol(self) -> None:
         assert isinstance(SQLiteConfig(), WarehouseConfig)
+
+
+class TestMySQLConfig:
+    """Unit tests for MySQLConfig — connection validation and env prefix."""
+
+    def test_no_args_raises(self) -> None:
+        """MySQLConfig() with no connection spec raises ValidationError."""
+        with pytest.raises(ValidationError):
+            MySQLConfig()
+
+    def test_uri_mode_constructs(self) -> None:
+        """MySQLConfig with uri= constructs successfully."""
+        c = MySQLConfig(uri=SecretStr("mysql://user:pass@host:3306/db"))  # pragma: allowlist secret
+        assert c.uri is not None
+        assert isinstance(c, WarehouseConfig)
+
+    def test_decomposed_no_password(self) -> None:
+        """MySQLConfig with host/user/database and no password constructs."""
+        c = MySQLConfig(host="localhost", user="root", database="demo")
+        assert c.password is None
+        assert c.port == 3306
+        assert isinstance(c, WarehouseConfig)
+
+    def test_decomposed_with_password(self) -> None:
+        """MySQLConfig with host/user/database/password constructs."""
+        c = MySQLConfig(
+            host="localhost",
+            user="root",
+            password=SecretStr("secret"),  # pragma: allowlist secret
+            database="demo",
+        )
+        assert c.password is not None
+        assert isinstance(c, WarehouseConfig)
+
+    def test_host_only_raises(self) -> None:
+        """MySQLConfig(host=...) with missing user and database raises ValidationError."""
+        with pytest.raises(ValidationError):
+            MySQLConfig(host="localhost")
+
+    def test_host_and_user_raises(self) -> None:
+        """MySQLConfig(host=..., user=...) with missing database raises ValidationError."""
+        with pytest.raises(ValidationError):
+            MySQLConfig(host="localhost", user="root")
+
+    def test_custom_port(self) -> None:
+        """MySQLConfig accepts a non-default port."""
+        c = MySQLConfig(host="h", user="u", database="db", port=5306)
+        assert c.port == 5306
+
+    def test_password_is_secret_str(self) -> None:
+        """Password field is SecretStr — repr does not expose value."""
+        c = MySQLConfig(
+            host="h",
+            user="u",
+            password=SecretStr("hunter2"),  # pragma: allowlist secret
+            database="db",
+        )
+        assert "hunter2" not in repr(c)
+
+    def test_env_prefix_loads_host(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """MYSQL_HOST, MYSQL_USER, MYSQL_DATABASE env vars load via env_prefix."""
+        monkeypatch.setenv("MYSQL_HOST", "envhost")
+        monkeypatch.setenv("MYSQL_USER", "envuser")
+        monkeypatch.setenv("MYSQL_DATABASE", "envdb")
+        c = MySQLConfig()
+        assert c.host == "envhost"
+        assert c.user == "envuser"
+        assert c.database == "envdb"
+
+    def test_env_prefix_pool_size(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """MYSQL_POOL_SIZE env var sets pool_size via env_prefix."""
+        monkeypatch.setenv("MYSQL_HOST", "h")
+        monkeypatch.setenv("MYSQL_USER", "u")
+        monkeypatch.setenv("MYSQL_DATABASE", "db")
+        monkeypatch.setenv("MYSQL_POOL_SIZE", "7")
+        c = MySQLConfig()
+        assert c.pool_size == 7

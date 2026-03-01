@@ -156,6 +156,40 @@ class TestDatabricksPoolFactory:
         assert actual_kwargs.get("uri") == expected_uri
 
 
+class TestMySQLPoolFactory:
+    """Mock pool-factory wiring tests for MySQLConfig decomposed-field mode."""
+
+    def test_decomposed_fields_wiring(self) -> None:
+        """Decomposed MySQLConfig passes correct Go DSN URI to create_adbc_connection."""
+        from unittest.mock import MagicMock, patch
+
+        from pydantic import SecretStr
+
+        from adbc_poolhouse import MySQLConfig, create_pool
+
+        config = MySQLConfig(
+            host="localhost",
+            user="root",
+            password=SecretStr("my-secret-pw"),  # pragma: allowlist secret
+            database="demo",
+        )
+        mock_conn = MagicMock()
+        mock_conn.adbc_clone = MagicMock(return_value=MagicMock())
+
+        with patch(
+            "adbc_poolhouse._pool_factory.create_adbc_connection",
+            return_value=mock_conn,
+        ) as mock_factory:
+            pool = create_pool(config)
+            pool.dispose()
+
+        expected_uri = "root:my-secret-pw@tcp(localhost:3306)/demo"  # pragma: allowlist secret
+        mock_factory.assert_called_once()
+        call_args = mock_factory.call_args
+        actual_kwargs = call_args.args[1]
+        assert actual_kwargs.get("uri") == expected_uri
+
+
 class TestExceptionHierarchy:
     """Exception hierarchy: PoolhouseError, ConfigurationError, DuckDBConfig bounds."""
 
