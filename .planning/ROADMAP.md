@@ -205,11 +205,17 @@ Plans:
 **Requirements**: DBC-01, DBC-02, DBC-03, MYSQL-01, MYSQL-02, MYSQL-03, MYSQL-04, MYSQL-05
 **Success Criteria** (what must be TRUE):
   1. `just install-dbc` installs the `dbc` CLI or exits with a human-readable message if already installed; the recipe uses a `command -v dbc` guard (not `which`)
-  2. `just install-foundry-drivers` runs `dbc install mysql clickhouse --level env` — drivers land in `$VIRTUAL_ENV/etc/adbc/drivers/` where `adbc_driver_manager` can find them
+  2. `just install-foundry-drivers` runs `dbc install mysql` and `dbc install clickhouse` — drivers land in `$VIRTUAL_ENV/etc/adbc/drivers/` where `adbc_driver_manager` can find them
   3. DEVELOP.md contains a "Foundry Driver Management" section documenting `install-dbc`, `install-foundry-drivers`, `dbc info`, and uninstall
   4. `MySQLConfig(uri="mysql://user:pass@host:3306/db")` and `MySQLConfig(host="host", user="user", password="pass", database="db")` both construct successfully; config with neither raises `ConfigurationError`
   5. `translate_mysql()` produces a correctly formatted Go DSN URI (`user:pass@tcp(host:port)/db`) when called with decomposed fields; `MySQLConfig` is in `_FOUNDRY_DRIVERS`; `from adbc_poolhouse import MySQLConfig` succeeds; `uv run mkdocs build --strict` passes with the MySQL guide page present
-**Plans**: TBD
+**Plans**: 4 plans
+
+Plans:
+- [ ] 11-01-PLAN.md — Foundry tooling: install-dbc and install-foundry-drivers justfile recipes + DEVELOP.md section
+- [ ] 11-02-PLAN.md — MySQLConfig class and translate_mysql() pure function
+- [ ] 11-03-PLAN.md — Wiring: _drivers.py, _translators.py, __init__.py; all MySQL tests
+- [ ] 11-04-PLAN.md — MySQL warehouse guide, configuration.md row, mkdocs.yml nav, human checkpoint
 
 ### Phase 12: ClickHouse Backend
 **Goal**: Consumers can create a pool backed by ClickHouse using `create_pool(ClickHouseConfig(...))` with the correct `username` driver kwarg
@@ -242,5 +248,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | 8. Review and Improve Docs | 6/6 | Complete   | 2026-02-28 |
 | 9. Infrastructure and Databricks Fix | 2/2 | Complete   | 2026-03-01 |
 | 10. SQLite Backend | 0/TBD | Not started | - |
-| 11. Foundry Tooling and MySQL Backend | 0/TBD | Not started | - |
+| 11. Foundry Tooling and MySQL Backend | 0/4 | Not started | - |
 | 12. ClickHouse Backend | 0/TBD | Not started | - |
