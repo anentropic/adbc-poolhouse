@@ -28,6 +28,8 @@ from adbc_poolhouse._redshift_config import RedshiftConfig
 from adbc_poolhouse._redshift_translator import translate_redshift
 from adbc_poolhouse._snowflake_config import SnowflakeConfig
 from adbc_poolhouse._snowflake_translator import translate_snowflake
+from adbc_poolhouse._sqlite_config import SQLiteConfig
+from adbc_poolhouse._sqlite_translator import translate_sqlite
 from adbc_poolhouse._trino_config import TrinoConfig
 from adbc_poolhouse._trino_translator import translate_trino
 
@@ -65,6 +67,8 @@ def translate_config(config: WarehouseConfig) -> dict[str, str]:
         return translate_postgresql(config)
     if isinstance(config, RedshiftConfig):
         return translate_redshift(config)
+    if isinstance(config, SQLiteConfig):
+        return translate_sqlite(config)
     if isinstance(config, SnowflakeConfig):
         return translate_snowflake(config)
     if isinstance(config, TrinoConfig):

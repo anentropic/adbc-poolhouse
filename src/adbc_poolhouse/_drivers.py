@@ -39,6 +39,7 @@ from adbc_poolhouse._mssql_config import MSSQLConfig
 from adbc_poolhouse._postgresql_config import PostgreSQLConfig
 from adbc_poolhouse._redshift_config import RedshiftConfig
 from adbc_poolhouse._snowflake_config import SnowflakeConfig
+from adbc_poolhouse._sqlite_config import SQLiteConfig
 from adbc_poolhouse._trino_config import TrinoConfig
 
 if TYPE_CHECKING:
@@ -52,6 +53,7 @@ _PYPI_PACKAGES: dict[type, tuple[str, str]] = {
     BigQueryConfig: ("adbc_driver_bigquery", "bigquery"),
     PostgreSQLConfig: ("adbc_driver_postgresql", "postgresql"),
     FlightSQLConfig: ("adbc_driver_flightsql", "flightsql"),
+    SQLiteConfig: ("adbc_driver_sqlite", "sqlite"),
 }
 
 # Foundry (manifest-based) drivers: (driver_manager_name, dbc_install_name).
