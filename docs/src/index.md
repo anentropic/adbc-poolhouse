@@ -25,6 +25,7 @@ adbc-poolhouse manages the pool, not the driver. You also need an ADBC driver fo
 | BigQuery | `pip install adbc-poolhouse[bigquery]` |
 | PostgreSQL | `pip install adbc-poolhouse[postgresql]` |
 | Apache Arrow Flight SQL | `pip install adbc-poolhouse[flightsql]` |
+| SQLite | `pip install adbc-poolhouse[sqlite]` |
 | Databricks | Foundry-distributed — see [Foundry installation](guides/databricks.md) |
 | Redshift | Foundry-distributed — see [Foundry installation](guides/redshift.md) |
 | Trino | Foundry-distributed — see [Foundry installation](guides/trino.md) |
@@ -33,7 +34,7 @@ adbc-poolhouse manages the pool, not the driver. You also need an ADBC driver fo
 ## First pool in five minutes
 
 All supported warehouses have a typed config class:
-`DuckDBConfig`, `SnowflakeConfig`, `BigQueryConfig`, `PostgreSQLConfig`,
+`DuckDBConfig`, `SQLiteConfig`, `SnowflakeConfig`, `BigQueryConfig`, `PostgreSQLConfig`,
 `FlightSQLConfig`, `DatabricksConfig`, `RedshiftConfig`, `TrinoConfig`,
 `MSSQLConfig`.
 

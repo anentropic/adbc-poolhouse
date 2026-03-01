@@ -9,6 +9,7 @@ Each config class reads its fields from environment variables with a prefix matc
 | Config class | env_prefix |
 |---|---|
 | `DuckDBConfig` | `DUCKDB_` |
+| `SQLiteConfig` | `SQLITE_` |
 | `SnowflakeConfig` | `SNOWFLAKE_` |
 | `BigQueryConfig` | `BIGQUERY_` |
 | `PostgreSQLConfig` | `POSTGRESQL_` |
