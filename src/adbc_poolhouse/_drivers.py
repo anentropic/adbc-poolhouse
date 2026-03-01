@@ -11,7 +11,7 @@ Three-path detection strategy (DRIV-01, DRIV-04):
       catches the NOT_FOUND status from ``adbc_driver_manager`` and re-raises it as
       a user-friendly ImportError pointing to https://docs.adbc-drivers.org/.
 
-  Foundry drivers (Databricks, Redshift, Trino, MSSQL, Teradata): skip find_spec
+  Foundry drivers (Databricks, Redshift, Trino, MSSQL, MySQL): skip find_spec
       entirely — return the short driver name for manifest resolution directly.
 
   DuckDB is special: it bundles its ADBC driver as the ``_duckdb`` C extension

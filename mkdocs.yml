@@ -105,7 +105,6 @@ nav:
       - Trino: guides/trino.md
       - MSSQL: guides/mssql.md
       - MySQL: guides/mysql.md
-      - Teradata: guides/teradata.md
       - SQLite: guides/sqlite.md
   - API Reference: reference/
   - Changelog: changelog.md

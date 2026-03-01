@@ -39,7 +39,7 @@ def create_adbc_connection(
     All ``cast()`` and ``# type: ignore`` suppressions for the ADBC driver
     manager are concentrated in this module (DRIV-03).
 
-    For Foundry drivers (Databricks, Redshift, Trino, MSSQL, Teradata):
+    For Foundry drivers (Databricks, Redshift, Trino, MSSQL, MySQL):
     if the driver manifest is not found, ``adbc_driver_manager`` raises an
     ``Error`` subclass with ``status_code == AdbcStatusCode.NOT_FOUND``. This
     is caught here and re-raised as ``ImportError`` with a human-readable

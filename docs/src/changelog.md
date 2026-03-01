@@ -37,7 +37,7 @@ All notable changes to this project will be documented in this file.
 - Create phase plan
 - Complete config layer foundation plan
 - Add self-check result to SUMMARY.md
-- Complete MSSQL and Teradata config plan
+- Complete MSSQL config plan
 - Complete Foundry backend configs plan (Databricks/Redshift/Trino)
 - Complete BigQuery/PostgreSQL/FlightSQL config plan
 - Complete public API wiring plan
@@ -91,7 +91,6 @@ All notable changes to this project will be documented in this file.
 - Add BaseWarehouseConfig abstract base and WarehouseConfig Protocol
 - Add DuckDBConfig with in-memory pool_size validator
 - Implement MSSQLConfig for SQL Server/Azure SQL/Fabric/Synapse
-- Implement TeradataConfig with LOW-confidence source-attributed fields
 - Add DatabricksConfig and RedshiftConfig
 - Add TrinoConfig
 - Add BigQueryConfig and PostgreSQLConfig
@@ -99,7 +98,7 @@ All notable changes to this project will be documented in this file.
 - Wire all config models into public API via __init__.py
 - Add DuckDB and PostgreSQL translator functions
 - Add BigQuery and FlightSQL translator functions
-- Implement Foundry backend translators (Databricks, Redshift, Trino, MSSQL, Teradata)
+- Implement Foundry backend translators (Databricks, Redshift, Trino, MSSQL)
 - Add translate_config() dispatch coordinator (_translators.py)
 - Add driver detection, ADBC facade, and type scaffold
 - All driver detection tests pass

@@ -69,7 +69,7 @@ Call `.get_secret_value()` when you need the raw string — for example, passing
 
 ## Foundry-distributed backends
 
-`DatabricksConfig`, `RedshiftConfig`, `TrinoConfig`, and `MSSQLConfig` are present in the package but their ADBC drivers are not available on PyPI. They are distributed through the ADBC Driver Foundry. If you use one of these backends, follow the installation guide for your Foundry setup to get the correct driver package installed.
+`DatabricksConfig`, `MySQLConfig`, `RedshiftConfig`, `TrinoConfig`, and `MSSQLConfig` are present in the package but their ADBC drivers are not available on PyPI. They are distributed through the ADBC Driver Foundry. If you use one of these backends, follow the installation guide for your Foundry setup to get the correct driver package installed.
 
 ## See also
 
