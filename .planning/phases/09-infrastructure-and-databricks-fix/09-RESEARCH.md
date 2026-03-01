@@ -1,0 +1,401 @@
+# Phase 9: Infrastructure and Databricks Fix - Research
+
+**Researched:** 2026-03-01
+**Domain:** Python dependency management, Pydantic model validators, URL encoding, project maintenance
+**Confidence:** HIGH
+
+---
+
+<phase_requirements>
+## Phase Requirements
+
+| ID | Description | Research Support |
+|----|-------------|-----------------|
+| INFRA-01 | Bump `adbc-driver-manager` minimum to `>=1.8.0` in pyproject.toml and uv.lock | Simple version floor bump in pyproject.toml `dependencies`; `uv sync` regenerates lock file automatically |
+| INFRA-02 | PROJECT.md active requirements updated — stale AdbcCreatorFn and `_adbc_driver_key()` items closed | Both symbols already removed from codebase; PROJECT.md `### Active` section still lists them as open items; tick the checkboxes |
+| DBX-01 | `DatabricksConfig` adds `model_validator(mode="after")` that raises `ConfigurationError` when neither `uri` nor minimum decomposed fields (`host`, `http_path`, `token`) are provided | DuckDB's `check_memory_pool_size` validator is the canonical pattern; `ConfigurationError` dual-inherits `PoolhouseError + ValueError`; `noqa: TC001` required on runtime import |
+| DBX-02 | `translate_databricks()` constructs correct Go DSN URI from decomposed fields with URL-encoded token; existing tests extended; mock-at-`create_adbc_connection` test for full kwargs | URI format confirmed: `databricks://token:{URL-encoded-token}@{host}:443{http_path}`; `urllib.parse.quote(token, safe='')` handles special characters (`+`, `=`, `/`, `@`); existing `test_no_uri_empty` test must be updated to expect `ValidationError` |
+</phase_requirements>
+
+---
+
+## Summary
+
+Phase 9 is a small, focused maintenance phase with four requirements across two concern areas: dependency version floor (INFRA-01/02) and Databricks translator correctness (DBX-01/02). None of the four requirements introduce new architectural concerns — all patterns are established in the codebase.
+
+The only non-trivial work is DBX-02: constructing the Databricks Go DSN URI from decomposed fields. The URI format `databricks://token:{token}@{host}:443{http_path}` is confirmed from the columnar-tech/adbc-quickstarts repository and the `danielbeach/adbc_databricks_driver_with_Agentic_AI` reference implementation. The critical detail is that the token must be URL-encoded using `urllib.parse.quote(token, safe='')` — Databricks PAT tokens contain `+`, `=`, `/`, and other special characters that would corrupt the URI if embedded raw. The `safe=''` argument ensures all non-alphanumeric characters are percent-encoded.
+
+DBX-01 closes the silent-failure path: `DatabricksConfig()` currently constructs successfully and `translate_databricks()` returns `{}`, causing a confusing runtime error at connection time. Adding a `model_validator(mode="after")` that checks for `uri` OR all three minimum decomposed fields (`host`, `http_path`, `token`) catches this at config-construction time. The existing `test_no_uri_empty` test in `test_translators.py` asserts `result == {}` — this test will need to be updated because `DatabricksConfig()` will now raise `ValidationError` before the translator is called.
+
+INFRA-01 and INFRA-02 are mechanical: one pyproject.toml line change plus `uv sync`, and two checkbox flips in PROJECT.md.
+
+**Primary recommendation:** Implement in two plans — P01 covers INFRA-01/INFRA-02 (one `pyproject.toml` edit, one `PROJECT.md` edit, `uv sync`), P02 covers DBX-01/DBX-02 (config validator, translator rewrite, test updates).
+
+---
+
+## Standard Stack
+
+### Core
+
+| Library | Version | Purpose | Why Standard |
+|---------|---------|---------|--------------|
+| `adbc-driver-manager` | `>=1.8.0` (new floor) | ADBC driver manager runtime dep | Required for Foundry manifest resolution per dbc CLI 0.2.0 |
+| `pydantic` | existing | `model_validator(mode="after")` for DatabricksConfig | Already used for DuckDB and Snowflake validators |
+| `urllib.parse` | stdlib | URL-encoding token in Databricks DSN URI | Standard library, no additional dep |
+| `pytest` + `pydantic.ValidationError` | existing | Test that `DatabricksConfig()` raises `ValidationError` | Existing pattern: DuckDB `:memory:` + `pool_size>1` test |
+
+### Supporting
+
+| Library | Version | Purpose | When to Use |
+|---------|---------|---------|-------------|
+| `unittest.mock.patch` | stdlib | Mock `create_adbc_connection` in pool-factory wiring test | Already used in `test_drivers.py` for driver detection paths |
+
+---
+
+## Architecture Patterns
+
+### Recommended Project Structure
+
+No new files needed. Changes are in:
+```
+src/adbc_poolhouse/
+├── _databricks_config.py    # add model_validator (DBX-01)
+└── _databricks_translator.py  # add decomposed-field URI construction (DBX-02)
+
+tests/
+└── test_translators.py      # update existing tests, add new test cases (DBX-02)
+
+pyproject.toml               # bump adbc-driver-manager floor (INFRA-01)
+uv.lock                      # regenerated by uv sync (INFRA-01)
+.planning/PROJECT.md         # close stale items (INFRA-02)
+```
+
+### Pattern 1: `model_validator(mode="after")` in DatabricksConfig
+
+**What:** Pydantic after-validator checks field state after all fields are set. Raises `ConfigurationError` when neither `uri` nor the minimum set of decomposed fields is present.
+
+**When to use:** Cross-field validation that requires checking multiple fields simultaneously.
+
+**Canonical existing example:**
+```python
+# src/adbc_poolhouse/_duckdb_config.py
+from pydantic import model_validator
+from adbc_poolhouse._exceptions import ConfigurationError  # noqa: TC001
+
+@model_validator(mode="after")
+def check_memory_pool_size(self) -> Self:
+    if self.database == ":memory:" and self.pool_size > 1:
+        raise ConfigurationError(
+            'pool_size > 1 with database=":memory:" ...'
+        )
+    return self
+```
+
+**DatabricksConfig adaptation:**
+```python
+# src/adbc_poolhouse/_databricks_config.py
+from __future__ import annotations
+from typing import Self
+from pydantic import Field, SecretStr, model_validator
+from pydantic_settings import SettingsConfigDict
+from adbc_poolhouse._base_config import BaseWarehouseConfig
+from adbc_poolhouse._exceptions import ConfigurationError  # noqa: TC001
+
+class DatabricksConfig(BaseWarehouseConfig):
+    ...
+
+    @model_validator(mode="after")
+    def check_connection_spec(self) -> Self:
+        has_uri = self.uri is not None
+        has_decomposed = (
+            self.host is not None
+            and self.http_path is not None
+            and self.token is not None
+        )
+        if not has_uri and not has_decomposed:
+            raise ConfigurationError(
+                "DatabricksConfig requires either 'uri' or all three of "
+                "'host', 'http_path', and 'token'. Got none of these."
+            )
+        return self
+```
+
+**Important:** The `ConfigurationError` import requires `# noqa: TC001` because it is a runtime import inside a method body, not a TYPE_CHECKING block. This is the same pattern used in `_duckdb_config.py`.
+
+### Pattern 2: Databricks DSN URI Construction with URL Encoding
+
+**What:** When `uri` is absent, `translate_databricks()` constructs a Go DSN URI from decomposed fields. The token must be URL-encoded because Databricks PAT tokens contain characters that are not valid in URI authority sections (`+`, `=`, `/`, `@`, `:`).
+
+**Confirmed URI format** (HIGH confidence, from columnar-tech/adbc-quickstarts Databricks branch + Daniel Beach's ADBC Databricks driver article):
+```
+databricks://token:{URL-encoded-token}@{host}:443{http_path}
+```
+
+**Example (per success criteria):**
+- Input: `host="host"`, `http_path="/sql/1.0/warehouses/abc"`, `token="dapi+test=value/path"`
+- Expected URI: `databricks://token:dapi%2Btest%3Dvalue%2Fpath@host:443/sql/1.0/warehouses/abc`
+
+**Code pattern:**
+```python
+# src/adbc_poolhouse/_databricks_translator.py
+from __future__ import annotations
+from typing import TYPE_CHECKING
+from urllib.parse import quote
+
+if TYPE_CHECKING:
+    from adbc_poolhouse._databricks_config import DatabricksConfig
+
+
+def translate_databricks(config: DatabricksConfig) -> dict[str, str]:
+    """..."""
+    kwargs: dict[str, str] = {}
+
+    if config.uri is not None:
+        kwargs["uri"] = config.uri.get_secret_value()
+        return kwargs
+
+    # Decomposed-field mode: config validator ensures host/http_path/token are all set
+    if config.host is not None and config.http_path is not None and config.token is not None:
+        encoded_token = quote(config.token.get_secret_value(), safe="")
+        uri = f"databricks://token:{encoded_token}@{config.host}:443{config.http_path}"
+        kwargs["uri"] = uri
+
+    return kwargs
+```
+
+**`urllib.parse.quote` parameters:**
+- `safe=""` — encodes ALL special characters including `/`, `+`, `=`, `@`, `:`. This is essential because these characters appear in Databricks PAT tokens and would break URI parsing if left raw.
+- The default `safe="/"` would leave forward slashes unencoded, corrupting a token like `"dapi+test=value/path"`.
+
+### Pattern 3: Test Updates for DBX-01/DBX-02
+
+**`test_translators.py` changes required:**
+
+1. The existing `test_no_uri_empty` test in `TestDatabricksTranslator` asserts `result == {}`. This test calls `translate_databricks(DatabricksConfig())` which will now raise `ValidationError` before the translator is called. This test must be updated or replaced.
+
+2. New test cases to add:
+   - `test_uri_mode_secret_extracted` — URI mode unchanged (existing test retitled)
+   - `test_decomposed_fields_url_encoded_token` — assert the full URI with special chars in token
+   - `test_decomposed_fields_plain_token` — assert URI with no special chars
+   - `test_no_args_raises_validation_error` — `DatabricksConfig()` raises `ValidationError` (new, covers DBX-01)
+
+**`test_configs.py` changes required:**
+
+The existing `test_databricks_default_construction` test calls `DatabricksConfig()` and expects success. This test must be updated — either removed or changed to test that construction with valid args works (`DatabricksConfig(uri=...)`).
+
+**Mock-at-`create_adbc_connection` test pattern** (from existing `test_drivers.py` style):
+```python
+# Add to test_pool_factory.py or test_translators.py
+from unittest.mock import MagicMock, patch
+from pydantic import SecretStr
+
+def test_databricks_decomposed_pool_factory_wiring():
+    """Mock create_adbc_connection to assert full kwargs dict passed to factory."""
+    from adbc_poolhouse import DatabricksConfig, create_pool
+    config = DatabricksConfig(
+        host="host",
+        http_path="/sql/1.0/warehouses/abc",
+        token=SecretStr("dapi+test=value/path"),
+    )
+    mock_conn = MagicMock()
+    mock_conn.adbc_clone = MagicMock()
+    with patch("adbc_poolhouse._pool_factory.create_adbc_connection", return_value=mock_conn):
+        pool = create_pool(config)
+        pool.dispose()
+    # assert create_adbc_connection was called with {"uri": "databricks://token:dapi%2Btest..."...}
+```
+
+### Anti-Patterns to Avoid
+
+- **Don't use `safe='/'`:** `urllib.parse.quote(token, safe='/')` leaves slashes unencoded, corrupting tokens with path-like content. Use `safe=""`.
+- **Don't embed token raw in URI:** `f"databricks://token:{token.get_secret_value()}@{host}..."` — a token like `dapi+test=value/path` would break URI parsing. Always URL-encode.
+- **Don't use `quote_plus()`:** `quote_plus` encodes spaces as `+`, not `%20`. Use `quote(s, safe='')` for URI components.
+- **Don't guard decomposed path with `has_uri = False`:** After the model_validator, either `uri` is set OR all three decomposed fields are set. The translator can check `if config.uri is not None:` as URI-first and fall through to the decomposed path safely.
+
+---
+
+## Don't Hand-Roll
+
+| Problem | Don't Build | Use Instead | Why |
+|---------|-------------|-------------|-----|
+| Percent-encoding token for URI | Custom character replacement loop | `urllib.parse.quote(token, safe='')` | Handles all edge cases, RFC 3986 compliant, stdlib |
+| Cross-field Pydantic validation | Custom `__init__` or `__post_init__` | `@model_validator(mode="after")` | Works with env var loading, settings sources, and direct construction equally |
+
+---
+
+## Common Pitfalls
+
+### Pitfall 1: Forgetting `noqa: TC001` on `ConfigurationError` import
+
+**What goes wrong:** ruff flags `from adbc_poolhouse._exceptions import ConfigurationError` as `TC001` (move to TYPE_CHECKING block) because the import appears at module level. But `ConfigurationError` must be importable at runtime because `@model_validator` methods execute at model construction time, not just at type-check time.
+
+**Why it happens:** ruff's `TCH` rules move imports to `TYPE_CHECKING` blocks when they appear to be annotation-only. Inside a `@model_validator` method, the class is used at runtime (raised as an exception), but ruff can't always detect this.
+
+**How to avoid:** Add `# noqa: TC001` to the `ConfigurationError` import line in `_databricks_config.py`. The identical pattern is already in `_duckdb_config.py` line 11.
+
+**Warning signs:** Pre-commit failing with `TC001` lint error; or runtime `NameError: name 'ConfigurationError' is not defined` when constructing `DatabricksConfig`.
+
+### Pitfall 2: `test_no_uri_empty` must be updated before DBX-01
+
+**What goes wrong:** If the validator is added before updating tests, `test_translators.py::TestDatabricksTranslator::test_no_uri_empty` will fail because `DatabricksConfig()` now raises `ValidationError` before `translate_databricks()` is ever called.
+
+**Why it happens:** The test was written when the current "silent empty dict" behaviour was intentional.
+
+**How to avoid:** In the same plan that adds the `model_validator`, update `test_translators.py` and `test_configs.py` to reflect the new constraint. The plan executor should treat it as a TDD RED → GREEN cycle: tests fail first (RED), validator added (GREEN).
+
+**Warning signs:** `ValidationError` raised during `translate_databricks(DatabricksConfig())` in a test that expected `{}`.
+
+### Pitfall 3: `uv sync` after pyproject.toml version bump
+
+**What goes wrong:** If `pyproject.toml` is updated but `uv sync` is not run, `uv.lock` is stale. CI runs `uv sync --frozen`, which will fail if the lock does not include `adbc-driver-manager>=1.8.0`.
+
+**Why it happens:** uv lock file must always be regenerated after pyproject.toml dependency changes.
+
+**How to avoid:** Run `uv sync` immediately after editing the `adbc-driver-manager` version floor in `pyproject.toml`. Commit both `pyproject.toml` and `uv.lock` together.
+
+**Warning signs:** `uv sync --frozen` fails in CI with "lock file is not up to date".
+
+### Pitfall 4: http_path must include leading slash in URI
+
+**What goes wrong:** If the http_path stored in config is `/sql/1.0/warehouses/abc` (with leading slash) and the URI is constructed as `...@host:443{http_path}`, the result is `...@host:443/sql/1.0/warehouses/abc` — correct. But if http_path is stored without the leading slash, the URI is malformed.
+
+**Why it happens:** The config field stores the raw http_path string. The success criteria example uses `/sql/1.0/warehouses/abc` (with slash).
+
+**How to avoid:** Document in the field docstring that http_path must include the leading slash (as it already does in the existing `DatabricksConfig`). The translator constructs `f"...@{config.host}:443{config.http_path}"` — the slash comes from the stored field value.
+
+---
+
+## Code Examples
+
+Verified patterns from official sources and existing codebase:
+
+### Databricks DSN URI Format (HIGH confidence)
+
+```python
+# Source: columnar-tech/adbc-quickstarts by-database/databricks branch
+#         + danielbeach/adbc_databricks_driver_with_Agentic_AI
+# Format: databricks://token:{URL-encoded-token}@{host}:443{http_path}
+
+from urllib.parse import quote
+
+host = "adb-xxx.azuredatabricks.net"
+http_path = "/sql/1.0/warehouses/abc123"
+token = "dapi+test=value/path"  # pragma: allowlist secret
+
+encoded_token = quote(token, safe="")
+uri = f"databricks://token:{encoded_token}@{host}:443{http_path}"
+# Result: "databricks://token:dapi%2Btest%3Dvalue%2Fpath@adb-xxx.azuredatabricks.net:443/sql/1.0/warehouses/abc123"
+```
+
+### model_validator(mode="after") Pattern (HIGH confidence)
+
+```python
+# Source: existing _duckdb_config.py — canonical pattern for this project
+from typing import Self
+from pydantic import model_validator
+from adbc_poolhouse._exceptions import ConfigurationError  # noqa: TC001
+
+@model_validator(mode="after")
+def check_connection_spec(self) -> Self:
+    if self.uri is None and not (
+        self.host is not None and self.http_path is not None and self.token is not None
+    ):
+        raise ConfigurationError(
+            "DatabricksConfig requires either 'uri' or all three of "
+            "'host', 'http_path', and 'token'."
+        )
+    return self
+```
+
+### Version Floor Bump (HIGH confidence)
+
+```toml
+# pyproject.toml — change from:
+"adbc-driver-manager>=1.0.0",
+# to:
+"adbc-driver-manager>=1.8.0",
+```
+
+Then run: `uv sync` (regenerates uv.lock).
+
+### PROJECT.md Stale Item Closure (HIGH confidence)
+
+```markdown
+# In .planning/PROJECT.md ### Active section:
+# Change from:
+- [ ] Remove AdbcCreatorFn unused type alias from _pool_types.py
+- [ ] Remove _adbc_driver_key() dead abstract method from BaseWarehouseConfig and all 10 subclasses
+# to:
+- [x] Remove AdbcCreatorFn unused type alias from _pool_types.py  ← already removed in v1.0
+- [x] Remove _adbc_driver_key() dead abstract method from BaseWarehouseConfig and all 10 subclasses  ← already removed in v1.0
+```
+
+**Note:** Searching the codebase confirms that neither `AdbcCreatorFn` nor `_adbc_driver_key` appears in any source file. Both were removed in v1.0 but the PROJECT.md items were never closed.
+
+---
+
+## State of the Art
+
+| Old Approach | Current Approach | When Changed | Impact |
+|--------------|------------------|--------------|--------|
+| `translate_databricks` URI-only, returns `{}` for no args | URI-first with decomposed-field fallback, validator guards empty construction | Phase 9 | Closes silent failure path; patterns MySQL/ClickHouse translators (Phases 11-12) |
+| `adbc-driver-manager>=1.0.0` | `adbc-driver-manager>=1.8.0` | Phase 9 (INFRA-01) | Enables dbc CLI 0.2.0 Foundry manifest resolution |
+
+---
+
+## Open Questions
+
+1. **`uv.lock` — will `adbc-driver-manager>=1.8.0` resolve without conflicts?**
+   - What we know: The current lock file has `>=1.0.0`. adbc-driver-manager is a direct dependency with no transitive dependents that constrain it.
+   - What's unclear: Whether the installed adbc-driver-manager version will satisfy `>=1.8.0` or whether `uv sync` needs to upgrade it.
+   - Recommendation: Run `uv sync` after the version bump and commit the updated lock. The test `uv run python -c "import adbc_driver_manager; print(adbc_driver_manager.__version__)"` verifies it prints `>=1.8.0`.
+
+2. **Should `auth_type`/`client_id`/`client_secret` be usable in decomposed mode?**
+   - What we know: DBX-01 requires the validator to check `host`, `http_path`, and `token` as minimum fields. OAuth fields (`auth_type`, `client_id`, `client_secret`) are optional additions.
+   - What's unclear: Whether decomposed OAuth mode (no `uri`, no `token`, but `auth_type`+`client_id`+`client_secret`) should be a valid path. The requirements specify `host`, `http_path`, `token` as the minimum.
+   - Recommendation: Implement exactly what DBX-01 specifies: `uri` OR (`host` + `http_path` + `token`). OAuth decomposed mode is not in scope for Phase 9 — the URI mode already handles OAuth via a complete URI string.
+
+---
+
+## Docs Quality Gate (Phase ≥ 7)
+
+Per `CLAUDE.md`, all plans in phases ≥ 7 must include `@.claude/skills/adbc-poolhouse-docs-author/SKILL.md` in `<execution_context>`. The docs impact for Phase 9:
+
+- **`docs/src/guides/databricks.md`** — the "Decomposed fields" section already documents the `host`/`http_path`/`token` pattern and already shows `DatabricksConfig()` reading from env. After DBX-01, `DatabricksConfig()` with no args raises `ConfigurationError` — the guide's "Loading from environment variables" section needs updating to clarify that all three env vars must be set. The existing decomposed-field code example remains valid.
+- **`_databricks_config.py` docstring** — the class docstring currently says "Individual fields (host, http_path, token) are stored for potential future decomposed-field translation but are not currently passed to the driver." This sentence must be removed and replaced with accurate documentation.
+- **`_databricks_translator.py` docstring** — update to describe decomposed-field mode.
+- **`uv run mkdocs build --strict` must pass** before the phase is complete.
+
+---
+
+## Sources
+
+### Primary (HIGH confidence)
+
+- Existing codebase (`_duckdb_config.py`, `_databricks_config.py`, `_databricks_translator.py`, `_exceptions.py`, `test_translators.py`, `test_configs.py`) — canonical patterns for model_validator, ConfigurationError, existing translator structure, and test style.
+- Python stdlib `urllib.parse` documentation (https://docs.python.org/3/library/urllib.parse.html) — `quote(string, safe='')` behaviour confirmed.
+- `danielbeach/adbc_databricks_driver_with_Agentic_AI` — Databricks ADBC URI format: `databricks://token:{TOKEN}@{HOST}:443/{HTTP_PATH}` confirmed from `abdc_databricks_driver.py`.
+- columnar-tech/adbc-quickstarts MSSQL DeepWiki page — URI pattern with URL-encoded password (e.g. `Co1umn%26r`) confirms the password-in-URI URL-encoding approach used across Columnar drivers.
+
+### Secondary (MEDIUM confidence)
+
+- STATE.md decision `[v1.1 roadmap 2026-03-01]: adbc-driver-manager floor bumped to >=1.8.0 — dbc CLI 0.2.0 requires this version for Foundry manifest resolution` — the rationale for INFRA-01 is already recorded as a locked decision.
+- STATE.md decision `[v1.1 roadmap 2026-03-01]: Databricks fix must land in Phase 9 before MySQL/ClickHouse — those translators model themselves on the URI-first decomposed-field pattern` — ordering rationale confirmed.
+- Web search result: Databricks ADBC URI format mentions `databricks://token:{DATABRICKS_TOKEN}@{DATABRICKS_HOST}` from multiple informal sources (blog post, environment variable documentation).
+
+### Tertiary (LOW confidence)
+
+- docs.adbc-drivers.org — 404 at time of research; official Databricks ADBC driver docs were unavailable. URI format triangulated from two independent sources above.
+
+---
+
+## Metadata
+
+**Confidence breakdown:**
+- Standard stack: HIGH — all libraries already in the project; patterns verified from existing code
+- Architecture: HIGH — all patterns directly modelled on existing implementations in the codebase
+- Databricks URI format: MEDIUM — confirmed from 2 independent sources, official docs 404'd
+- URL encoding approach: HIGH — stdlib `urllib.parse.quote` documentation verified
+
+**Research date:** 2026-03-01
+**Valid until:** 2026-04-01 (stable patterns; adbc-drivers.org docs may become available, confirming URI format)
