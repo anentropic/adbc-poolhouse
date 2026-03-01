@@ -18,6 +18,7 @@ Each config class reads its fields from environment variables with a prefix matc
 | `RedshiftConfig` | `REDSHIFT_` |
 | `TrinoConfig` | `TRINO_` |
 | `MSSQLConfig` | `MSSQL_` |
+| `MySQLConfig` | `MYSQL_` |
 
 For example, setting `SNOWFLAKE_ACCOUNT=myorg-myaccount` in the environment is equivalent to passing `account="myorg-myaccount"` to `SnowflakeConfig(...)`.
 
