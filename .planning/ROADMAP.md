@@ -191,7 +191,13 @@ Plans:
   3. `pip install adbc-poolhouse[sqlite]` installs `adbc-driver-sqlite` and nothing else; `pip install adbc-poolhouse[all]` also installs the SQLite extra
   4. All SQLite unit and integration tests pass — config validation, translator kwargs, mock pool-factory wiring, and in-memory end-to-end query
   5. `from adbc_poolhouse import SQLiteConfig` succeeds; `uv run mkdocs build --strict` passes with the new SQLite warehouse guide page present
-**Plans**: TBD
+**Plans**: 4 plans
+
+Plans:
+- [ ] 10-01-PLAN.md — SQLiteConfig class and translate_sqlite() pure function
+- [ ] 10-02-PLAN.md — Wiring: _drivers.py, _translators.py, __init__.py, pyproject.toml extras, uv.lock
+- [ ] 10-03-PLAN.md — All SQLite tests: config unit tests, translator unit tests, mock wiring, integration test
+- [ ] 10-04-PLAN.md — SQLite warehouse guide, mkdocs.yml nav update, human checkpoint
 
 ### Phase 11: Foundry Tooling and MySQL Backend
 **Goal**: Developers can install and verify all Foundry drivers via justfile recipes, and consumers can create a MySQL pool using `create_pool(MySQLConfig(...))`
