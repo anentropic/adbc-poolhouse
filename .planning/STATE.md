@@ -1,14 +1,14 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.1
-milestone_name: Backend Expansion & Debt Cleanup
-status: active
-last_updated: "2026-02-28T22:00:00.000Z"
+milestone: v1.0
+milestone_name: milestone
+status: unknown
+last_updated: "2026-03-01T02:11:03.853Z"
 progress:
-  total_phases: 0
-  completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
+  total_phases: 9
+  completed_phases: 8
+  total_plans: 31
+  completed_plans: 30
 ---
 
 # Project State
@@ -18,16 +18,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-02-28)
 
 **Core value:** One config in, one pool out — `create_pool(SnowflakeConfig(...))` returns a ready-to-use SQLAlchemy QueuePool in a single call.
-**Current focus:** v1.1.0 — Backend Expansion & Debt Cleanup (defining requirements)
+**Current focus:** v1.1.0 — Backend Expansion & Debt Cleanup (roadmap created, ready for Phase 9)
 
 ## Current Position
 
-Phase: Not started (defining requirements)
-Plan: —
-Status: Defining requirements for v1.1.0
-Last activity: 2026-02-28 — Milestone v1.1.0 started
+Phase: 09-infrastructure-and-databricks-fix (Plan 1 of 2 complete)
+Plan: 09-01 (complete), next: 09-02
+Status: In Progress — Phase 9 active
+Last activity: 2026-03-01 — 09-01 complete (adbc-driver-manager floor bump, tech-debt closure)
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [█░░░░░░░░░] 10%
 
 ## Performance Metrics
 
@@ -63,6 +63,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 08-review-and-improve-docs P01 | 3 | 2 tasks | 2 files |
 | Phase 08-review-and-improve-docs P02 | 106 | 3 tasks | 4 files |
 | Phase 08-review-and-improve-docs P06 | 1 | 1 tasks | 1 files |
+| Phase 09-infrastructure-and-databricks-fix P01 | 3 | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -141,6 +142,13 @@ Recent decisions affecting current work:
 - [Phase 08-review-and-improve-docs]: close_pool and managed_pool inserted into __all__ in alphabetical order (close_pool before ConfigurationError, managed_pool before MSSQLConfig)
 - [Phase 08-review-and-improve-docs]: max_overflow default corrected from 10 to 3 in configuration.md (aligns with code)
 - [Phase 08-review-and-improve-docs]: Snowflake moved from flat Guides list into Warehouse Guides sub-section — consistent with all other warehouse guides
+- [v1.1 roadmap 2026-03-01]: adbc-driver-manager floor bumped to >=1.8.0 — dbc CLI 0.2.0 requires this version for Foundry manifest resolution
+- [v1.1 roadmap 2026-03-01]: MySQL and Foundry tooling grouped in Phase 11 — dbc justfile recipes are prerequisites for locally testing MySQL driver
+- [v1.1 roadmap 2026-03-01]: MySQL decomposed-field kwarg names are MEDIUM confidence — verify against live `dbc install mysql` before writing translator decomposed-field path
+- [v1.1 roadmap 2026-03-01]: ClickHouse uses `username` kwarg (not `user`) — confirmed from columnar-tech/adbc-quickstarts; wrong key causes silent auth failure
+- [v1.1 roadmap 2026-03-01]: Databricks fix must land in Phase 9 before MySQL/ClickHouse — those translators model themselves on the URI-first decomposed-field pattern
+- [Phase 09-01]: adbc-driver-manager floor raised from >=1.0.0 to >=1.8.0 — required for dbc CLI 0.2.0 Foundry manifest resolution (Phase 11 prerequisite)
+- [Phase 09-01]: AdbcCreatorFn and _adbc_driver_key() PROJECT.md items marked [x] with inline 'removed in v1.0' note — confirms symbols absent, clears misleading open checkboxes
 
 ### Pending Todos
 
@@ -162,9 +170,10 @@ None yet.
 
 - Phase 4 (Driver Detection): Foundry driver path discovery mechanism in `adbc_driver_manager` is sparsely documented — needs implementation-time research against actual Foundry-installed driver paths (ADBC Driver Foundry launched Oct 2025)
 - Phase 6 (Snowflake Snapshots): Snapshot recording requires real Snowflake credentials — snapshots not yet recorded; run `pytest --override-ini="addopts=" -m snowflake --snapshot-update` to record
+- Phase 11 (MySQL): Decomposed-field individual kwarg names are MEDIUM confidence — run `dbc install mysql` and confirm exact key strings before writing the decomposed-field translator path
 
 ## Session Continuity
 
-Last session: 2026-02-28
-Stopped at: Completed quick task 7 — improved README.md with tagline, DuckDB example, warehouse list, and links; added [project.urls] to pyproject.toml for PyPI sidebar
+Last session: 2026-03-01
+Stopped at: v1.1.0 roadmap created — Phases 9-12 defined, files written, ready for /gsd:plan-phase 9
 Resume file: None

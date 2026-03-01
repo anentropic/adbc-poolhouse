@@ -19,6 +19,11 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 5: Pool Factory and DuckDB Integration** - Assemble the public `create_pool()` API and validate it end-to-end with DuckDB tests (completed 2026-02-24)
 - [ ] **Phase 6: Snowflake Integration** - Add syrupy snapshot tests for Snowflake with a custom serializer stripping non-deterministic fields
 - [x] **Phase 7: Documentation and PyPI Publication** - Write docs skill, author all guides, and publish to PyPI via OIDC trusted publisher (completed 2026-02-26)
+- [ ] **Phase 8: Review and Improve Docs** - Public API cleanup (close_pool, managed_pool) and comprehensive per-warehouse guide pages
+- [ ] **Phase 9: Infrastructure and Databricks Fix** - Bump adbc-driver-manager floor, close stale PROJECT.md items, and fix the silent Databricks decomposed-field failure
+- [ ] **Phase 10: SQLite Backend** - Add SQLite as a PyPI-distributed ADBC backend with full config, translation, tests, and docs
+- [ ] **Phase 11: Foundry Tooling and MySQL Backend** - Add dbc CLI justfile recipes and the MySQL Foundry backend (dbc recipes are prerequisites for testing MySQL locally)
+- [ ] **Phase 12: ClickHouse Backend** - Add ClickHouse as a Foundry-distributed ADBC backend with full config, translation, tests, and docs
 
 ## Phase Details
 
@@ -165,6 +170,53 @@ Plans:
 - [ ] 08-05-PLAN.md — Create Foundry warehouse guide pages (databricks, redshift, trino, mssql, teradata stub)
 - [ ] 08-06-PLAN.md — Update mkdocs.yml nav with Warehouse Guides section and verify mkdocs build --strict
 
+### Phase 9: Infrastructure and Databricks Fix
+**Goal**: The dependency floor is correct for Foundry tooling, stale PROJECT.md tech debt items are closed, and the Databricks translator handles decomposed fields without silent failure
+**Depends on**: Phase 8
+**Requirements**: INFRA-01, INFRA-02, DBX-01, DBX-02
+**Success Criteria** (what must be TRUE):
+  1. `uv sync` resolves `adbc-driver-manager>=1.8.0` and `uv run python -c "import adbc_driver_manager; print(adbc_driver_manager.__version__)"` prints a version ≥1.8.0
+  2. `DatabricksConfig(host="host", http_path="/sql/1.0/warehouses/abc", token="dapi+test=value/path")` constructs successfully and `translate_databricks()` produces a correctly URL-encoded URI (token special characters preserved via `urllib.parse.quote`)
+  3. `DatabricksConfig()` with no arguments raises `ConfigurationError` — the silent empty-dict path is closed
+  4. PROJECT.md active requirements list no longer contains the already-completed `_adbc_driver_key()` or `AdbcCreatorFn` items
+**Plans**: TBD
+
+### Phase 10: SQLite Backend
+**Goal**: Consumers can create a pool backed by SQLite using the same `create_pool(SQLiteConfig(...))` call pattern as all other backends
+**Depends on**: Phase 9
+**Requirements**: SQLT-01, SQLT-02, SQLT-03, SQLT-04, SQLT-05
+**Success Criteria** (what must be TRUE):
+  1. `create_pool(SQLiteConfig(database=":memory:"))` returns a working `QueuePool`; `SQLiteConfig(database=":memory:", pool_size=2)` raises `ValueError`
+  2. `translate_sqlite()` returns the exact ADBC kwargs dict expected by `adbc_driver_manager`; `_adbc_entrypoint()` returns `"adbc_driver_sqlite_init"`
+  3. `pip install adbc-poolhouse[sqlite]` installs `adbc-driver-sqlite` and nothing else; `pip install adbc-poolhouse[all]` also installs the SQLite extra
+  4. All SQLite unit and integration tests pass — config validation, translator kwargs, mock pool-factory wiring, and in-memory end-to-end query
+  5. `from adbc_poolhouse import SQLiteConfig` succeeds; `uv run mkdocs build --strict` passes with the new SQLite warehouse guide page present
+**Plans**: TBD
+
+### Phase 11: Foundry Tooling and MySQL Backend
+**Goal**: Developers can install and verify all Foundry drivers via justfile recipes, and consumers can create a MySQL pool using `create_pool(MySQLConfig(...))`
+**Depends on**: Phase 9
+**Requirements**: DBC-01, DBC-02, DBC-03, MYSQL-01, MYSQL-02, MYSQL-03, MYSQL-04, MYSQL-05
+**Success Criteria** (what must be TRUE):
+  1. `just install-dbc` installs the `dbc` CLI or exits with a human-readable message if already installed; the recipe uses a `command -v dbc` guard (not `which`)
+  2. `just install-foundry-drivers` runs `dbc install mysql clickhouse --level env` — drivers land in `$VIRTUAL_ENV/etc/adbc/drivers/` where `adbc_driver_manager` can find them
+  3. DEVELOP.md contains a "Foundry Driver Management" section documenting `install-dbc`, `install-foundry-drivers`, `dbc info`, and uninstall
+  4. `MySQLConfig(uri="mysql://user:pass@host:3306/db")` and `MySQLConfig(host="host", user="user", password="pass", database="db")` both construct successfully; config with neither raises `ConfigurationError`
+  5. `translate_mysql()` produces a correctly formatted Go DSN URI (`user:pass@tcp(host:port)/db`) when called with decomposed fields; `MySQLConfig` is in `_FOUNDRY_DRIVERS`; `from adbc_poolhouse import MySQLConfig` succeeds; `uv run mkdocs build --strict` passes with the MySQL guide page present
+**Plans**: TBD
+
+### Phase 12: ClickHouse Backend
+**Goal**: Consumers can create a pool backed by ClickHouse using `create_pool(ClickHouseConfig(...))` with the correct `username` driver kwarg
+**Depends on**: Phase 11
+**Requirements**: CH-01, CH-02, CH-03, CH-04, CH-05
+**Success Criteria** (what must be TRUE):
+  1. `ClickHouseConfig(host="host", username="user", password="pass")` constructs successfully; `translate_clickhouse()` emits `username` (not `user`) in the kwargs dict
+  2. `translate_clickhouse()` returns the exact ADBC kwargs dict verified against the Columnar ClickHouse driver; all kwargs keys match the driver's documented parameter names
+  3. `ClickHouseConfig` appears in `_FOUNDRY_DRIVERS` with key `"clickhouse"`; the missing-driver error message instructs `dbc install clickhouse`
+  4. All ClickHouse unit tests pass — config validation, translator kwargs, and mock pool-factory wiring
+  5. `from adbc_poolhouse import ClickHouseConfig` succeeds; `uv run mkdocs build --strict` passes with the ClickHouse warehouse guide page present
+**Plans**: TBD
+
 ---
 
 ## Progress
@@ -182,3 +234,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | 6. Snowflake Integration | 0/1 | Not started | - |
 | 7. Documentation and PyPI Publication | 5/5 | Complete   | 2026-02-27 |
 | 8. Review and Improve Docs | 6/6 | Complete   | 2026-02-28 |
+| 9. Infrastructure and Databricks Fix | 1/2 | In Progress|  |
+| 10. SQLite Backend | 0/TBD | Not started | - |
+| 11. Foundry Tooling and MySQL Backend | 0/TBD | Not started | - |
+| 12. ClickHouse Backend | 0/TBD | Not started | - |

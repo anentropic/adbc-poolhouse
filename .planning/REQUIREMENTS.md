@@ -97,8 +97,8 @@ Isolates all type suppressions to dedicated internal modules.
 
 ### Infrastructure
 
-- [ ] **INFRA-01**: Bump `adbc-driver-manager` minimum to `>=1.8.0` in pyproject.toml and uv.lock (required for Foundry manifest resolution)
-- [ ] **INFRA-02**: PROJECT.md active requirements updated — stale AdbcCreatorFn and `_adbc_driver_key()` items closed (both already removed from codebase in v1.0)
+- [x] **INFRA-01**: Bump `adbc-driver-manager` minimum to `>=1.8.0` in pyproject.toml and uv.lock (required for Foundry manifest resolution)
+- [x] **INFRA-02**: PROJECT.md active requirements updated — stale AdbcCreatorFn and `_adbc_driver_key()` items closed (both already removed from codebase in v1.0)
 
 ### Databricks Fix
 
@@ -216,12 +216,39 @@ Isolates all type suppressions to dedicated internal modules.
 | DIST-01 | Phase 7 | Complete |
 | DIST-02 | Phase 7 | Complete |
 | DIST-03 | Phase 7 | Complete |
+| INFRA-01 | Phase 9 | Complete |
+| INFRA-02 | Phase 9 | Complete |
+| DBX-01 | Phase 9 | Pending |
+| DBX-02 | Phase 9 | Pending |
+| SQLT-01 | Phase 10 | Pending |
+| SQLT-02 | Phase 10 | Pending |
+| SQLT-03 | Phase 10 | Pending |
+| SQLT-04 | Phase 10 | Pending |
+| SQLT-05 | Phase 10 | Pending |
+| DBC-01 | Phase 11 | Pending |
+| DBC-02 | Phase 11 | Pending |
+| DBC-03 | Phase 11 | Pending |
+| MYSQL-01 | Phase 11 | Pending |
+| MYSQL-02 | Phase 11 | Pending |
+| MYSQL-03 | Phase 11 | Pending |
+| MYSQL-04 | Phase 11 | Pending |
+| MYSQL-05 | Phase 11 | Pending |
+| CH-01 | Phase 12 | Pending |
+| CH-02 | Phase 12 | Pending |
+| CH-03 | Phase 12 | Pending |
+| CH-04 | Phase 12 | Pending |
+| CH-05 | Phase 12 | Pending |
 
 **Coverage:**
 - v0.1 requirements: 44 total
 - Mapped to phases: 44
 - Unmapped: 0
 
+**v1.1 Coverage:**
+- v1.1 requirements: 22 total
+- Mapped to phases: 22
+- Unmapped: 0
+
 ---
 *Requirements defined: 2026-02-23*
-*Last updated: 2026-02-23 — traceability populated after roadmap creation*
+*Last updated: 2026-03-01 — v1.1 traceability populated (Phases 9-12)*
