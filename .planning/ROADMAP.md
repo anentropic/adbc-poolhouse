@@ -21,7 +21,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 7: Documentation and PyPI Publication** - Write docs skill, author all guides, and publish to PyPI via OIDC trusted publisher (completed 2026-02-26)
 - [ ] **Phase 8: Review and Improve Docs** - Public API cleanup (close_pool, managed_pool) and comprehensive per-warehouse guide pages
 - [x] **Phase 9: Infrastructure and Databricks Fix** - Bump adbc-driver-manager floor, close stale PROJECT.md items, and fix the silent Databricks decomposed-field failure
-- [ ] **Phase 10: SQLite Backend** - Add SQLite as a PyPI-distributed ADBC backend with full config, translation, tests, and docs
+- [x] **Phase 10: SQLite Backend** - Add SQLite as a PyPI-distributed ADBC backend with full config, translation, tests, and docs
 - [ ] **Phase 11: Foundry Tooling and MySQL Backend** - Add dbc CLI justfile recipes and the MySQL Foundry backend (dbc recipes are prerequisites for testing MySQL locally)
 - [ ] **Phase 12: ClickHouse Backend** - Add ClickHouse as a Foundry-distributed ADBC backend with full config, translation, tests, and docs
 
@@ -194,10 +194,10 @@ Plans:
 **Plans**: 4 plans
 
 Plans:
-- [ ] 10-01-PLAN.md — SQLiteConfig class and translate_sqlite() pure function
-- [ ] 10-02-PLAN.md — Wiring: _drivers.py, _translators.py, __init__.py, pyproject.toml extras, uv.lock
-- [ ] 10-03-PLAN.md — All SQLite tests: config unit tests, translator unit tests, mock wiring, integration test
-- [ ] 10-04-PLAN.md — SQLite warehouse guide, mkdocs.yml nav update, human checkpoint
+- [x] 10-01-PLAN.md — SQLiteConfig class and translate_sqlite() pure function
+- [x] 10-02-PLAN.md — Wiring: _drivers.py, _translators.py, __init__.py, pyproject.toml extras, uv.lock
+- [x] 10-03-PLAN.md — All SQLite tests: config unit tests, translator unit tests, mock wiring, integration test
+- [x] 10-04-PLAN.md — SQLite warehouse guide, mkdocs.yml nav update, human checkpoint
 
 ### Phase 11: Foundry Tooling and MySQL Backend
 **Goal**: Developers can install and verify all Foundry drivers via justfile recipes, and consumers can create a MySQL pool using `create_pool(MySQLConfig(...))`
