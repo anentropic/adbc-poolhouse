@@ -90,7 +90,11 @@ class SQLiteConfig(BaseWarehouseConfig):
 
         Internal only — not part of the public API.
         """
-        return "adbc_driver_sqlite_init"
+        # NOTE: The C source uses "AdbcDriverSqliteInit" (PascalCase), not the
+        # snake_case "adbc_driver_sqlite_init" that the module name might suggest.
+        # Confirmed by integration testing: "adbc_driver_sqlite_init" raises
+        # dlsym symbol-not-found; "AdbcDriverSqliteInit" resolves correctly.
+        return "AdbcDriverSqliteInit"
 
     @model_validator(mode="after")
     def check_memory_pool_size(self) -> Self:
