@@ -1,7 +1,7 @@
 # Databricks guide
 
 The Databricks ADBC driver is distributed via the ADBC Driver Foundry, not PyPI.
-Follow the [Foundry installation guide](https://arrow.apache.org/adbc/current/driver/installation.html) to install it before using `DatabricksConfig`.
+Follow the [Foundry installation guide](https://arrow.apache.org/adbc/current/driver/installation.html) to install it before using [`DatabricksConfig`][adbc_poolhouse.DatabricksConfig].
 
 `adbc-poolhouse` does not need a separate extra for Databricks:
 
@@ -11,7 +11,7 @@ pip install adbc-poolhouse
 
 ## Connection
 
-`DatabricksConfig` connects to a Databricks SQL warehouse or all-purpose cluster
+[`DatabricksConfig`][adbc_poolhouse.DatabricksConfig] connects to a Databricks SQL warehouse or all-purpose cluster
 using a personal access token (PAT). You must specify the connection in one of two
 ways: a full URI or individual fields (`host`, `http_path`, and `token` together).
 
@@ -48,7 +48,7 @@ pool = create_pool(config)
 
 ## Loading from environment variables
 
-`DatabricksConfig` reads all fields from environment variables with the `DATABRICKS_` prefix.
+[`DatabricksConfig`][adbc_poolhouse.DatabricksConfig] reads all fields from environment variables with the `DATABRICKS_` prefix.
 For individual field mode, all three variables must be set at the same time — setting only
 `DATABRICKS_HOST` or `DATABRICKS_TOKEN` alone causes [`ConfigurationError`][adbc_poolhouse.ConfigurationError] at construction.
 

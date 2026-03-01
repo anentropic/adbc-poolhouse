@@ -14,6 +14,8 @@ uv add "adbc-poolhouse[postgresql]"
 
 ## Connection
 
+[`PostgreSQLConfig`][adbc_poolhouse.PostgreSQLConfig] supports URI-based and individual field connection specification.
+
 ### URI mode
 
 ```python

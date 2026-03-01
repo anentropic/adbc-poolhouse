@@ -9,10 +9,9 @@ Follow the [Foundry installation guide](https://arrow.apache.org/adbc/current/dr
 pip install adbc-poolhouse
 ```
 
-[`MSSQLConfig`][adbc_poolhouse.MSSQLConfig] covers Microsoft SQL Server, Azure SQL Database, Azure SQL Managed
-Instance, Azure Synapse Analytics, and Azure Fabric SQL endpoint.
-
 ## Connection
+
+[`MSSQLConfig`][adbc_poolhouse.MSSQLConfig] covers Microsoft SQL Server, Azure SQL Database, Azure SQL Managed Instance, Azure Synapse Analytics, and Azure Fabric SQL endpoint.
 
 ### URI mode
 
