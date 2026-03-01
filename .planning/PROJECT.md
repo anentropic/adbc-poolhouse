@@ -37,7 +37,7 @@ One config in, one pool out — `create_pool(SnowflakeConfig(...))` returns a re
 
 ### Active
 
-- [ ] Fix DatabricksConfig decomposed-field gap (host/http_path/token silently produce empty dict when URI absent)
+- [x] Fix DatabricksConfig decomposed-field gap (host/http_path/token silently produce empty dict when URI absent) — fixed in Phase 9 (DBX-01/DBX-02)
 - [x] Remove AdbcCreatorFn unused type alias from _pool_types.py — removed in v1.0
 - [x] Remove _adbc_driver_key() dead abstract method from BaseWarehouseConfig and all 10 subclasses — removed in v1.0
 - [ ] Verify Teradata field names against real Columnar ADBC Teradata driver
