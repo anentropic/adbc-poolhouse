@@ -1,652 +1,540 @@
-# Architecture Research: adbc-poolhouse
+# Architecture Patterns
 
-**Research Type:** Project Research — Architecture dimension
-**Milestone:** Greenfield
-**Date:** 2026-02-23
-**Question:** How are Python database driver wrapper/pooling libraries typically structured? What are the major components and how should an ADBC-specific library be layered?
-
----
-
-## Summary
-
-adbc-poolhouse is a thin translation and wiring library. Its job is: receive a typed warehouse config, translate it to ADBC driver kwargs, resolve the right driver binary, and hand the resulting connection factory to SQLAlchemy QueuePool. Each of the four concerns maps cleanly to one module. The public API is a single function — `create_pool(config)` — that calls through those modules in sequence.
-
-The key architectural insight is that SQLAlchemy QueuePool is designed for exactly this pattern: it takes a zero-argument callable (`creator`) that returns a raw DBAPI connection, and it manages the pool lifecycle around it. ADBC's `adbc_driver_manager.dbapi.connect` is a conforming DBAPI2 factory. The library's job is to build the right `creator` closure and pass it to `QueuePool`.
+**Domain:** adbc-poolhouse — ADBC backend expansion and Foundry driver tooling
+**Researched:** 2026-03-01
+**Confidence:** HIGH — based on direct source inspection of all files in the codebase plus dbc CLI reference docs from GitHub
 
 ---
 
-## Q1: How SQLAlchemy QueuePool Works With Custom DBAPI Connections
+## Recommended Architecture
 
-### The `creator` pattern
+The codebase already implements a clean slice-per-warehouse pattern. Every new backend
+follows the same slotting model: one config file, one translator file, one entry in two
+dispatch tables, one public re-export, one test class per file, one docs guide. The
+pattern is mechanical and additive — no cross-cutting rewrites required.
 
-`sqlalchemy.pool.QueuePool` (and all SQLAlchemy pool implementations) accept a `creator` keyword argument. `creator` is a zero-argument callable that returns a new raw DBAPI connection. QueuePool calls it whenever it needs to open a new physical connection — it does not call `connect()` on a dialect or engine; it just calls `creator()`.
+```
+create_pool(config)
+    └─ resolve_driver(config)      <- _drivers.py   (dispatch: type -> driver path/name)
+    └─ translate_config(config)    <- _translators.py (dispatch: type -> dict[str,str])
+    └─ config._adbc_entrypoint()   <- _base_config.py (default None; DuckDB overrides)
+         └─ create_adbc_connection(driver_path, kwargs, entrypoint)
+                                   <- _driver_api.py  (single adbc_driver_manager facade)
+```
+
+### Component Boundaries
+
+| File | Responsibility | What Changes Per New Backend |
+|------|---------------|------------------------------|
+| `_[warehouse]_config.py` | Pydantic BaseSettings model, env_prefix, field validators | NEW FILE — always |
+| `_[warehouse]_translator.py` | Pure function: config -> dict[str, str] ADBC kwargs | NEW FILE — always |
+| `_translators.py` | isinstance dispatch: config type -> translator fn | ADD import + elif branch |
+| `_drivers.py` | type -> (pkg_name, extra) for PyPI; type -> short_name for Foundry | ADD entry to `_PYPI_PACKAGES` or `_FOUNDRY_DRIVERS` dict |
+| `__init__.py` | Public re-exports | ADD import + `__all__` entry |
+| `tests/test_configs.py` | Config model unit tests | ADD test class |
+| `tests/test_translators.py` | Translator pure-function tests | ADD test class + dispatch test case |
+| `tests/test_drivers.py` | Driver detection path tests | ADD test for new config type |
+| `pyproject.toml` | Optional dependencies | ADD extra for PyPI backends only |
+| `docs/src/guides/[warehouse].md` | Per-warehouse installation and usage guide | NEW FILE — always |
+| `DEVELOP.md` | Developer guide | ADD dbc section |
+| `justfile` | Developer task recipes | ADD dbc recipes |
+
+---
+
+## PyPI Backend: File-Level Change List
+
+A PyPI backend is one where the ADBC driver is published to PyPI and installed via pip.
+Current PyPI backends: Snowflake, BigQuery, PostgreSQL, FlightSQL.
+
+**New files (create):**
+
+1. `src/adbc_poolhouse/_[warehouse]_config.py`
+   - Subclass `BaseWarehouseConfig`
+   - Set `model_config = SettingsConfigDict(env_prefix="[WAREHOUSE]_")`
+   - Map driver-specific connection params as typed Pydantic fields
+   - Use `SecretStr` for passwords, tokens, URIs that embed credentials
+   - Override `_adbc_entrypoint()` only if the driver requires a non-None entrypoint symbol (currently only DuckDB does; all other drivers return the base class default of `None`)
+   - Do NOT implement `_adbc_driver_key()` — that method was removed in a prior tech debt cleanup and no longer exists on BaseWarehouseConfig
+
+2. `src/adbc_poolhouse/_[warehouse]_translator.py`
+   - Single pure function `translate_[warehouse](config: [Warehouse]Config) -> dict[str, str]`
+   - Config type import under `TYPE_CHECKING` guard (avoids circular imports)
+   - Map config fields to exact ADBC driver parameter key names
+   - Omit `None` fields; include bool defaults as `'true'`/`'false'` strings
+
+3. `docs/src/guides/[warehouse].md`
+   - Installation: `pip install adbc-poolhouse[[warehouse]]`
+   - Connection code examples
+   - Env-var loading pattern
+
+**Modified files (edit):**
+
+4. `src/adbc_poolhouse/_drivers.py`
+   - Add config class import at module level
+   - Add entry to `_PYPI_PACKAGES` dict: `[Warehouse]Config: ("[pkg_name]", "[extra]")`
+   - Example: `BigQueryConfig: ("adbc_driver_bigquery", "bigquery")`
+
+5. `src/adbc_poolhouse/_translators.py`
+   - Add config class import at module level
+   - Add translator function import at module level
+   - Add `if isinstance(config, [Warehouse]Config): return translate_[warehouse](config)` branch before the final `raise TypeError`
+   - Alphabetical order within PyPI group per existing convention
+
+6. `src/adbc_poolhouse/__init__.py`
+   - Add `from adbc_poolhouse._[warehouse]_config import [Warehouse]Config`
+   - Add `"[Warehouse]Config"` to `__all__`
+
+7. `pyproject.toml`
+   - Add `[warehouse] = ["[pypi-package]>=[min-version]"]` to `[project.optional-dependencies]`
+   - Add `"adbc-poolhouse[[warehouse]]"` to the `all` extra list
+
+8. `tests/test_configs.py` — add test class `Test[Warehouse]Config`
+9. `tests/test_translators.py` — add test class `Test[Warehouse]Translator` + dispatch test case
+10. `tests/test_drivers.py` — add Path 1 and Path 2 tests for the new config type
+
+---
+
+## Foundry Backend: File-Level Change List
+
+A Foundry backend is one whose ADBC driver is distributed by the ADBC Driver Foundry
+(not on PyPI) and accessed via `adbc_driver_manager` manifest resolution. Current
+Foundry backends: Databricks, Redshift, Trino, MSSQL.
+
+**New files (create):**
+
+1. `src/adbc_poolhouse/_[warehouse]_config.py`
+   - Same structure as PyPI config
+   - No `_adbc_entrypoint()` override needed (Foundry drivers use manifest resolution, not a shared-lib entrypoint symbol)
+   - Do not reference the dbc install name in the config model — that lives in `_drivers.py`
+
+2. `src/adbc_poolhouse/_[warehouse]_translator.py`
+   - Same pattern. For Foundry backends, connection is typically URI-only or URI-first with decomposed-field fallback. Verify key names against `docs.adbc-drivers.org` and `adbc-quickstarts` examples.
+
+3. `docs/src/guides/[warehouse].md`
+   - Installation: `pip install adbc-poolhouse` (no extra — Foundry drivers have no PyPI package)
+   - dbc install command: `dbc install [short_name]`
+   - Connection code examples
+
+**Modified files (edit):**
+
+4. `src/adbc_poolhouse/_drivers.py`
+   - Add config class import at module level
+   - Add entry to `_FOUNDRY_DRIVERS` dict: `[Warehouse]Config: ("[short_name]", "[short_name]")`
+   - The first string is the `adbc_driver_manager` manifest name; the second is the `dbc install` name
+   - Example: `DatabricksConfig: ("databricks", "databricks")`
+   - `_driver_api.py` uses this dict to build the `dbc install [name]` error message automatically — no changes needed to `_driver_api.py`
+
+5. `src/adbc_poolhouse/_translators.py`
+   - Same as PyPI path — add imports and isinstance branch
+
+6. `src/adbc_poolhouse/__init__.py`
+   - Same as PyPI path — add import and `__all__` entry
+
+7. `pyproject.toml`
+   - No new optional dependency entry — Foundry drivers have no PyPI package
+   - No change to the `all` extra
+
+8. `tests/test_configs.py` — add test class
+9. `tests/test_translators.py` — add test class + dispatch test
+10. `tests/test_drivers.py` — add Foundry short-name test (assert `resolve_driver(Config())` returns the short name without calling `find_spec`)
+
+**Not modified for Foundry:**
+
+`_driver_api.py` — already handles all Foundry NOT_FOUND errors via the `_FOUNDRY_DRIVERS`
+reverse-lookup. Adding a new entry to `_FOUNDRY_DRIVERS` in `_drivers.py` is the only
+change needed. `_driver_api.py` imports that dict at runtime and builds `dbc install
+[name]` error messages automatically.
+
+---
+
+## Dispatch Table Update Patterns
+
+### `_drivers.py` — Two distinct dispatch dicts
 
 ```python
-from sqlalchemy.pool import QueuePool
+# PyPI: find_spec -> path, with manifest fallback
+_PYPI_PACKAGES: dict[type, tuple[str, str]] = {
+    SnowflakeConfig:  ("adbc_driver_snowflake",  "snowflake"),
+    BigQueryConfig:   ("adbc_driver_bigquery",   "bigquery"),
+    PostgreSQLConfig: ("adbc_driver_postgresql", "postgresql"),
+    FlightSQLConfig:  ("adbc_driver_flightsql",  "flightsql"),
+    # NEW PyPI backend:
+    # [Warehouse]Config: ("[pkg_name]", "[extra]"),
+}
 
-def my_creator():
-    import some_dbapi
-    return some_dbapi.connect(host="...", user="...", password="...")
-
-pool = QueuePool(
-    creator=my_creator,
-    pool_size=5,
-    max_overflow=3,
-    timeout=30,
-    recycle=3600,
-    pre_ping=True,
-)
+# Foundry: skip find_spec, return short name for manifest resolution
+_FOUNDRY_DRIVERS: dict[type, tuple[str, str]] = {
+    DatabricksConfig: ("databricks", "databricks"),
+    RedshiftConfig:   ("redshift",   "redshift"),
+    TrinoConfig:      ("trino",      "trino"),
+    MSSQLConfig:      ("mssql",      "mssql"),
+    # NEW Foundry backend:
+    # MySQLConfig:     ("mysql",      "mysql"),
+    # TeradataConfig:  ("teradata",   "teradata"),
+}
 ```
 
-This is the lowest-level SQLAlchemy pool API — it has no knowledge of dialects, engines, or SQL. It is exactly what a non-SQLAlchemy driver wrapper needs. Importing `sqlalchemy.pool` does not pull in the ORM, dialects, or engine machinery.
+**Key invariant:** A config type belongs in exactly one dict. If a driver is available
+both on PyPI and through Foundry (currently no such case), prefer the PyPI path so
+`find_spec` can resolve the shared library directly.
 
-### Constructor parameters that matter
-
-| Parameter | Type | Default | Effect |
-|-----------|------|---------|--------|
-| `creator` | `Callable[[], Connection]` | required | Called to open each new physical connection |
-| `pool_size` | `int` | 5 | Number of connections kept open in the pool at steady state |
-| `max_overflow` | `int` | 10 | Additional connections allowed above `pool_size` under load; destroyed when returned |
-| `timeout` | `float` | 30.0 | Seconds to wait for a connection before raising `TimeoutError` |
-| `recycle` | `float` | -1 | Seconds after which a connection is closed and recreated; use ~3600 for warehouses with session/token expiry |
-| `pre_ping` | `bool` | False | Issue a lightweight query (`SELECT 1`) before returning a connection from the pool; discards stale connections |
-
-### The `recycle` parameter and warehouse auth
-
-This parameter is important for Snowflake (and similar warehouse drivers) that issue short-lived session tokens. Setting `recycle=3600` ensures connections are recreated before their auth tokens expire, rather than surfacing auth errors to query callers. It is not a keepalive — it is a maximum connection age.
-
-### `pre_ping` behaviour
-
-When `pre_ping=True`, QueuePool wraps each checkout with a dialect-level ping. Since we are not using a SQLAlchemy dialect, we need to be aware: QueuePool's `pre_ping` with a custom `creator` uses the pool's `_dialect` attribute to issue the ping. With no dialect attached (raw pool, no engine), `pre_ping` may not function as expected without explicit event hooking.
-
-**The recommended approach for pre-ping without a dialect:** Use SQLAlchemy's `event.listen` on the pool's `checkout` event, or set `pre_ping=False` and rely on `recycle` alone for connection health. Alternatively, wrap the connection in a lightweight validation wrapper. For v1, `recycle=3600` combined with Snowflake's session management provides sufficient health guarantees without the complexity of a custom pre-ping handler.
-
-**Note:** This is a known nuance when using QueuePool standalone (without `create_engine`). The `pre_ping` flag is intended for use with engine-bound pools that have a dialect. A standalone `QueuePool` with `pre_ping=True` will attempt to call `dialect.do_ping(dbapi_connection)` — if no dialect is set, this silently no-ops in most SQLAlchemy versions. Setting `pre_ping=False` and using `recycle` is the safer default for this usage pattern.
-
-### Connection checkout and return
-
-Consumers call `pool.connect()` to get a `_ConnectionFairy` (a proxied connection). The context manager protocol is supported: `with pool.connect() as conn:` returns the connection to the pool on exit. The connection object itself is the raw DBAPI connection wrapped in a proxy that intercepts `close()` to return it to the pool instead.
-
-### What QueuePool does NOT do
-
-- It does not parse SQL.
-- It does not know about transactions beyond what the DBAPI connection exposes.
-- It does not retry failed connections (retries are a consumer responsibility, or can be added via event hooks).
-- It does not log or observe queries.
-
----
-
-## Q2: How ADBC's `adbc_driver_manager.dbapi` Interface Works
-
-### The ADBC abstraction layers
-
-ADBC has two Python-facing layers:
-
-1. **`adbc_driver_manager` (C extension)** — the low-level layer. Wraps the C ADBC API. Provides `AdbcDatabase`, `AdbcConnection`, and `AdbcStatement` classes.
-2. **`adbc_driver_manager.dbapi`** — the DBAPI2 shim over the low-level layer. Provides `connect()`, `Connection`, `Cursor` objects conforming to PEP 249.
-
-The `dbapi` module is what we care about. It is the standard DBAPI2 interface.
-
-### `adbc_driver_manager.dbapi.connect()`
+### `_translators.py` — isinstance chain
 
 ```python
-import adbc_driver_manager.dbapi as adbc_dbapi
-
-conn = adbc_dbapi.connect(
-    driver="adbc_driver_snowflake",       # Python module name (PyPI driver)
-    # OR
-    driver="/path/to/libadbc_driver.so",  # shared library path (Foundry driver)
-    entrypoint="AdbcDriverInit",          # C entry point (optional, has a default)
-    db_kwargs={
-        "adbc.snowflake.sql.account":  "xy12345",
-        "adbc.snowflake.sql.user":     "myuser",
-        "adbc.snowflake.sql.password": "secret",
-    },
-    conn_kwargs={},  # connection-level kwargs (usually empty; most config is at db level)
-)
+def translate_config(config: WarehouseConfig) -> dict[str, str]:
+    # Order within each group is alphabetical (existing convention).
+    if isinstance(config, BigQueryConfig):    return translate_bigquery(config)
+    if isinstance(config, DatabricksConfig):  return translate_databricks(config)
+    if isinstance(config, DuckDBConfig):      return translate_duckdb(config)
+    if isinstance(config, FlightSQLConfig):   return translate_flightsql(config)
+    if isinstance(config, MSSQLConfig):       return translate_mssql(config)
+    if isinstance(config, PostgreSQLConfig):  return translate_postgresql(config)
+    if isinstance(config, RedshiftConfig):    return translate_redshift(config)
+    if isinstance(config, SnowflakeConfig):   return translate_snowflake(config)
+    if isinstance(config, TrinoConfig):       return translate_trino(config)
+    # INSERT new backend here, maintaining alphabetical order:
+    # if isinstance(config, MySQLConfig):     return translate_mysql(config)
+    raise TypeError(f"Unsupported config type: {type(config).__name__}")
 ```
 
-Key behaviour:
-- `driver` is either a Python module name (for PyPI-installed drivers like `adbc_driver_snowflake`) or a filesystem path to a compiled shared library (for Foundry-installed drivers).
-- `db_kwargs` is a `dict[str, str]` — all values must be strings. This is where warehouse-specific parameters go. The parameter names are driver-defined namespaced strings (e.g. `adbc.snowflake.sql.account`).
-- `conn_kwargs` is rarely needed; most drivers accept all parameters at the database level.
-- Returns a DBAPI2-conforming `Connection` object.
+All concrete config classes are direct siblings of `BaseWarehouseConfig` (no
+multi-level inheritance), so `isinstance` check order does not affect correctness.
 
-### Driver module vs. shared library path
+---
 
-**PyPI drivers** (e.g. `adbc-driver-snowflake`) install a Python package that exposes a top-level function `_init_fn` (or similar). When you pass `driver="adbc_driver_snowflake"`, `adbc_driver_manager` imports the module and calls the init function to get the C driver handle.
+## New Backends: Research-Confirmed Connection Parameter Patterns
 
-**Foundry drivers** (e.g. `dbc install databricks`) install a shared library (`.so`/`.dylib`/`.dll`) to a known path. When you pass a filesystem path as `driver`, `adbc_driver_manager` `dlopen`s the library directly.
+The following patterns were verified from the `columnar-tech/adbc-quickstarts` repository
+via GitHub API (HIGH confidence for URI shape).
 
-Both paths converge at the C ADBC interface — from Python's perspective, the connect call is identical except for what you pass as `driver`.
-
-### DuckDB special case
-
-DuckDB's ADBC support comes through the `duckdb` package itself — there is no separate `adbc-driver-duckdb` package. The DuckDB package ships its own `adbc_driver_duckdb` module. The connect call uses:
+### MySQL (Foundry — `dbc install mysql`)
 
 ```python
-conn = adbc_dbapi.connect(
-    driver="adbc_driver_duckdb",
-    db_kwargs={
-        "path": "/tmp/my.db",  # or ":memory:"
-    },
-)
+# URI format (verified: columnar-tech/adbc-quickstarts/python/mysql/mysql/main.py)
+db_kwargs = {"uri": "root:password@tcp(localhost:3306)/dbname"}
 ```
 
-This means the `duckdb` package must be installed — not a separate `adbc-driver-duckdb`.
+MySQL URI format uses the Go DSN style (`tcp(host:port)/db`), not a standard URL scheme.
+`MySQLConfig` fields: `uri: str | None`, plus decomposed `host`, `port`, `user`,
+`password`, `database` for field-mode connection.
 
-### The creator closure for QueuePool
-
-Because `adbc_driver_manager.dbapi.connect()` takes the driver name and db_kwargs at call time, the QueuePool creator closure is straightforward:
+### Teradata (Foundry — `dbc install teradata`)
 
 ```python
-def _make_creator(driver: str, db_kwargs: dict[str, str]) -> Callable[[], Connection]:
-    def creator() -> Connection:
-        return adbc_dbapi.connect(driver=driver, db_kwargs=db_kwargs)
-    return creator
+# URI format (verified: columnar-tech/adbc-quickstarts/python/teradata/main.py)
+db_kwargs = {"uri": "teradata://username:password@host:1025"}
 ```
 
-The `driver` string and `db_kwargs` dict are captured in the closure — they are computed once during pool creation and reused for every new connection opened by the pool.
+Standard URL scheme. `TeradataConfig` fields: `uri: SecretStr | None`, plus decomposed
+`host`, `port`, `user`, `password`.
 
-### DBAPI2 conformance
+Note: Teradata was previously dropped from this project because no Foundry driver existed
+at that time (per `.planning/.continue-here.md`). The driver now exists in the
+`adbc-drivers` GitHub org and has quickstart examples. Verify driver stability before
+re-adding.
 
-`adbc_driver_manager.dbapi` provides:
-- `connect()` — returns a `Connection`
-- `Connection.cursor()` — returns a `Cursor` with `execute()`, `fetchall()`, `fetchmany()`, `fetchone()`
-- `Connection.commit()`, `Connection.rollback()`, `Connection.close()`
-- Exception hierarchy: `Warning`, `Error`, `InterfaceError`, `DatabaseError`, etc.
-- Thread safety level: `threadsafety = 1` — connections are not thread-safe, but the module-level connect function is. This aligns with QueuePool's model of one connection per checkout.
-
----
-
-## Q3: Module Structure
-
-### Recommended layout
-
-```
-src/adbc_poolhouse/
-    __init__.py            # Public API: exports create_pool + all config models
-    _types.py              # Shared type aliases and protocols (WarehouseConfig protocol)
-    config/
-        __init__.py        # Re-exports all config models for flat import convenience
-        base.py            # BaseWarehouseConfig (shared Pydantic BaseSettings base class)
-        duckdb.py          # DuckDBConfig
-        snowflake.py       # SnowflakeConfig
-    _translators.py        # Internal: translate(config) -> (driver_str, db_kwargs dict)
-    _drivers.py            # Internal: resolve_driver(config) -> str (module name or path)
-    _pool.py               # Internal: _build_pool(driver, db_kwargs, **pool_kwargs) -> QueuePool
-    _exceptions.py         # DriverNotInstalledError and related helpful errors
-    factory.py             # Public: create_pool(config, **pool_kwargs) -> QueuePool
-    py.typed               # PEP 561 marker
-```
-
-**Alternative (simpler, flat):**
-
-```
-src/adbc_poolhouse/
-    __init__.py            # Public API
-    _types.py              # Protocols and type aliases
-    _config_base.py        # Shared BaseWarehouseConfig
-    config_duckdb.py       # DuckDBConfig
-    config_snowflake.py    # SnowflakeConfig
-    _translators.py        # Config → ADBC kwargs
-    _drivers.py            # Driver resolution
-    _exceptions.py         # DriverNotInstalledError
-    factory.py             # create_pool()
-    py.typed
-```
-
-### Recommendation: flat layout
-
-For a library this size (two config models at launch, each small), the flat layout is preferable. The `config/` sub-package is premature until there are 5+ warehouse configs. Flat modules are easier to import, easier to navigate, and have less indirection.
-
-The only sub-package that makes sense is if config models grow complex enough to warrant per-warehouse modules that are clearly grouped. Revisit if/when BigQuery, PostgreSQL, and Databricks are added.
-
-### Module responsibilities and boundaries
-
-**`_config_base.py`** — `BaseWarehouseConfig`
-- Contains the abstract Pydantic `BaseSettings` base class
-- Defines only fields common to all warehouses (none currently — may add `pool_size` override fields here later)
-- No imports from other library modules
-
-**`config_duckdb.py`** — `DuckDBConfig`
-- Imports from `_config_base`
-- Fields: `database` (path string, default `":memory:"`), `read_only` (bool, default False)
-- No auth fields needed for DuckDB in-process usage
-- No imports from driver or pool modules
-
-**`config_snowflake.py`** — `SnowflakeConfig`
-- Imports from `_config_base`
-- Fields: `account`, `user`, `password` or `private_key`/`private_key_passphrase`, `warehouse`, `database`, `schema_`, `role`
-- Auth method fields should be `SecretStr` (Pydantic) so passwords are not logged
-- Pydantic `model_validator` to enforce that at least one auth method is present
-- No imports from driver or pool modules
-
-**`_exceptions.py`** — error types
-- `DriverNotInstalledError(ImportError)` with helpful message template
-- `DriverResolutionError(RuntimeError)` for unexpected detection failures
-- No imports from other library modules
-
-**`_translators.py`** — config to ADBC kwargs
-- `translate(config: BaseWarehouseConfig) -> dict[str, str]`
-- One private function per warehouse type: `_translate_duckdb`, `_translate_snowflake`
-- Uses `isinstance` dispatch or a registry pattern
-- Returns a `dict[str, str]` of ADBC driver kwargs (`db_kwargs`)
-- Imports config models, `_exceptions`; no imports from `_drivers` or pool modules
-
-**`_drivers.py`** — driver resolution
-- `resolve_driver(config: BaseWarehouseConfig) -> str`
-- Returns the driver identifier string to pass to `adbc_driver_manager.dbapi.connect(driver=...)`
-- Strategy: `try: importlib.import_module(pypi_module_name)` — if it succeeds, return the module name. If `ImportError`, try `adbc_driver_manager` lookup for the Foundry path. If neither works, raise `DriverNotInstalledError` with install instructions.
-- Does NOT import any ADBC driver packages at module load time — only inside the resolution function
-- Imports `_exceptions`; no imports from translators or pool modules
-
-**`factory.py`** — `create_pool()`
-- The only module that imports `sqlalchemy.pool`
-- Calls `_translators.translate(config)` to get `db_kwargs`
-- Calls `_drivers.resolve_driver(config)` to get the driver string
-- Builds the creator closure
-- Constructs `QueuePool(creator=creator, pool_size=..., max_overflow=..., timeout=..., recycle=..., pre_ping=False)` (see Q1 notes on pre_ping)
-- Accepts `**pool_kwargs` to allow consumer overrides of all pool parameters
-- Returns `QueuePool`
-
-**`__init__.py`** — public API surface
-- `from adbc_poolhouse.factory import create_pool`
-- `from adbc_poolhouse.config_duckdb import DuckDBConfig`
-- `from adbc_poolhouse.config_snowflake import SnowflakeConfig`
-- `__all__ = ["create_pool", "DuckDBConfig", "SnowflakeConfig"]`
-- Does NOT import `_translators`, `_drivers`, `_exceptions`, `_config_base` — those are internal
-
----
-
-## Q4: Public API Design for Multiple Backends Without Requiring All Drivers
-
-### The core problem
-
-If `create_pool(config)` had warehouse-specific code at the top level, importing the library would fail if optional driver packages were not installed. The solution is deferred import — driver packages are imported only when a connection is actually requested, not at library import time.
-
-### Pattern: lazy imports inside the creator closure
+### ClickHouse (Foundry — `dbc install clickhouse`)
 
 ```python
-# In _drivers.py
-def resolve_driver(config: BaseWarehouseConfig) -> str:
-    if isinstance(config, DuckDBConfig):
-        return _resolve_duckdb_driver()
-    elif isinstance(config, SnowflakeConfig):
-        return _resolve_snowflake_driver()
-    raise DriverResolutionError(f"No driver known for {type(config).__name__}")
-
-def _resolve_duckdb_driver() -> str:
-    try:
-        import adbc_driver_duckdb  # noqa: F401
-        return "adbc_driver_duckdb"
-    except ImportError:
-        raise DriverNotInstalledError(
-            "DuckDB ADBC driver not found. Install it with: pip install duckdb"
-        ) from None
-
-def _resolve_snowflake_driver() -> str:
-    try:
-        import adbc_driver_snowflake  # noqa: F401
-        return "adbc_driver_snowflake"
-    except ImportError:
-        pass
-    # Foundry fallback
-    foundry_path = _find_foundry_driver("snowflake")
-    if foundry_path:
-        return foundry_path
-    raise DriverNotInstalledError(
-        "Snowflake ADBC driver not found. "
-        "Install it with: pip install adbc-driver-snowflake\n"
-        "Or via ADBC Driver Foundry: dbc install snowflake"
-    )
+# URI + decomposed (verified: columnar-tech/adbc-quickstarts/python/clickhouse/main.py)
+db_kwargs = {"uri": "http://localhost:8123", "username": "user", "password": "pass"}
 ```
 
-### Key design principles
+ClickHouse uses HTTP URI plus separate `username`/`password` keys.
 
-1. **No top-level driver imports.** Neither `adbc_driver_snowflake` nor `adbc_driver_duckdb` appears at module scope anywhere in the library. All driver imports are guarded by `try/except ImportError` inside functions.
-
-2. **Optional extras in `pyproject.toml`.** Declare driver packages as optional extras so consumers can install exactly what they need:
-
-   ```toml
-   [project.optional-dependencies]
-   duckdb = ["duckdb>=0.10"]
-   snowflake = ["adbc-driver-snowflake>=1.0"]
-   all = ["duckdb>=0.10", "adbc-driver-snowflake>=1.0"]
-   ```
-
-   Consumers then do `pip install adbc-poolhouse[snowflake]`. The library itself has `adbc-driver-manager` as a required dependency (it is the common substrate for all drivers).
-
-3. **`adbc_driver_manager` is always required.** This is the one ADBC package that must be installed regardless of warehouse. It is the C extension that manages driver loading. List it as a required dependency in `[project.dependencies]`.
-
-4. **`sqlalchemy` is always required.** It provides `QueuePool`. List it as a required dependency. The import cost is low — importing `sqlalchemy.pool` does not load the ORM.
-
-5. **Config model registration, not driver imports.** The factory dispatches on config type (`isinstance` check or a `__adbc_driver_module__` class variable on each config). Adding a new warehouse means adding a new config class and a new entry in the resolver — the factory itself does not change.
-
-### `create_pool` signature
+### Oracle (Foundry — `dbc install oracle`)
 
 ```python
-from sqlalchemy.pool import QueuePool
-
-def create_pool(
-    config: BaseWarehouseConfig,
-    *,
-    pool_size: int = 5,
-    max_overflow: int = 3,
-    timeout: float = 30.0,
-    recycle: float = 3600.0,
-    pre_ping: bool = False,
-) -> QueuePool:
-    """Create a SQLAlchemy QueuePool wrapping ADBC connections for the given warehouse.
-
-    Args:
-        config: Typed warehouse configuration (DuckDBConfig, SnowflakeConfig, etc.)
-        pool_size: Number of connections to keep open at steady state.
-        max_overflow: Additional connections allowed above pool_size under burst load.
-        timeout: Seconds to wait for a connection when the pool is exhausted.
-        recycle: Seconds after which connections are recreated (prevents auth token expiry).
-        pre_ping: Whether to issue a health-check before returning pooled connections.
-            Note: when using QueuePool standalone (without SQLAlchemy engine), pre_ping
-            requires a dialect. Leave False and rely on recycle for connection health.
-
-    Returns:
-        A configured QueuePool ready for use.
-
-    Raises:
-        DriverNotInstalledError: If the required ADBC driver package is not installed.
-        pydantic.ValidationError: If config fields fail validation.
-    """
+# URI format (verified: columnar-tech/adbc-quickstarts/python/oracle/main.py)
+db_kwargs = {"uri": "oracle://system:password@localhost:1521/FREEPDB1"}
 ```
 
-The keyword-only arguments (`*,`) enforce that pool settings are always passed by name, not position. This is important for readability and for future-proofing if parameter order ever changes.
+Standard Oracle connection string. `OracleConfig` fields: `uri: SecretStr | None`, plus
+decomposed `host`, `port`, `user`, `password`, `service_name`.
 
 ---
 
-## Component Boundaries
+## justfile Recipes: dbc Tooling
 
-```
-Consumer
-    |
-    | SnowflakeConfig(account=..., ...)
-    v
-[config_snowflake.py]  <-- Pydantic validation happens here
-    |
-    | config object (typed, validated)
-    v
-[factory.py: create_pool(config)]
-    |
-    +---> [_translators.py: translate(config)]
-    |          |
-    |          v
-    |     dict[str, str]  (ADBC db_kwargs)
-    |
-    +---> [_drivers.py: resolve_driver(config)]
-    |          |
-    |          +--> try: import adbc_driver_snowflake  (PyPI path)
-    |          |         |
-    |          |         v (if ImportError)
-    |          +--> try: adbc_driver_manager Foundry path
-    |          |         |
-    |          |         v (if not found)
-    |          +--> raise DriverNotInstalledError
-    |          |
-    |          v
-    |     str  ("adbc_driver_snowflake" or "/path/to/lib.so")
-    |
-    v
-[_pool.py / factory.py]
-    |
-    | QueuePool(
-    |     creator=lambda: adbc_driver_manager.dbapi.connect(
-    |         driver=driver_str,
-    |         db_kwargs=db_kwargs,
-    |     ),
-    |     pool_size=5, max_overflow=3, ...
-    | )
-    |
-    v
-QueuePool  (returned to consumer)
-```
+The `dbc` CLI (v0.2.0, February 2026) is the tool for installing Foundry drivers.
+The following recipe shapes are derived from `columnar-tech/dbc/docs/reference/cli.md`
+(HIGH confidence — fetched directly from GitHub).
 
-### Dependency graph (who imports what)
+### Available `dbc` Commands (v0.2.0)
 
-```
-__init__.py
-    imports: factory.py, config_duckdb.py, config_snowflake.py
+| Command | Purpose |
+|---------|---------|
+| `dbc search [PATTERN]` | Search available drivers |
+| `dbc install <DRIVER>` | Install a driver (user level by default) |
+| `dbc uninstall <DRIVER>` | Uninstall a driver |
+| `dbc info <DRIVER>` | Show driver metadata and version |
+| `dbc init` | Create `dbc.toml` driver list file |
+| `dbc add <DRIVER>` | Add driver to `dbc.toml` |
+| `dbc remove <DRIVER>` | Remove driver from `dbc.toml` |
+| `dbc sync` | Install all drivers from `dbc.toml` |
+| `dbc docs [DRIVER]` | Open driver documentation in browser |
 
-factory.py
-    imports: _translators.py, _drivers.py, _config_base.py
-    imports: sqlalchemy.pool (QueuePool)
-    imports: adbc_driver_manager.dbapi (inside creator closure)
+**There is no `dbc verify` subcommand.** The `dbc info <DRIVER>` subcommand shows
+version and metadata. Runtime verification (is the driver loadable?) is handled by
+the existing `create_adbc_connection()` in `_driver_api.py`, which raises a clear
+`ImportError` when the manifest is missing.
 
-_translators.py
-    imports: config_duckdb.py, config_snowflake.py, _config_base.py, _exceptions.py
+### Recommended justfile Recipes
 
-_drivers.py
-    imports: _config_base.py, _exceptions.py
-    imports: adbc_driver_manager (for Foundry path lookup)
-    lazy imports: adbc_driver_duckdb, adbc_driver_snowflake (guarded try/except)
+```just
+# Install the dbc CLI via pipx (isolated, puts dbc on PATH)
+dbc-install-cli:
+    pipx install dbc
 
-config_duckdb.py
-    imports: _config_base.py
+# Install all Foundry drivers supported by adbc-poolhouse
+dbc-install-drivers:
+    dbc install databricks
+    dbc install redshift
+    dbc install trino
+    dbc install mssql
 
-config_snowflake.py
-    imports: _config_base.py
+# Show metadata for each supported Foundry driver
+dbc-info:
+    dbc info databricks
+    dbc info redshift
+    dbc info trino
+    dbc info mssql
 
-_config_base.py
-    imports: pydantic_settings (BaseSettings)
+# Uninstall all Foundry drivers
+dbc-uninstall-drivers:
+    dbc uninstall databricks
+    dbc uninstall redshift
+    dbc uninstall trino
+    dbc uninstall mssql
 
-_exceptions.py
-    imports: nothing from this library
+# Search all available drivers (for discovery)
+dbc-search:
+    dbc search
 ```
 
-**Rule:** No circular imports. The dependency direction is strictly: `__init__` → `factory` → `translators`/`drivers` → `config` → `config_base`. Exceptions is a leaf node that nothing depends on (except translators and drivers).
+### Recipe Design Notes
+
+1. `dbc install` installs at user level by default. For CI or system-wide installs
+   add `--level system`. For venv-local installs, `VIRTUAL_ENV` is auto-detected.
+
+2. As of dbc 0.2.0, multiple drivers can be installed in a single call
+   (`dbc install databricks redshift`). Separate lines in the justfile recipe are
+   preferred for clear error attribution.
+
+3. `dbc install` accepts version constraints: `dbc install databricks>=1.0.0`.
+   The justfile recipes install latest stable (no version pin).
+
+4. When a new Foundry backend is added to adbc-poolhouse: add the corresponding
+   `dbc install [name]` line to `dbc-install-drivers` and `dbc uninstall [name]`
+   to `dbc-uninstall-drivers`. Keep the list in alphabetical order.
 
 ---
 
-## Data Flow
+## DEVELOP.md Changes Required
 
-### Pool creation (the happy path)
+The existing `DEVELOP.md` has no section on Foundry driver management. The following
+changes are needed:
 
-```
-1. Consumer constructs: config = SnowflakeConfig(account="xy12345", user="me", password="...")
-   - Pydantic BaseSettings validates fields
-   - Environment variable overrides applied (SNOWFLAKE_ACCOUNT etc.)
-   - ValidationError raised here if required fields missing
+### New section: "Foundry driver management"
 
-2. Consumer calls: pool = create_pool(config, pool_size=10)
-   - factory.py receives config
+Add under `## Common Tasks`. Content to cover:
 
-3. factory.py calls: db_kwargs = translate(config)
-   - _translators.py maps config.account → "adbc.snowflake.sql.account"
-   - Returns dict[str, str] of ADBC driver parameters
+1. What the ADBC Driver Foundry is (Columnar, not Apache) and why some drivers are not on PyPI
+2. Installing the `dbc` CLI: `just dbc-install-cli` (or `pipx install dbc` directly)
+3. Installing all supported Foundry drivers: `just dbc-install-drivers`
+4. Checking driver metadata: `just dbc-info`
+5. Reference to `https://docs.columnar.tech/dbc/` and `https://docs.adbc-drivers.org/`
+6. `adbc_driver_manager` version requirement: `>=1.8.0` for manifest resolution. The
+   dbc README explicitly states `adbc-driver-manager>=1.8.0` is required. The current
+   `pyproject.toml` pins `>=1.0.0` — this should be updated.
+7. The `ADBC_DRIVER_PATH` environment variable for per-project driver isolation
+8. Brief note on the three-path detection strategy in `_drivers.py` so contributors
+   understand how new Foundry backends integrate
 
-4. factory.py calls: driver_str = resolve_driver(config)
-   - _drivers.py attempts: import adbc_driver_snowflake
-   - Succeeds: returns "adbc_driver_snowflake"
-   - (Failure path: raises DriverNotInstalledError with install instructions)
+### Update `## Project Structure` section
 
-5. factory.py builds creator closure:
-   driver_str and db_kwargs are captured in the closure
-   creator = lambda: adbc_dbapi.connect(driver=driver_str, db_kwargs=db_kwargs)
+The current structure listing references files that no longer exist:
+- Remove `_pool_types.py` from the listing (deleted in prior tech debt cleanup)
+- The listing should not include `_teradata_*.py` (Teradata support was dropped)
 
-6. factory.py constructs:
-   pool = QueuePool(creator=creator, pool_size=10, max_overflow=3, timeout=30, recycle=3600)
+### Update `## Common Tasks`
 
-7. pool is returned to consumer — no connections opened yet
-
-8. Consumer calls: with pool.connect() as conn:
-   - QueuePool opens a physical connection by calling creator()
-   - creator() calls adbc_dbapi.connect(...) → opens ADBC connection
-   - Returns connection wrapped in _ConnectionFairy proxy
-
-9. Consumer uses conn to execute queries
-   - Consumer calls conn.cursor() → ADBC Cursor
-   - Consumer calls cursor.execute(sql, params)
-
-10. Context manager exits: conn is returned to pool (not closed)
-    - Pool keeps the connection open for reuse
-    - If pool.size == pool_size + max_overflow, excess connection is closed
-
-11. On recycle timeout: next checkout after recycle seconds creates a new ADBC connection
-```
-
-### Error flow (driver not installed)
-
-```
-1. Consumer: pool = create_pool(SnowflakeConfig(...))
-2. factory.py → _drivers.py: resolve_driver(config)
-3. _drivers.py: import adbc_driver_snowflake → ImportError
-4. _drivers.py: check Foundry path → not found
-5. _drivers.py: raise DriverNotInstalledError(
-     "Snowflake ADBC driver not found.\n"
-     "Install with: pip install adbc-driver-snowflake\n"
-     "Or via ADBC Driver Foundry: dbc install snowflake"
-   )
-6. Exception propagates to consumer with actionable message
-```
-
-### Error flow (invalid config)
-
-```
-1. Consumer: SnowflakeConfig(account="xy12345")  # missing user and all auth
-2. Pydantic model_validator fires → ValidationError raised immediately
-3. create_pool() is never called
-4. Consumer sees structured Pydantic error with field names and reasons
-```
+Add entries for:
+- `just dbc-install-cli`
+- `just dbc-install-drivers`
+- `just dbc-info`
 
 ---
 
-## Suggested Build Order
+## Tech Debt Removals: Interaction With New Backend Additions
 
-The dependency graph above implies a natural build order. Each phase can be tested and verified before the next phase begins.
+### Current Status of Declared Tech Debt
 
-### Phase 1: Config models (no external dependencies except pydantic-settings)
+| Item | Actual Status | Impact on New Backends |
+|------|--------------|------------------------|
+| Remove `_pool_types.py` (AdbcCreatorFn) | DONE — file does not exist in repo | None — do not import this |
+| Remove `_adbc_driver_key()` from BaseWarehouseConfig and all subclasses | DONE — not present in current source | New config files MUST NOT implement this method |
+| Fix DatabricksConfig decomposed-field gap (host/http_path/token silently produce `{}` when URI absent) | PENDING — `translate_databricks()` only emits `uri` | Must fix before adding new Foundry backends that use decomposed fields (MySQL, Teradata, ClickHouse) |
+| Verify Teradata field names against real Columnar ADBC Teradata driver | PENDING — but Teradata config/translator don't exist yet | Teradata is a new backend, not a fix to existing code |
 
-Build:
-- `_config_base.py` — `BaseWarehouseConfig(BaseSettings)`
-- `config_duckdb.py` — `DuckDBConfig`
-- `config_snowflake.py` — `SnowflakeConfig`
-- `_exceptions.py` — `DriverNotInstalledError`
+The PROJECT.md file still lists items 1 and 2 as `[ ]` (open), but the source files
+confirm they were completed in a prior session. The `.planning/.continue-here.md` file
+records this explicitly: "Deleted `_pool_types.py` (AdbcCreatorFn unused)" and
+"Removed dead `_adbc_driver_key()` abstract method from base + all 10 subclasses".
 
-Test:
-- Unit tests for each config model: valid construction, env var overrides, validation errors
-- No ADBC or SQLAlchemy needed at this phase
+### Build Order Implication
 
-Why first: Config models are pure data structures. They are the input to every other component. All downstream code depends on them. Testing them in isolation is fast and requires only pydantic-settings.
-
-### Phase 2: Parameter translation (depends on Phase 1)
-
-Build:
-- `_translators.py` — `translate(config)` dispatch + per-warehouse translators
-
-Test:
-- Unit tests: `translate(DuckDBConfig(database=":memory:"))` returns expected `db_kwargs` dict
-- `translate(SnowflakeConfig(account="xy12345", ...))` maps all fields correctly
-- No ADBC, no SQLAlchemy
-
-Why second: Translation is pure Python — dict construction. It can be tested without any external services or drivers. Its correctness is easy to verify by inspection against ADBC driver documentation.
-
-### Phase 3: Driver detection (depends on Phase 1, Phase 2 not needed)
-
-Build:
-- `_drivers.py` — `resolve_driver(config)` with PyPI and Foundry detection
-
-Test:
-- Unit tests with mocked `importlib.import_module`: test PyPI found path, PyPI not found + Foundry found path, neither found → `DriverNotInstalledError`
-- Integration test (CI only, with DuckDB installed): `resolve_driver(DuckDBConfig())` returns `"adbc_driver_duckdb"`
-
-Why third: Driver resolution logic is independent of translation. It can be developed and tested in parallel with Phase 2. The mocking strategy for import detection is straightforward with `unittest.mock.patch("builtins.__import__")` or by temporarily manipulating `sys.modules`.
-
-### Phase 4: Pool factory (depends on Phases 1, 2, 3)
-
-Build:
-- `factory.py` — `create_pool(config, **pool_kwargs) -> QueuePool`
-- Add `sqlalchemy` and `adbc-driver-manager` to `[project.dependencies]` in `pyproject.toml`
-- Add optional extras for driver packages
-
-Test (DuckDB, no credentials):
-- Integration test: `create_pool(DuckDBConfig())` returns a `QueuePool`
-- Integration test: `with pool.connect() as conn: conn.cursor().execute("SELECT 1")`
-- Test pool configuration is applied (verify `pool.size()`, `pool.overflow()`)
-- Test error propagation: missing driver raises `DriverNotInstalledError`
-
-Test (Snowflake, with credentials):
-- Syrupy snapshot tests: record locally, replay in CI
-- Test connection opens, basic query works, pool recycles correctly
-
-Why last: The factory wires everything together. It is the last piece, not the first. Building and testing it before the components it depends on (especially config and translation) are solid leads to integration tests that catch configuration mistakes, not structural issues.
-
-### Phase 5: Public API and `__init__.py` cleanup
-
-Build:
-- Update `__init__.py` `__all__` with all public symbols
-- Update `pyproject.toml` with proper dependency declarations
-- Add Google-style docstrings to all public APIs
-
-This is not a separate implementation phase — it happens incrementally during Phases 1–4 — but a final audit ensures everything is exported correctly and the public API is complete.
+Fix the DatabricksConfig decomposed-field gap **before** adding MySQL, Teradata, or
+ClickHouse. The fix establishes the authoritative pattern for URI-first with
+decomposed-field fallback that those translators will follow. Adding them before the
+fix means their translators are modelled on a broken Databricks translator.
 
 ---
 
-## Module Layout Recommendation (Final)
+## Correct Build Order
+
+The dependency DAG for this milestone is:
 
 ```
-src/adbc_poolhouse/
-    __init__.py            # Public exports: create_pool, DuckDBConfig, SnowflakeConfig
-    py.typed               # PEP 561 marker
-    _exceptions.py         # DriverNotInstalledError (leaf — no internal imports)
-    _config_base.py        # BaseWarehouseConfig(BaseSettings) (leaf — only pydantic-settings)
-    config_duckdb.py       # DuckDBConfig (imports _config_base)
-    config_snowflake.py    # SnowflakeConfig (imports _config_base)
-    _translators.py        # translate(config) → dict[str,str] (imports configs, _exceptions)
-    _drivers.py            # resolve_driver(config) → str (imports _config_base, _exceptions)
-    factory.py             # create_pool(...) → QueuePool (imports all internal modules)
+1. Tech debt removals (already done in prior session — no work needed)
+   - _pool_types.py deleted
+   - _adbc_driver_key() removed
+
+2. DatabricksConfig decomposed-field fix
+   - translate_databricks() gains host/http_path/token decomposed path
+   - test_translators.py gains decomposed-field test cases
+   - MUST come before new Foundry backends with decomposed fields
+
+3. justfile dbc recipes (independent of backend additions)
+   - dbc-install-cli, dbc-install-drivers, dbc-info, dbc-uninstall-drivers, dbc-search
+
+4. DEVELOP.md dbc section (depends on justfile recipes existing)
+
+5. pyproject.toml adbc-driver-manager version bump
+   - Change >=1.0.0 to >=1.8.0 (manifest resolution requires 1.8.0 per dbc README)
+   - Independent of backend additions but affects Foundry driver correctness
+
+6. New Foundry backend: Teradata (verify driver stability before implementing)
+   - _teradata_config.py
+   - _teradata_translator.py
+   - _drivers.py: entry in _FOUNDRY_DRIVERS
+   - _translators.py: entry in isinstance chain
+   - __init__.py: export
+   - tests/test_configs.py: class
+   - tests/test_translators.py: class
+   - tests/test_drivers.py: case
+   - docs/src/guides/teradata.md (replaces existing placeholder page)
+   - justfile: add teradata to dbc-install-drivers and dbc-uninstall-drivers
+
+7. New Foundry backend: MySQL (parallel with Teradata — independent slices)
+   - Same file list as step 6 with mysql substituted
+
+8. New backends: ClickHouse, Oracle, others (same pattern; verify driver stability each)
+
+9. (No separate docs step — docs are created as part of each backend slice)
 ```
 
-**Naming rationale:**
-- `config_*.py` files are public (no underscore prefix) because the config classes they define (`DuckDBConfig`, `SnowflakeConfig`) are part of the public API.
-- `_translators.py`, `_drivers.py`, `_config_base.py` have underscore prefixes because they are implementation details — consumers never import them directly.
-- `factory.py` has no underscore prefix because `create_pool` could logically be imported from there directly, though `__init__.py` will re-export it.
-- `_exceptions.py` — `DriverNotInstalledError` may be part of the public API (consumers catching it), so this is debatable. Start private, promote to public if consumers need to catch it by name.
+**Why this order:**
+
+- Step 2 before steps 6-8: DatabricksConfig fix establishes the correct decomposed-field pattern
+- Steps 3-5 are independent and can be parallelised or done in any order relative to each other
+- Steps 6-8 are independent slices that touch disjoint files
+- Any step can be committed independently since each slice is self-contained
 
 ---
 
-## Validation Against Design Documents
+## Anti-Patterns to Avoid
 
-The architecture above is consistent with `_notes/design-discussion.md` and `.planning/codebase/ARCHITECTURE.md`. Key validated decisions:
+### Anti-Pattern 1: Putting driver logic in the config model
 
-| Design decision | Confirmed |
-|----------------|-----------|
-| Pydantic BaseSettings for config | Yes — leaf modules, no circular deps |
-| SQLAlchemy QueuePool only (not ORM) | Yes — only `sqlalchemy.pool` imported |
-| One pool per call | Yes — `create_pool()` is stateless, returns a new pool each time |
-| No global state | Yes — all state in the returned `QueuePool` object, owned by consumer |
-| PyPI + Foundry driver support | Yes — handled in `_drivers.py` lazy import + path lookup |
-| Helpful errors on missing driver | Yes — `DriverNotInstalledError` with install instructions |
-| DuckDB first (no credentials needed) | Yes — Phase 4 integration tests use DuckDB |
+**What:** Adding dispatch logic, driver path resolution, or dbc install commands into
+the config model (`_[warehouse]_config.py`).
 
-### Issues found in existing design docs
+**Why bad:** Config models are data containers. Driver resolution lives in `_drivers.py`
+dispatch tables. Mixing them creates coupling that makes testing harder and breaks the
+separation that lets `_driver_api.py` be the single `adbc_driver_manager` importer.
 
-1. **`pre_ping=True` default needs reconsideration.** The design notes list `pool_pre_ping=True` as a default. As documented in Q1 above, `pre_ping` with a standalone `QueuePool` (no dialect) does not function as expected. The safer default is `pre_ping=False` with `recycle=3600`. This should be updated in the design notes.
+**Instead:** Config model fields only. Detection logic in `_drivers.py` dict entries.
 
-2. **DuckDB driver package name.** The design notes list `adbc-driver-duckdb` as the DuckDB driver package name, but the correct package is `duckdb` — DuckDB ships its ADBC support in the main `duckdb` package as `adbc_driver_duckdb`. The Foundry/install instructions should reflect this.
+### Anti-Pattern 2: Importing driver packages at module level in `_drivers.py`
 
-3. **`adbc_driver_manager` as required vs. optional.** The design describes both PyPI and Foundry paths. `adbc_driver_manager` should be a required dependency (it is always needed as the underlying C extension, including for PyPI drivers). It is not optional — even `adbc_driver_snowflake` uses it under the hood.
+**What:** Adding `import adbc_driver_[warehouse]` at the top of `_drivers.py`.
+
+**Why bad:** Breaks bare-import safety (the module docstring calls this DRIV-04). The
+library must be importable without any ADBC driver installed. Driver package imports
+are guarded inside function bodies (`_resolve_pypi_driver` uses `__import__` after
+`find_spec` confirms presence).
+
+**Instead:** Only config class imports at module level in `_drivers.py`. Driver package
+imports inside function bodies under `find_spec` guard.
+
+### Anti-Pattern 3: Adding Foundry backends to `_PYPI_PACKAGES`
+
+**What:** Adding a Foundry-distributed driver (Databricks, MySQL, Teradata) to the
+`_PYPI_PACKAGES` dict rather than `_FOUNDRY_DRIVERS`.
+
+**Why bad:** `_PYPI_PACKAGES` triggers a `find_spec` call that always returns `None` for
+Foundry-only drivers. The Path 2 fallback returns the package name as a manifest key,
+which accidentally works — but it bypasses the `_FOUNDRY_DRIVERS` reverse lookup used
+by `_driver_api.py` to build the `dbc install [name]` error message.
+
+**Instead:** Foundry-only drivers go in `_FOUNDRY_DRIVERS`. The `_driver_api.py`
+NOT_FOUND handler uses `_FOUNDRY_DRIVERS.values()` to resolve the correct install name.
+
+### Anti-Pattern 4: Emitting empty dict from decomposed-field translators
+
+**What:** Implementing a translator that only emits `uri` when set and silently returns
+`{}` when decomposed fields (host, port, user, password) are provided instead.
+
+**Why bad:** Silent connection failures. The driver receives no parameters and raises
+an unhelpful error at connection time rather than a clear error at translation time.
+
+**Instead:** For URI-first translators, implement both paths: if `uri` is set, return
+early with `{"uri": ...}`; otherwise map decomposed fields. This is the pattern the
+DatabricksConfig fix will establish — follow it for all new Foundry backends.
+
+### Anti-Pattern 5: Implementing `_adbc_driver_key()` on a new config class
+
+**What:** Adding `def _adbc_driver_key(self) -> str:` to a new config class.
+
+**Why bad:** This method was removed in tech debt cleanup. It is no longer part of
+`BaseWarehouseConfig` or the `WarehouseConfig` Protocol. Any new implementation will
+be dead code immediately.
+
+**Instead:** Register the config type in `_PYPI_PACKAGES` or `_FOUNDRY_DRIVERS`.
 
 ---
 
-## Open Questions for Implementation
+## Scalability Considerations
 
-1. **`DriverNotInstalledError` visibility.** Should it be public (in `__all__`) so consumers can catch it specifically, or remain `_exceptions.DriverNotInstalledError` and be documented but not re-exported? Recommendation: export it — consumers will want to catch it.
+| Concern | Current (9 warehouses) | At 20 warehouses | At 50 warehouses |
+|---------|------------------------|-----------------|-----------------|
+| `_translators.py` isinstance chain | 9 branches, ~70 lines | ~20 branches, ~140 lines | Too long — refactor to dict dispatch |
+| `_drivers.py` import block | 9 config imports | ~20 imports | Acceptable |
+| `__init__.py` export list | 10 symbols | ~22 symbols | Acceptable |
+| `tests/test_translators.py` | ~270 lines | ~540 lines | Split into per-warehouse test files |
 
-2. **`BaseWarehouseConfig` visibility.** Should `BaseWarehouseConfig` be exported? The Semantic ORM consumer could want to use it as a type annotation. Recommendation: export it as part of the public API for typing purposes.
-
-3. **`translate()` return type.** The translator returns `dict[str, str]`. Some ADBC parameters may technically accept non-string values (e.g. booleans, integers). Verify against driver documentation whether string coercion is always safe, or if the type should be `dict[str, str | int | bool]`.
-
-4. **Snowflake private key handling.** Private key auth for Snowflake involves reading a PEM file and potentially decrypting with a passphrase. This is a non-trivial field in `SnowflakeConfig` — the config model should accept a `Path` (file path) or `str` (PEM content), and the translator handles serialization to what the driver expects. This is a known complexity item.
-
-5. **Pool `connection_class` parameter.** SQLAlchemy QueuePool accepts a `_ConnectionRecord` subclass for custom checkout/checkin behaviour. Not needed for v1 but useful for future observability hooks.
+At 20 warehouses the isinstance chain in `_translators.py` is still acceptable. At 50
+warehouses, refactor to a `dict[type, Callable]` dispatch table (same shape as
+`_drivers.py` already uses). That refactor does not change external behaviour.
 
 ---
 
-*Research complete: 2026-02-23*
+## Sources
+
+- **HIGH confidence** (direct source inspection): All files in `src/adbc_poolhouse/`,
+  `tests/`, `justfile`, `DEVELOP.md`, `pyproject.toml`, `.planning/.continue-here.md`,
+  `docs/src/guides/`
+- **HIGH confidence** (dbc CLI reference): `columnar-tech/dbc/docs/reference/cli.md`
+  fetched via GitHub raw URL (v0.2.0, released 2026-02-10)
+- **HIGH confidence** (dbc driver list reference): `columnar-tech/dbc/docs/reference/driver_list.md`
+- **HIGH confidence** (dbc README): `columnar-tech/dbc/README.md` — confirms `>=1.8.0`
+  requirement for manifest resolution
+- **HIGH confidence** (adbc-drivers org repos): `api.github.com/orgs/adbc-drivers/repos`
+  — 23 repositories confirmed including mysql, clickhouse, mssql, databricks, redshift,
+  trino (also: oracle via quickstarts)
+- **HIGH confidence** (connection parameter shapes): `columnar-tech/adbc-quickstarts`
+  Python examples for mysql, teradata, clickhouse, oracle — fetched via GitHub API
+- **MEDIUM confidence** (decomposed-field key names for MySQL, Teradata, ClickHouse):
+  quickstarts show URI only; individual key names for decomposed-field mode need
+  verification against driver source or `docs.adbc-drivers.org`

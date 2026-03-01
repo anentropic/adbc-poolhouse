@@ -1,240 +1,500 @@
-# Features Research: Python Connection Pool Libraries
+# Feature Landscape: New ADBC Backends and Foundry Driver Tooling
 
-**Date:** 2026-02-23
-**Question:** What features do Python database connection pool libraries have? What's table stakes vs differentiating for an ADBC-specific connection pooling library targeting data warehouse workloads?
-**Scope:** SQLAlchemy pool, psycopg3 ConnectionPool, asyncpg Pool, ADBC-specific examples
-
----
-
-## Summary
-
-Python connection pool libraries converge on a well-understood feature set. The table-stakes features are established and boring; every serious pool has them. The interesting question for adbc-poolhouse is not "how do we re-implement all of this" but "what is the minimal set needed given that SQLAlchemy QueuePool handles the hard parts, and what unique value comes from the ADBC + data warehouse context?"
-
-The design already made the right call: delegate pool mechanics to SQLAlchemy QueuePool, own the config + translation + driver detection layers. This document maps the full feature space so requirements can make explicit keep/cut decisions.
+**Domain:** Python ADBC connection-pool library — backend expansion and developer tooling
+**Researched:** 2026-03-01
+**Scope:** New backends not yet in adbc-poolhouse (SQLite, MySQL, ClickHouse, Oracle, Teradata); dbc CLI workflow for Foundry driver management
 
 ---
 
-## Library Survey
+## Context: What Already Exists
 
-### SQLAlchemy Pool (`sqlalchemy.pool`)
+The following backends are already implemented (v1.0) and are **out of scope** for this research:
 
-SQLAlchemy ships multiple pool implementations behind a common interface:
+| Backend | Distribution | Pattern |
+|---------|-------------|---------|
+| DuckDB | PyPI (`duckdb` bundled) | Decomposed fields, `_adbc_entrypoint()` override |
+| Snowflake | PyPI (`adbc-driver-snowflake`) | Decomposed fields, full auth matrix |
+| BigQuery | PyPI (`adbc-driver-bigquery`) | Decomposed fields |
+| PostgreSQL | PyPI (`adbc-driver-postgresql`) | `uri`-only config |
+| FlightSQL | PyPI (`adbc-driver-flightsql`) | Decomposed fields |
+| Databricks | Foundry (`databricks`) | `uri`-based, decomposed as supplemental |
+| Redshift | Foundry (`redshift`) | `uri`-based, cluster-type fields |
+| Trino | Foundry (`trino`) | `uri`-based, decomposed fields |
+| MSSQL | Foundry (`mssql`) | `uri`-based, fedauth fields for Azure |
 
-**Pool types:**
-- `QueuePool` — thread-safe FIFO pool with configurable size and overflow; the default for most dialects
-- `NullPool` — no pooling; open/close on every checkout (useful for per-request or serverless)
-- `StaticPool` — single reused connection (in-memory databases, testing)
-- `AssertionPool` — raises if more than one connection checked out at a time (test enforcement)
-- `AsyncAdaptedQueuePool` — async-compatible version of QueuePool
-
-**Core configuration knobs:**
-| Parameter | Purpose |
-|-----------|---------|
-| `pool_size` | Steady-state idle connections maintained |
-| `max_overflow` | Burst capacity above `pool_size` (total max = `pool_size + max_overflow`) |
-| `timeout` | Seconds to block when pool is exhausted before raising `TimeoutError` |
-| `recycle` | Seconds before a connection is proactively replaced (avoids server-side idle timeouts and token expiry) |
-| `pre_ping` | Issue a lightweight "is this connection still alive?" check on checkout |
-| `use_lifo` | Last-in-first-out checkout (reduces idle connections under low load) |
-| `reset_on_return` | `'rollback'`, `'commit'`, or `None` — what to do with the connection when returned |
-
-**Event hooks (`sqlalchemy.event`):**
-- `connect` — fired when a new DBAPI connection is created (set session defaults, SET ROLE, etc.)
-- `checkout` — fired on every borrow from the pool (telemetry, circuit breakers)
-| `checkin` — fired on every return
-- `invalidate` — fired when a connection is removed as bad
-
-**Health management:**
-- Pre-ping on checkout (`pre_ping=True`) — cheapest form of health checking
-- `Pool.dispose()` — close all connections and replace pool (for credential rotation, fork-safety)
-- Connection invalidation on error — bad connections are discarded rather than returned
-
-**Fork safety:**
-- `NullPool` or `Pool.dispose()` after `os.fork()` — SQLAlchemy documents the fork-safety contract; consuming processes must reinitialize pools
-
-**What SQLAlchemy does NOT do:**
-- No async-native pool for blocking drivers (the async pool adapts sync connections; real async requires asyncio-native DBAPI)
-- No built-in circuit breaker
-- No metrics/instrumentation (consumers hook events manually)
-- No per-connection credential refresh at checkout time (recycle is time-based only)
+Teradata `.pyc` files exist in `__pycache__` but the source module is absent from `__init__.py` and the src tree. Teradata is in-progress or previously removed. See note in New Backends section.
 
 ---
 
-### psycopg3 `ConnectionPool` and `AsyncConnectionPool`
+## New Backends
 
-psycopg3 ships its own pool as a separate package (`psycopg-pool`). It is purpose-built for PostgreSQL with knowledge of the protocol.
+### Decision Framework
 
-**Key features beyond SQLAlchemy's pool:**
+Each candidate backend must meet the bar:
+1. A working Foundry or PyPI ADBC driver exists (not just planned)
+2. The driver is installable by consumers without building from source
+3. The driver has confirmed Python support via `adbc_driver_manager`
 
-| Feature | Description |
-|---------|-------------|
-| `min_size` / `max_size` | Maintain a range of connections (not pool_size + overflow) |
-| Background connection opener | Proactively fills pool to `min_size` in a background thread/task |
-| `reconnect_attempts` | Retry failed connections N times with backoff before giving up |
-| `reconnect_timeout` | Total time budget for reconnection attempts |
-| `open(wait=True/False)` | Block until pool is ready, or return immediately (background fill) |
-| `check()` | Verify all idle connections are alive (triggered by `check_connection` callback) |
-| `getconn()` / `putconn()` / context manager | Two checkout styles |
-| `connection()` context manager | High-level: borrow, use, return in one `with` block |
-| `stats()` | Returns dict of pool metrics: pool_min, pool_max, pool_size, pool_available, requests_waiting, etc. |
-| Per-pool `configure` callback | Called after connection creation; used to set `search_path`, timezone, etc. |
-| Per-pool `check` callback | Called at checkout to validate; replaces pre_ping |
-| `closed` property | Detect if pool was disposed |
-| `AsyncConnectionPool` | True async pool (not adapted sync); native asyncio |
-
-**What makes psycopg3's pool noteworthy for this research:**
-- The `stats()` method is a notable differentiator: built-in visibility into pool state without hooking events
-- Explicit `open()` / `close()` lifecycle with `wait` parameter — important for startup sequencing
-- Background prefill means first request does not pay the connection cost
-- `check_connection` callback decouples health check logic from pool internals
+Sources: `docs.adbc-drivers.org` (confirmed 2026-03-01), `adbc-quickstarts` by-database branch (confirmed 2026-03-01).
 
 ---
 
-### asyncpg `Pool`
+### SQLite — INCLUDE
 
-asyncpg's pool is async-native, designed specifically for PostgreSQL with the asyncpg driver.
+**Distribution:** PyPI (`adbc-driver-sqlite`, Apache ADBC project)
+**Install:** `pip install adbc-driver-sqlite` or `dbc install sqlite`
+**Status:** Stable (Apache ADBC official driver; described as the reference implementation)
+**Confidence:** HIGH — official Apache ADBC docs, PyPI package confirmed
 
-**Key features:**
+**Why include:** The only local-file-backed database with a stable PyPI ADBC driver. Useful for testing, embedded data pipelines, and offline development. Complements DuckDB for local-first use cases.
 
-| Feature | Description |
-|---------|-------------|
-| `min_size` / `max_size` | Maintain between min and max live connections |
-| `max_inactive_connection_lifetime` | Prune connections idle longer than N seconds (separate from recycle) |
-| `setup` coroutine | Called after each new connection: SET statements, prepare statements, etc. |
-| `init` coroutine | Called once on pool creation |
-| `connection_class` | Override the connection class returned by `acquire()` |
-| `acquire()` / `release()` | Explicit borrow/return; also works as async context manager |
-| `acquire(timeout=N)` | Per-acquire timeout overriding pool default |
-| `terminate()` / `close()` | Graceful vs. immediate shutdown |
-| `get_size()` / `get_min_size()` / `get_max_size()` | Runtime introspection |
-| `get_idle_size()` | Count idle connections at any moment |
-| Connection pruning | Background task prunes idle connections down toward min_size |
+**Connection parameters:**
 
-**asyncpg-specific:**
-- `execute()` / `fetch()` / `fetchrow()` / `fetchval()` directly on the pool (borrow-execute-return in one call) — this is a "pool as executor" pattern that adbc-poolhouse explicitly does NOT adopt
-- Statement caching per-connection (Postgres-specific)
+| Pydantic field | Type | Driver kwarg key | Notes |
+|---------------|------|-----------------|-------|
+| `uri` | `str = ":memory:"` | `"uri"` | Filename path, SQLite URI (e.g. `file:data.db?mode=ro`), or `:memory:`. Defaults to an in-memory database shared across connections when omitted. |
+
+**Additional driver options (set at connection level, not database level):**
+
+| Option key | Type | Notes |
+|-----------|------|-------|
+| `adbc.sqlite.load_extension.enabled` | `"true"/"false"` | Enable extension loading; off by default |
+| `adbc.sqlite.load_extension.path` | string | Path to `.so`/`.dll` to load |
+| `adbc.sqlite.load_extension.entrypoint` | string | Entrypoint symbol in extension |
+| `adbc.sqlite.query.batch_rows` | int string | Result batch size |
+
+The connection-level options are not first-class config fields (they are set after `AdbcConnectionInit`), so they do not belong in `SQLiteConfig`. The `uri` field is the only database-level parameter.
+
+**Pydantic field map:**
+```python
+class SQLiteConfig(BaseWarehouseConfig):
+    model_config = SettingsConfigDict(env_prefix="SQLITE_")
+
+    uri: str = ":memory:"
+    """File path, SQLite URI string, or ':memory:'. Env: SQLITE_URI."""
+```
+
+**Special behaviour:** Like DuckDB `:memory:`, an in-memory SQLite database shared across connections (SQLite's shared-cache mode) is the default when no file is specified. Unlike DuckDB, multiple connections to the same in-memory SQLite DB share state (not isolated). `pool_size=1` is still the safer default for `:memory:` to avoid unexpected concurrent-write errors from SQLite's per-file lock.
+
+**Complexity:** Low. Follows the DuckDB pattern exactly. The `_adbc_entrypoint()` override is needed: the SQLite Apache driver uses the entrypoint `adbc_driver_sqlite_init`.
+
+**Dependency on existing patterns:** Identical to DuckDBConfig. PyPI resolution path in `_drivers.py` via `find_spec("adbc_driver_sqlite")`, then `pkg._driver_path()`.
+
+---
+
+### MySQL — INCLUDE
+
+**Distribution:** Foundry (Columnar `adbc-drivers/mysql` repo)
+**Install:** `dbc install mysql`
+**Status:** Stable on Foundry (pre-built binaries on Columnar CDN); not on PyPI
+**Confidence:** HIGH — README confirmed from `adbc-drivers/mysql`, quickstart confirmed from `adbc-quickstarts`
+
+**Why include:** MySQL is the most-deployed open-source RDBMS. MariaDB, TiDB, and Vitess use the same driver (MySQL wire protocol). A single `MySQLConfig` covers all four.
+
+**URI format:** `user:password@tcp(host:port)/dbname`
+
+Note the format is **not** `mysql://` — it follows Go's `database/sql` DSN convention (this driver is written in Go). The Columnar quickstart confirms this format:
+```
+"uri": "root:my-secret-pw@tcp(localhost:3306)/demo"
+```
+
+**Pydantic field map:**
+
+| Pydantic field | Type | Driver kwarg key | Notes |
+|---------------|------|-----------------|-------|
+| `uri` | `SecretStr \| None` | `"uri"` | Full DSN: `user:pass@tcp(host:port)/dbname`. May contain credentials. |
+| `host` | `str \| None` | — | Supplemental; compose into URI at translation time |
+| `port` | `int \| None` | — | Supplemental; default 3306 |
+| `user` | `str \| None` | — | Supplemental |
+| `password` | `SecretStr \| None` | — | Supplemental |
+| `database` | `str \| None` | — | Default database name |
+
+**Translation strategy:** URI wins if provided. If absent, translate decomposed fields into the `user:pass@tcp(host:port)/db` DSN format at translation time. This matches the DatabricksConfig pattern.
+
+**Complexity:** Medium. URI format is unconventional (Go DSN, not `mysql://`). Decomposed-to-URI translation is straightforward but needs a unit test that explicitly covers the non-standard DSN format.
+
+**Dependency on existing patterns:** Foundry driver path in `_drivers.py`. Add to `_FOUNDRY_DRIVERS` dict with key `"mysql"`.
+
+**MariaDB/TiDB/Vitess:** These use the MySQL wire protocol and can share `MySQLConfig` with the same `mysql` Foundry driver. No separate config class is needed.
 
 ---
 
-### ADBC-Specific Pooling Examples
+### ClickHouse — INCLUDE (with caution)
 
-There is no widely-adopted standalone ADBC connection pool library as of early 2026. The pattern in the wild is:
+**Distribution:** Foundry (Columnar, `clickhouse` driver name); official ClickHouse ADBC driver from `ClickHouse/adbc_clickhouse` is separate but **work-in-progress and not production-ready**
+**Install:** `dbc install clickhouse` (Columnar Foundry driver)
+**Status:** Columnar Foundry driver is stable for basic query flow; official ClickHouse ADBC driver is alpha-stage
+**Confidence:** MEDIUM — quickstart confirmed for Columnar driver; ClickHouse's own driver README explicitly says "not ready for production"
 
-1. **Direct dbapi usage** — open a single connection per process, no pooling (common for DuckDB in scripts)
-2. **SQLAlchemy dialects** — `adbc-driver-postgresql`, `adbc-driver-snowflake` each ship SQLAlchemy dialect adapters; consumers use SQLAlchemy `create_engine()` which wraps QueuePool automatically. This is the closest to "existing ADBC pooling," but it goes through the full ORM engine machinery.
-3. **Flight SQL + gRPC connection pooling** — some data warehouse clients pool gRPC channels rather than ADBC connections; this is a different layer
-4. **Custom pools in BI tools** — tools like Apache Superset manage their own per-warehouse connection pools; ADBC drivers are treated as just another DBAPI
+**Why include:** ClickHouse is a major OLAP/analytics database increasingly used alongside data warehouses. The Foundry driver supports the HTTP interface which is ClickHouse's most stable API surface.
 
-**ADBC-specific challenges that generic pools don't handle:**
-- Token/credential expiry: warehouse auth tokens (Snowflake JWT, OAuth tokens) expire independently of connection idle time; `recycle` by wall-clock time is the blunt fix but not perfectly aligned
-- Driver detection: ADBC has two driver distribution channels (PyPI packages and Foundry shared libraries); pools that wrap DBAPI assume `import driver_module` works, but Foundry drivers require `adbc_driver_manager` loading
-- Connection kwargs structure: ADBC driver kwargs are warehouse-specific string keys (e.g. `adbc.snowflake.sql.account`); generic pools have no translation layer
-- `adbc_driver_manager.dbapi.connect()` vs per-driver `.connect()`: the manager's DBAPI connect is the uniform entry point; pools need to know to use this
+**Connection parameters:** HTTP-interface based. URI is `http://host:port` or `https://host:port`.
+
+| Pydantic field | Type | Driver kwarg key | Notes |
+|---------------|------|-----------------|-------|
+| `uri` | `str \| None` | `"uri"` | `http://host:port` or `https://host:port`. Required. |
+| `username` | `str \| None` | `"username"` | Note: key is `username`, not `user` — ClickHouse-specific |
+| `password` | `SecretStr \| None` | `"password"` | HTTP basic auth password |
+| `database` | `str \| None` | `"database"` | Default database (ClickHouse schema) |
+
+**Important field naming difference:** ClickHouse uses `username` not `user` as the driver kwarg key. The Pydantic field should be named `username` to match directly and avoid a confusing field-to-kwarg rename.
+
+**Complexity:** Low. URI-only connection with simple additional fields. Translation is trivial — no DSN assembly needed.
+
+**Dependency on existing patterns:** Foundry driver path. Add to `_FOUNDRY_DRIVERS` with key `"clickhouse"`.
+
+**Flag:** The official ClickHouse ADBC driver (`ClickHouse/adbc_clickhouse`) is alpha/WIP and explicitly not production-ready. Do not use it. Only the Columnar Foundry `clickhouse` driver is viable.
+
+---
+
+### Teradata — COMPLETE (missing source, not new)
+
+**Distribution:** Foundry private registry (Columnar, `teradata` driver name; requires `dbc auth login`)
+**Install:** `dbc auth login` then `dbc install teradata`
+**Status:** `.pyc` files present in `__pycache__` indicate this was implemented but the source `.py` file is absent from the tree. Not in `__init__.py`.
+**Confidence:** HIGH for connection parameters (quickstart confirmed)
+
+**Why include:** The source module exists as compiled bytecode — it was written but not committed or was deleted. This is not a new backend; it needs to be recovered/rewritten, not researched from scratch.
+
+**Connection parameters:**
+
+| Pydantic field | Type | Driver kwarg key | Notes |
+|---------------|------|-----------------|-------|
+| `uri` | `SecretStr \| None` | `"uri"` | `teradata://user:pass@host:1025` — standard scheme, port 1025 |
+| `host` | `str \| None` | — | Decomposed alternative |
+| `user` | `str \| None` | — | Decomposed alternative |
+| `password` | `SecretStr \| None` | — | Decomposed alternative |
+| `port` | `int \| None` | — | Default 1025 |
+
+**Quickstart reference:**
+```python
+dbapi.connect(
+    driver="teradata",
+    db_kwargs={"uri": "teradata://YOUR_USERNAME:YOUR_PASSWORD@YOUR_HOST:1025"},
+)
+```
+
+**Private registry note:** Teradata requires `dbc auth login` before `dbc install teradata`. This is different from public Foundry drivers (MySQL, ClickHouse, MSSQL etc.) which do not require auth. The justfile recipes must document this distinction.
+
+**Complexity:** Low (standard URI pattern). Medium if the `_teradata_config.py` source needs to be reconstructed from the compiled `.pyc`.
 
 ---
 
-## Feature Taxonomy
+### Oracle — EXCLUDE (for this milestone)
 
-### Table Stakes
-*The library is not usable without these. Any serious pool has them.*
+**Distribution:** Foundry private registry (requires `dbc auth login` then `dbc install oracle`)
+**Status:** Available in dbc 0.2.0+ (launched February 2026) via private registry
+**Confidence:** MEDIUM — dbc 0.2.0 announcement confirmed
 
-| Feature | Complexity | Notes |
-|---------|-----------|-------|
-| Configurable pool size | Low | `pool_size`, `max_overflow` — SQLAlchemy QueuePool provides |
-| Checkout timeout | Low | Block and raise when pool exhausted — QueuePool provides |
-| Connection health check (pre-ping) | Low | SQLAlchemy `pre_ping=True` — one flag |
-| Connection recycling by age | Low | `recycle=N` — critical for warehouse token expiry |
-| Thread-safe checkout/return | Medium | QueuePool is thread-safe; single-threaded use does not need this but multi-threaded consumers require it |
-| Pool disposal / shutdown | Low | `Pool.dispose()` — required for clean teardown |
-| Typed warehouse configuration | Medium | Pydantic BaseSettings per warehouse type; validation at construction time |
-| ADBC driver kwargs translation | Medium | Config fields → driver-specific string kwargs; one translator per warehouse |
-| ADBC driver detection | Medium | Try PyPI import, fall back to adbc_driver_manager; helpful error on missing driver |
-| Sensible defaults | Low | `pool_size=5`, `max_overflow=3`, `timeout=30`, `pre_ping=True`, `recycle=3600` out of the box |
-| Overridable pool kwargs | Low | Pass-through to QueuePool constructor; consumers who know what they want can set it |
+**Why exclude:** Requires private registry authentication (`dbc auth login`). Oracle has a more complex licensing environment. Adding a private-registry-only backend adds friction to the developer workflow without a concrete consumer requesting it. Defer to a future milestone when there is a specific consumer asking for Oracle.
 
-**Dependency chain:** Driver detection depends on Config layer. Translation depends on Config layer. Pool factory depends on all three.
+**Connection parameters when added:**
+```python
+# quickstart shows: "uri": "oracle://system:password@localhost:1521/FREEPDB1"
+```
+
+Standard URI pattern (`oracle://user:pass@host:port/service_name`). Low complexity when needed.
 
 ---
+
+## New Backend Summary Table
+
+| Backend | Include? | Distribution | Driver name | URI format | Complexity |
+|---------|----------|-------------|------------|-----------|-----------|
+| SQLite | Yes | PyPI | `adbc_driver_sqlite` | filename or `file:` URI or `:memory:` | Low |
+| MySQL | Yes | Foundry (public) | `mysql` | `user:pass@tcp(host:port)/db` | Medium |
+| ClickHouse | Yes | Foundry (public) | `clickhouse` | `http://host:port` | Low |
+| Teradata | Recover (not new) | Foundry (private) | `teradata` | `teradata://user:pass@host:port` | Low |
+| Oracle | No (future) | Foundry (private) | `oracle` | `oracle://user:pass@host:port/svc` | Low |
+
+---
+
+## dbc CLI Developer Workflow
+
+### What dbc Is
+
+`dbc` is the Columnar Technologies CLI for installing and managing ADBC drivers. It downloads pre-built driver binaries from the Columnar CDN (public) or a private registry (Oracle, Teradata), installs them to a user-level or system-level location, and registers them as ADBC driver manifests so that `adbc_driver_manager` can resolve them by name (e.g. `driver="mysql"`).
+
+**Current version:** 0.2.0 (released February 10, 2026)
+**Requires:** `adbc-driver-manager>=1.8.0` for manifest support
+
+### Installation
+
+```bash
+# Recommended: standalone installer (no Python env needed)
+curl -LsSf https://dbc.columnar.tech/install.sh | sh
+
+# Alternative: pipx (puts dbc on PATH without a venv)
+pipx install dbc
+
+# Alternative: uv tool install (similar to pipx)
+uv tool install dbc
+
+# Alternative: Homebrew (macOS)
+brew install columnar-tech/tap/dbc
+
+# Verify install
+dbc --version
+```
+
+### Complete Developer Workflow: Public Foundry Drivers
+
+Public drivers (Databricks, Redshift, Trino, MSSQL, MySQL, ClickHouse) require no authentication:
+
+```bash
+# 1. Install a driver
+dbc install mysql
+
+# 2. Verify the driver is installed and discoverable
+dbc info mysql
+
+# 3. Verify the driver can be loaded by adbc_driver_manager
+#    (the canonical smoke test — same check adbc-poolhouse performs)
+python -c "
+from adbc_driver_manager import dbapi
+import adbc_driver_manager._lib as _lib
+db = _lib.AdbcDatabase(driver='mysql')
+print('mysql driver loaded OK')
+"
+
+# 4. Search for available drivers (read-only, no install)
+dbc search
+
+# 5. List what is installed at the current level
+dbc info mysql  # info for one driver
+# (no bare "dbc list" command; use "dbc search" to see all registry drivers)
+
+# 6. Uninstall / remove a driver
+dbc remove mysql
+```
+
+### Complete Developer Workflow: Private Registry Drivers (Teradata, Oracle)
+
+```bash
+# 1. Authenticate with the private registry (browser OAuth flow)
+dbc auth login
+
+# 2. Install private driver (now authenticated)
+dbc install teradata
+
+# 3. Verify (same as public)
+dbc info teradata
+
+# 4. Smoke test
+python -c "
+from adbc_driver_manager import dbapi
+import adbc_driver_manager._lib as _lib
+db = _lib.AdbcDatabase(driver='teradata')
+print('teradata driver loaded OK')
+"
+```
+
+### Declarative Project Workflow (dbc.toml)
+
+For reproducible dev environments, `dbc` supports a lockfile-based declarative mode:
+
+```bash
+# Initialize a dbc.toml in the project root
+dbc init
+
+# Add drivers to dbc.toml (equivalent to editing the file)
+dbc add mysql
+dbc add clickhouse
+dbc add "databricks>=1.0.0"  # version constraint supported
+
+# Install all listed drivers and write dbc.lock
+dbc sync
+
+# On another machine or CI: reproduce exact installed set
+dbc sync
+```
+
+### dbc CLI Reference (Commands Used in Recipes)
+
+| Command | Purpose | Notes |
+|---------|---------|-------|
+| `dbc install <driver>` | Download and install driver | User level by default; `--level system` for system-wide |
+| `dbc install --pre <driver>` | Install pre-release build | For testing fixes before stable release |
+| `dbc info <driver>` | Show driver metadata, version, path | Read-only; fetches from registry CDN |
+| `dbc search` | List all available drivers in registry | Read-only; `--pre` to include pre-releases |
+| `dbc remove <driver>` | Uninstall a driver | Removes from the installed level |
+| `dbc add <driver>` | Add driver to `dbc.toml` driver list | Declarative; does not install immediately |
+| `dbc sync` | Install all drivers in `dbc.toml` | Creates/updates `dbc.lock` |
+| `dbc init` | Create a `dbc.toml` in current directory | Declarative workflow entry point |
+| `dbc auth login` | Authenticate with private registry | Required for Teradata, Oracle |
+| `dbc docs <driver>` | Open driver documentation (dbc 0.2.0+) | `--no-open` to print URL only |
+
+**Flags available on most subcommands:**
+- `--level user` / `--level system` / `--level env` — installation scope
+- `--quiet` — suppress output (for embedding in scripts)
+- `--json` — structured JSON output (for programmatic consumption)
+- `--pre` — include pre-release builds
+
+### Verifying a Foundry Driver From the Command Line
+
+The canonical verification sequence for a Foundry driver is:
+
+```bash
+# Step 1: confirm dbc sees the driver installed
+dbc info mysql
+
+# Step 2: confirm the ADBC driver manager can resolve and load it
+python -c "
+from adbc_driver_manager import _lib
+try:
+    db = _lib.AdbcDatabase(driver='mysql')
+    print('OK: driver=mysql resolved and loaded')
+except Exception as e:
+    print(f'FAIL: {e}')
+"
+
+# Step 3: confirm a real connection (requires live database)
+#   - not suitable for justfile recipes (no creds in repo)
+#   - leave this as a manual step in docs
+```
+
+The `_lib.AdbcDatabase(driver='<name>')` call is the correct smoke test: it exercises the manifest lookup and shared-library load without requiring a network-reachable database. This is the same internal path that `adbc-poolhouse`'s `create_pool()` takes before attempting a real connection.
+
+---
+
+## Justfile Recipes for Foundry Driver Tooling
+
+### Proposed Recipes
+
+```just
+# Install the dbc CLI (standalone installer; no Python env required)
+install-dbc:
+    curl -LsSf https://dbc.columnar.tech/install.sh | sh
+
+# Install all public Foundry drivers supported by adbc-poolhouse
+install-foundry-drivers:
+    dbc install databricks
+    dbc install redshift
+    dbc install trino
+    dbc install mssql
+    dbc install mysql
+    dbc install clickhouse
+
+# Install private Foundry drivers (requires dbc auth login first)
+install-private-drivers:
+    @echo "Authenticating with Columnar private registry..."
+    dbc auth login
+    dbc install teradata
+
+# Verify all installed Foundry drivers are loadable by adbc_driver_manager
+verify-foundry-drivers:
+    #!/usr/bin/env python3
+    from adbc_driver_manager import _lib
+    drivers = ["databricks", "redshift", "trino", "mssql", "mysql", "clickhouse"]
+    failed = []
+    for d in drivers:
+        try:
+            _lib.AdbcDatabase(driver=d)
+            print(f"OK  {d}")
+        except Exception as e:
+            print(f"FAIL {d}: {e}")
+            failed.append(d)
+    if failed:
+        raise SystemExit(f"Failed drivers: {failed}")
+
+# Show info for all public Foundry drivers (version, path)
+info-foundry-drivers:
+    @for driver in databricks redshift trino mssql mysql clickhouse; do \
+        echo "--- $$driver ---"; \
+        dbc info $$driver; \
+    done
+
+# Remove all installed Foundry drivers (cleanup)
+remove-foundry-drivers:
+    dbc remove databricks
+    dbc remove redshift
+    dbc remove trino
+    dbc remove mssql
+    dbc remove mysql
+    dbc remove clickhouse
+```
+
+**Notes on recipe design:**
+- `install-dbc` is a separate recipe from `install-foundry-drivers` so CI can cache the dbc binary
+- `verify-foundry-drivers` uses an inline Python script rather than shelling out to individual commands, so it produces a single summary rather than per-driver exit codes
+- Private drivers (`teradata`, `oracle`) are in a separate recipe because they require interactive auth (`dbc auth login` prompts a browser flow)
+- The `remove-foundry-drivers` recipe is useful for clean test setups but should not be in default CI runs
+
+---
+
+## Table Stakes vs Differentiators
+
+### Table Stakes for Each New Backend
+
+These features are required for a backend to ship — absent any of them, the backend is incomplete.
+
+| Feature | SQLite | MySQL | ClickHouse | Teradata |
+|---------|--------|-------|-----------|---------|
+| Config class (`*Config`) | Required | Required | Required | Required (recover) |
+| Parameter translation function | Required | Required | Required | Required (recover) |
+| Registration in `_drivers.py` | Required | Required | Required | Required (recover) |
+| Export in `__init__.py` | Required | Required | Required | Required |
+| Driver name verified working | High confidence | High confidence | Medium confidence | High confidence |
+| Unit tests for translator | Required | Required | Required | Required |
+| Documentation page | Required | Required | Required | Required |
 
 ### Differentiators
-*Competitive advantage for the ADBC + data warehouse use case. Not universal in generic pools.*
 
-| Feature | Complexity | Notes |
-|---------|-----------|-------|
-| Warehouse-typed config models | Medium | `SnowflakeConfig`, `DuckDBConfig` — not "dsn string", but fields that match warehouse concepts (`account`, `warehouse`, `role`); Pydantic BaseSettings means env vars work for free |
-| Environment variable support out of the box | Low | Comes for free from Pydantic BaseSettings — no extra work; competitors require manual os.environ |
-| Dual driver channel support (PyPI + Foundry) | Medium | Transparent to consumer; handles the ADBC Foundry (dbc CLI) driver distribution model that generic pools know nothing about |
-| Helpful installation errors | Low | "Driver not found. Run: pip install adbc-driver-snowflake" instead of ImportError traceback — DX differentiator |
-| Config-to-pool in one call | Low | `create_pool(SnowflakeConfig(...))` — no DSN string wrangling, no manual kwarg construction |
-| Recycle default tuned for token expiry | Low | Default `recycle=3600` is deliberately set for warehouse auth token lifetimes, not just "avoid server timeout" |
-| No global state | Low | Library owns no singletons; consumers own pools — safe for multi-tenant applications and testing |
+Features that add genuine value beyond a bare config class:
 
-**Dependency chain:** All differentiators build on the Config layer. Dual driver support is internal to the driver detection layer.
+| Feature | Backend | Value | Complexity |
+|---------|---------|-------|-----------|
+| Decomposed fields with URI assembly | MySQL | Parity with existing Databricks/Trino pattern; consumers don't need to know Go DSN format | Low |
+| Pool size validation for `:memory:` | SQLite | Same as DuckDB: prevent silent isolated-state bug | Low |
+| ClickHouse `username` field (not `user`) | ClickHouse | Correct kwarg name prevents silent auth failure; most users guess `user` | Low |
+| Private registry workflow documentation | Teradata | Auth flow is non-obvious; requires `dbc auth login` before `dbc install` | Low |
 
----
+### Anti-Features (Explicitly Not Building)
 
-### Anti-Features
-*Things to deliberately NOT build. Each one kept out reduces scope and maintenance burden.*
-
-| Anti-Feature | Why Not | Risk if Added |
-|-------------|---------|---------------|
-| Multi-pool registry / warehouse router | Consumer business logic; library is one pool per call | Adds global state, lifecycle management, thread contention over registry |
-| Query execution on the pool | asyncpg does `pool.fetch()` etc; adbc-poolhouse explicitly does not | Couples execution semantics to pool; consumers have incompatible needs |
-| Async pool | ADBC DBAPI is synchronous; SQLAlchemy async pool adapts sync connections (not native); genuine async ADBC is a future protocol concern | Incorrect semantics; blocking I/O in async context without proper thread pool is worse than no async |
-| Connection string / DSN parsing | Each warehouse has different DSN formats; Pydantic fields are the right abstraction | DSN parsing is a rabbit hole; breaks type safety |
-| OAuth / SSO auth logic | Delegated entirely to ADBC drivers and config field values | Auth is warehouse-specific and security-critical; wrong place to own it |
-| Connection health callback customization | SQLAlchemy events cover this if consumers need it; default pre_ping is sufficient | Adds surface area; most consumers never need it |
-| Built-in metrics / stats | psycopg3 has `stats()`; this library does not need it for v1 | Can be added later; SQLAlchemy events let consumers instrument themselves |
-| Background connection prefill | psycopg3 and asyncpg pre-open connections; QueuePool is lazy | Complexity without clear benefit for batch/data warehouse workloads |
-| Per-connection credential refresh | Some pools refresh tokens at checkout time | Warehouse token expiry is handled by `recycle`; proper per-checkout refresh requires driver cooperation |
-| BigQuery, PostgreSQL, Databricks, Redshift, Trino, MSSQL | Explicitly Future | Adding before DuckDB + Snowflake are solid increases test burden |
-| dbt profiles.yml reading | Consumer (dbt-open-sl) provides its own translation shim | This library must not know about dbt |
-| Flight SQL / REST / gRPC serving | Different layer entirely | Out of scope by definition |
-
----
-
-## Alignment with Existing Design
-
-The design documented in `_notes/design-discussion.md` aligns well with standard practice:
-
-**Aligns with standard practice:**
-- SQLAlchemy QueuePool as the pool implementation — the most widely used, battle-tested choice; psycopg3 and asyncpg built their own pools only because they needed async or PostgreSQL-specific features that SQLAlchemy's pool did not provide
-- `pool_size`, `max_overflow`, `timeout`, `pre_ping`, `recycle` defaults — these map exactly to the knobs every serious pool exposes
-- No global state — consistent with modern library design; SQLAlchemy itself moved away from global metadata in recent versions
-- Config + pool only, no execution — the right separation of concerns
-
-**Diverges from standard practice (intentionally):**
-- Typed config models instead of DSN strings — generic pools universally accept connection strings or callables; adbc-poolhouse's Pydantic BaseSettings is more opinionated and DX-focused; this is a deliberate differentiator, not a gap
-- No async pool — asyncpg and psycopg3 both have async-first pools for async workloads; this library explicitly declines for v1 because ADBC DBAPI is synchronous
-- Dual driver channel (PyPI + Foundry) — no generic pool knows about the ADBC driver distribution problem; this is unique to this library
-
-**Design decisions that are table stakes but appear unique:**
-- `recycle=3600` default — generic pools often default to no recycling or very long intervals; the 1-hour default is tuned for warehouse auth token lifetimes, making it a better default for the target use case
+| Anti-Feature | Reason |
+|-------------|--------|
+| Oracle backend | Private registry, no concrete consumer, deferred |
+| ClickHouse official driver (`ClickHouse/adbc_clickhouse`) | Alpha-stage, explicitly not production-ready per their README |
+| MySQL-specific SSL fields | Driver supports TLS but SSL parameters are query-string params in the DSN; initial implementation is URI-only with a note |
+| ClickHouse HTTP auth beyond basic username/password | Columnar quickstart shows only `uri`/`username`/`password`; additional auth (JWT, cert) is undocumented in the Foundry driver |
+| Multiple MySQL-family configs (MariaDB, TiDB, Vitess) | Single `MySQLConfig` covers all; they share the MySQL wire protocol and the same Foundry driver |
 
 ---
 
 ## Feature Dependencies
 
 ```
-Config Layer (Pydantic BaseSettings per warehouse)
-    └── Parameter Translation Layer (config fields → ADBC kwargs)
-            └── Driver Detection Layer (PyPI import → Foundry fallback → helpful error)
-                    └── Pool Factory: create_pool(config, **pool_kwargs) → QueuePool
-                                └── Consumer: borrows connections, executes queries
-```
+Existing patterns (DatabricksConfig, TrinoConfig):
+  └── MySQL: URI-or-decomposed pattern, Foundry driver path
+  └── MSSQL: URI-or-decomposed pattern, Foundry driver path
 
-Table stakes features cluster in the Pool Factory and are mostly delegated to SQLAlchemy QueuePool.
-Differentiators cluster in the Config and Translation layers — this is where adbc-poolhouse does original work.
-Anti-features are mostly things that belong either above the factory (consumer) or below it (driver internals).
+Existing patterns (DuckDBConfig):
+  └── SQLite: decomposed uri field, PyPI driver path, pool_size=1 guard for :memory:
+
+New connection model (HTTP-based):
+  └── ClickHouse: uri + username + password, Foundry driver path, username kwarg != user
+
+Existing Foundry-driver infrastructure (_FOUNDRY_DRIVERS dict, resolve_driver()):
+  └── All new Foundry backends extend this dict
+
+New private registry auth flow:
+  └── Teradata: dbc auth login → dbc install teradata → standard Foundry path
+```
 
 ---
 
 ## Sources
 
-This research draws on:
-- SQLAlchemy pool documentation and source (`sqlalchemy.pool.QueuePool`, `sqlalchemy.pool.events`)
-- psycopg3 / psycopg-pool documentation (`ConnectionPool`, `AsyncConnectionPool`)
-- asyncpg documentation (`asyncpg.create_pool`, `asyncpg.Pool`)
-- Apache Arrow ADBC documentation and driver packages (`adbc-driver-snowflake`, `adbc-driver-manager`)
-- ADBC Driver Foundry documentation (launched Oct 2025)
-- Project design documents: `_notes/design-discussion.md`, `.planning/PROJECT.md`, `.planning/codebase/ARCHITECTURE.md`
+- ADBC Drivers Foundry overview: https://docs.adbc-drivers.org/ (confirmed 2026-03-01) — HIGH confidence
+- dbc CLI README: https://github.com/columnar-tech/dbc (confirmed 2026-03-01) — HIGH confidence
+- dbc 0.2.0 announcement: https://columnar.tech/blog/announcing-dbc-0.2.0/ (February 10, 2026) — HIGH confidence
+- MySQL ADBC driver README: https://github.com/adbc-drivers/mysql (confirmed 2026-03-01) — HIGH confidence
+- ClickHouse ADBC driver README: https://github.com/ClickHouse/adbc_clickhouse (confirmed 2026-03-01) — HIGH confidence (WIP status explicitly stated)
+- adbc-quickstarts by-database branch: https://github.com/columnar-tech/adbc-quickstarts (confirmed 2026-03-01) — HIGH confidence (live code, not docs)
+  - MySQL: `root:my-secret-pw@tcp(localhost:3306)/demo` URI format
+  - ClickHouse: `http://localhost:8123` + `username`/`password` kwargs
+  - SQLite: `games.sqlite` filename URI
+  - Oracle: `oracle://system:password@localhost:1521/FREEPDB1`
+  - Teradata: `teradata://YOUR_USERNAME:YOUR_PASSWORD@YOUR_HOST:1025`
+- Apache ADBC SQLite driver docs: https://arrow.apache.org/adbc/current/driver/sqlite.html — HIGH confidence
+- dbc CLI DeepWiki commands reference: https://deepwiki.com/columnar-tech/dbc/4-commands-reference — MEDIUM confidence (indexed November 2025, pre-0.2.0)

@@ -1,184 +1,213 @@
 # Project Research Summary
 
-**Project:** adbc-poolhouse
-**Domain:** Python library — ADBC connection pooling for data warehouse workloads
-**Researched:** 2026-02-23
-**Confidence:** MEDIUM-HIGH
+**Project:** adbc-poolhouse v1.1.0 — Backend Expansion & Debt Cleanup
+**Domain:** Python ADBC connection-pool library — backend expansion and developer tooling
+**Researched:** 2026-03-01
+**Confidence:** HIGH
 
 ## Executive Summary
 
-adbc-poolhouse is a thin translation and wiring library: receive a typed warehouse config, translate it to ADBC driver kwargs, resolve the right driver binary, and hand the resulting connection factory to SQLAlchemy QueuePool. The core architectural insight — that QueuePool's `creator` pattern is a perfect fit for ADBC's `adbc_driver_manager.dbapi.connect()` — means this library does not need to build a pool from scratch. The design decisions already documented in `_notes/design-discussion.md` are correct: pydantic-settings for config, SQLAlchemy QueuePool for pooling, uv for tooling, basedpyright strict for type checking. Research confirms these choices and identifies no direction-reversing issues.
+adbc-poolhouse has a clean, mechanically extensible architecture: one config file, one translator file, two dispatch-table entries, one public re-export, and one docs guide per backend. Adding new backends in v1.1.0 is additive and slice-isolated — no cross-cutting rewrites are required. The milestone adds four new backends (SQLite via PyPI; MySQL, ClickHouse, and Teradata via the Columnar ADBC Driver Foundry), fixes a silent-failure bug in the Databricks translator's decomposed-field path, and introduces justfile recipes for `dbc` CLI driver management. The `dbc` CLI (v0.2.0, February 2026) is the canonical tool for installing Foundry drivers and requires `adbc-driver-manager>=1.8.0` for manifest resolution — the project's current `>=1.0.0` floor must be bumped.
 
-The recommended approach is a strict layered architecture with four modules — config models, parameter translation, driver detection, and pool factory — where each layer depends only on layers below it. The public API surface is a single function `create_pool(config)` plus the config model classes. All driver imports are lazy (deferred to `create_pool()` call time, never at module import). The library's differentiation comes from the Config and Translation layers; the Pool Factory layer is mostly delegation to SQLAlchemy.
+The recommended build order is driven by one hard dependency: the Databricks decomposed-field fix must land before MySQL, Teradata, or ClickHouse, because those translators follow the URI-first-with-decomposed-fallback pattern and will model themselves on a broken Databricks implementation if the fix is deferred. Beyond that single constraint, all backend slices are independent and touch disjoint files. Two tech debt items declared open in PROJECT.md (removal of `_adbc_driver_key()` and deletion of `_pool_types.py`) are already complete — confirmed from live source inspection and `.planning/.continue-here.md` — and are not active work items for this milestone.
 
-The key risks are concentrated in the earliest implementation work: the `pythonVersion = "3.14"` in basedpyright must be corrected to `"3.11"` before any code is written, lazy driver detection architecture must be locked before structuring modules, and the ADBC driver typing facade must be built before the pool factory. An additional cluster of non-obvious risks surrounds the `pre_ping` parameter (it does not function correctly on a standalone QueuePool without a dialect), DuckDB `:memory:` isolation (each pool connection gets a separate empty database), and syrupy snapshot hygiene for Snowflake tests.
+The primary risks are: (1) the Databricks translator fix carries five specific pitfalls around URL-encoding, silent empty-dict, OAuth M2M, and leading-slash normalisation that must all be addressed in the initial implementation; (2) the `dbc` CLI justfile recipes require a `command -v dbc` prerequisite guard and `--level env` install flag from the start, not as later refinements; and (3) Teradata requires `dbc auth login` (private registry) before `dbc install teradata`, and connection parameters must be verified against a live driver install before writing the translator.
+
+## Conflict Resolution: Teradata Driver Availability
+
+PITFALLS.md states "no Teradata driver exists in the ADBC Driver Foundry — docs.adbc-drivers.org lists 8 drivers, Teradata absent." ARCHITECTURE.md states "`dbc install teradata` is available" (HIGH confidence, fetched from `columnar-tech/dbc/docs/reference/driver_list.md` via GitHub API).
+
+**Both sources are correct for what they describe.** The conflict is a scoping difference, not a factual contradiction:
+
+- `docs.adbc-drivers.org` lists **public** Foundry drivers (8 drivers). Teradata is absent because it is a **private-registry** driver that requires authentication before installation.
+- The `dbc` CLI driver registry (`columnar-tech/dbc/docs/reference/driver_list.md`) includes private-registry drivers not listed on the public documentation site.
+- FEATURES.md independently confirms the distinction: public drivers (MySQL, ClickHouse, Databricks, Redshift, Trino, MSSQL) install without authentication; private-registry drivers (Teradata, Oracle) require `dbc auth login` first.
+
+**Authoritative answer:** The Teradata driver exists in the dbc private registry and is installable via `dbc auth login && dbc install teradata`. It is intentionally absent from `docs.adbc-drivers.org` because that site covers only the public Foundry. ARCHITECTURE.md (GitHub source, HIGH confidence) is the authoritative source for the driver's existence. PITFALLS.md's concern about field-name verification remains valid — decomposed connection parameters must be confirmed against a live driver install before writing the translator.
+
+**Recommendation:** Include TeradataConfig and `translate_teradata()` in this milestone. Gate decomposed-field implementation on a live `dbc install teradata` smoke test. Ship URI-only initially (`teradata://user:pass@host:1025` — confirmed from `adbc-quickstarts`) and add decomposed fields only after key names are verified.
 
 ## Key Findings
 
 ### Recommended Stack
 
-The stack is largely already in place and confirmed correct. Runtime dependencies (`pydantic-settings>=2.7,<3`, `sqlalchemy>=2.0,<3`, `adbc-driver-manager>=1.0,<2`) need to be added to `pyproject.toml` — currently `dependencies = []`. Two dev dependencies are missing: `pytest-mock>=3.14` (needed for mocking `importlib.import_module` in driver detection tests) and `syrupy>=4.0` (required by the Snowflake snapshot test strategy). ADBC driver packages should be optional extras, not hard deps. Two pre-existing config issues must be fixed before implementation: `pythonVersion = "3.14"` in basedpyright (should be `"3.11"`), and `{{ cookiecutter.package_name }}` in `release.yml` line 67 (must become `adbc_poolhouse`).
+The v1.0 stack (pydantic-settings, SQLAlchemy QueuePool, basedpyright, ruff, uv) is confirmed correct and is not re-researched. New stack additions for v1.1.0:
 
-**Core technologies:**
-- `pydantic-settings>=2.7,<3`: typed warehouse config with env-var integration — best-in-class for library config APIs in 2025
-- `sqlalchemy>=2.0,<3` (pool submodule only): QueuePool provides battle-tested thread-safe pooling via the `creator` pattern — avoids reinventing 15 years of production hardening
-- `adbc-driver-manager>=1.0,<2`: universal ADBC driver loader for both PyPI and Foundry (Databricks, Redshift, Trino) distribution channels — always a required hard dep
-- `pytest-mock>=3.14`: mocker fixture for intercepting `importlib.import_module` in driver detection tests — not yet in dev deps, needed
-- `syrupy>=4.0`: snapshot testing for Snowflake — explicitly called out in PROJECT.md test strategy
+**Core technologies — new additions only:**
+- `adbc-driver-sqlite>=1.0.0` (PyPI, Apache ADBC project): Stable driver at v1.10.0; follows the same release cadence as the existing PostgreSQL/FlightSQL/Snowflake drivers; adds an optional `sqlite` extra. Current ADBC 22 (January 2026) release.
+- `dbc` CLI (Columnar, v0.2.0, February 2026): Foundry driver manager — canonical tool for installing MySQL, ClickHouse, Teradata, and all existing Foundry backends. Install via `curl -LsSf https://dbc.columnar.tech/install.sh | sh` or `uv tool install dbc`.
+- `adbc-driver-manager>=1.8.0`: Version floor bump required — dbc README explicitly states manifest resolution requires `>=1.8.0`. Current `>=1.0.0` pin must be updated.
+
+**What NOT to add:**
+- `adbc_clickhouse` (ClickHouse's own ADBC driver): Alpha-stage, WIP, explicitly not production-ready per their README. Use the Columnar Foundry `clickhouse` driver (`dbc install clickhouse`) instead.
+- Oracle backend: Private-registry only (`dbc auth login` required), no concrete consumer, deferred to a future milestone.
+- Spark driver: Does not exist as ADBC. Use FlightSQL or DatabricksConfig.
+- `adbc-driver-duckdb` separate PyPI package: DuckDB bundles ADBC in its wheel; this package is redundant.
+
+See `.planning/research/STACK.md` for the full version table, dbc CLI command reference, and pyproject.toml optional-dependency block.
 
 ### Expected Features
 
-The feature space for connection pool libraries is well-understood. adbc-poolhouse's differentiation is not in re-implementing pool mechanics (SQLAlchemy handles those) but in the Config and Translation layers that make ADBC + data warehouse access ergonomic.
+**Must have (table stakes) — required for every new backend before it ships:**
+- Config class (`*Config`) with Pydantic field validation and env-prefix
+- Parameter translator (pure function: config → `dict[str, str]` ADBC kwargs; omit `None` fields)
+- Registration in `_PYPI_PACKAGES` or `_FOUNDRY_DRIVERS` dispatch dict
+- Export in `__init__.py`
+- Unit tests for config model and translator function
+- Docs guide page (`docs/src/guides/[warehouse].md`)
 
-**Must have (table stakes):**
-- Configurable pool size (`pool_size`, `max_overflow`, `timeout`, `recycle`) — delegated to QueuePool
-- Connection health via `recycle=3600` default — tuned for warehouse auth token lifetimes, not just server idle timeouts
-- Thread-safe checkout/return — QueuePool provides; consumers must not share checked-out connections across threads
-- Typed warehouse config models with env-var support — `SnowflakeConfig`, `DuckDBConfig` as Pydantic BaseSettings
-- ADBC driver kwargs translation — config fields to driver-specific string kwargs
-- Driver detection with dual channel support — try PyPI import, fall back to Foundry shared library path
-- Helpful `DriverNotInstalledError` with install instructions — critical DX element
-- Pool disposal — `pool.dispose()` for clean teardown; consumer responsibility but must be documented prominently
+**Backend-specific must-have behaviours:**
 
-**Should have (differentiators):**
-- `create_pool(config)` one-call API — no DSN string wrangling, no manual kwarg construction
-- Explicit `env_prefix` per config model — prevents silent env var collision (e.g. `DATABASE` from Heroku colliding with `DuckDBConfig.database`)
-- DuckDB `:memory:` pool_size warning — `UserWarning` when `pool_size > 1` with `:memory:` since connections are isolated
-- `login_timeout_seconds` field on `SnowflakeConfig` — prevents indefinite hangs when Snowflake is unreachable
-- Public `DriverNotInstalledError` in `__all__` — consumers need to catch it by name
-- `BaseWarehouseConfig` exported — consumers and downstream libraries (dbt-open-sl) use it as a type annotation
+| Backend | Must-have special behaviour | Distribution |
+|---------|---------------------------|-------------|
+| SQLite | `pool_size=1` guard for `:memory:` databases (same pattern as DuckDB); `_adbc_entrypoint()` override to `adbc_driver_sqlite_init` | PyPI extra |
+| MySQL | Decomposed-to-URI translation that hides the Go DSN format (`user:pass@tcp(host:port)/db`) — consumers must not need to know this convention | Foundry public |
+| ClickHouse | `username` field (not `user`) matching the driver kwarg exactly; HTTP URI format (`http://host:port`) | Foundry public |
+| Teradata | Private-registry auth workflow documented in justfile and DEVELOP.md; URI-only initially (`teradata://user:pass@host:1025`) | Foundry private |
+| Databricks (fix) | URI-first with decomposed-field fallback; URL-encoding via `urllib.parse.quote()`; `model_validator` gate for all-None config; `http_path` leading-slash normalisation; URI-precedence `UserWarning` when both URI and decomposed fields are set | Existing — fix only |
 
-**Defer to v2+:**
-- BigQuery, PostgreSQL, Databricks, Redshift, Trino, MSSQL backends — adding before DuckDB + Snowflake are solid increases test burden
-- Async pool — ADBC dbapi is synchronous; correct async requires asyncio-native DBAPI which does not exist yet
-- Built-in metrics/stats — SQLAlchemy events let consumers instrument themselves
-- Multi-pool registry / warehouse router — consumer business logic, not library concern
-- Background connection prefill — complexity without clear benefit for batch/warehouse workloads
+**Defer to future milestones:**
+- Oracle backend (private registry, no concrete consumer)
+- MySQL SSL field parameters (DSN query-string params; add when specifically requested)
+- ClickHouse JWT/cert auth beyond basic `username`/`password`
+- Multiple MySQL-family configs (MariaDB, TiDB, Vitess all share `MySQLConfig` via MySQL wire protocol — no separate classes needed)
+
+See `.planning/research/FEATURES.md` for the full dbc CLI workflow documentation and justfile recipe designs.
 
 ### Architecture Approach
 
-adbc-poolhouse is structured as four strictly layered modules with a unidirectional dependency graph. The public API (`create_pool` + config models) is re-exported from `__init__.py`; internal modules use underscore prefixes. Config models are leaf nodes (only pydantic-settings, no driver imports). The factory is the only module that imports SQLAlchemy. All ADBC driver imports are lazy (inside functions, guarded by try/except), never at module scope. A typed driver facade (`_driver_api.py`) isolates all `type: ignore` suppressions needed to bridge ADBC's untyped packages with basedpyright strict mode.
+The slice-per-warehouse pattern is mechanical and fully additive. Every new backend follows an identical checklist: two new source files (`_[warehouse]_config.py`, `_[warehouse]_translator.py`), entries in two dispatch tables (`_PYPI_PACKAGES` or `_FOUNDRY_DRIVERS` in `_drivers.py`; alphabetical `isinstance` branch in `_translators.py`), one `__init__.py` re-export, three test additions (configs, translators, drivers), one docs guide, and for PyPI backends one `pyproject.toml` extra. No changes to `_driver_api.py` or `_pool_factory.py` are needed for any new backend — the existing infrastructure handles driver dispatch and error messaging automatically.
 
 **Major components:**
-1. `_config_base.py` + `config_duckdb.py` + `config_snowflake.py` — Pydantic BaseSettings config models; leaf nodes, no ADBC or SQLAlchemy imports; Pydantic validates fields at construction time before any network call
-2. `_translators.py` — pure Python dict construction mapping config fields to ADBC driver-specific string kwargs (`adbc.snowflake.sql.account` etc.); no external deps beyond config models
-3. `_drivers.py` — lazy driver resolution: `importlib.util.find_spec()` check before import attempt (to distinguish "not installed" from "installed but broken"), then Foundry shared library fallback, then `DriverNotInstalledError` with actionable install message
-4. `factory.py` — wires translator + driver resolver into a `creator` closure, constructs `QueuePool` with `pre_ping=False` (pre_ping requires a SQLAlchemy dialect; standalone QueuePool silently no-ops it), returns the pool to the consumer
-5. `_exceptions.py` — leaf node; `DriverNotInstalledError(ImportError)` and `DriverResolutionError(RuntimeError)` with no internal imports
+1. `_drivers.py` — two dispatch dicts (`_PYPI_PACKAGES` for PyPI backends, `_FOUNDRY_DRIVERS` for Foundry backends); type-keyed; drives both driver resolution and the automatic `dbc install [name]` error messages emitted by `_driver_api.py`
+2. `_translators.py` — alphabetical `isinstance` chain; maps config type to translator function; single `translate_config()` public entry point; receives new `if isinstance(config, XConfig): return translate_x(config)` branch per backend
+3. `_[warehouse]_config.py` — Pydantic BaseSettings subclass per backend; env-prefix; `SecretStr` for credentials; pool-size validators where applicable; no `_adbc_driver_key()` method (already removed)
+4. `_[warehouse]_translator.py` — pure function; maps config fields to exact ADBC driver kwarg keys; omits `None` fields; for Foundry backends uses URI-first with decomposed fallback
+5. `_driver_api.py` — single `adbc_driver_manager` facade (unchanged); NOT_FOUND handler reads `_FOUNDRY_DRIVERS` reverse-lookup to emit `dbc install [name]` automatically
+
+**Key invariant:** A config type belongs in exactly one dispatch dict. PyPI-distributed drivers go in `_PYPI_PACKAGES`; Foundry-only drivers go in `_FOUNDRY_DRIVERS`. A Foundry driver incorrectly placed in `_PYPI_PACKAGES` will trigger a `find_spec` call that always returns `None`, bypassing the correct error message path.
+
+**Tech debt status:** `_adbc_driver_key()` is already removed from `BaseWarehouseConfig` and all subclasses. `_pool_types.py` (AdbcCreatorFn) is already deleted. Do not re-introduce either. PROJECT.md still shows these as open — it is stale.
+
+See `.planning/research/ARCHITECTURE.md` for file-level change lists, dispatch table code, anti-pattern catalogue, and scalability notes.
 
 ### Critical Pitfalls
 
-1. **`pre_ping=True` silently no-ops on standalone QueuePool** — `pre_ping` requires a SQLAlchemy dialect to call `dialect.do_ping()`; without an engine, it does nothing. Use `pre_ping=False` and rely on `recycle=3600` for connection health. This is a hard default change from the design notes.
+1. **Databricks URI URL-encoding (PITFALL-D1, CRITICAL)** — PAT tokens contain base64 characters (`+`, `=`, `/`) that are URI metacharacters. Construct the URI using `urllib.parse.quote(token, safe="")` on every variable component. An f-string without encoding silently misparses tokens that contain `+` or `=`. Test with a token string that is exactly `dapi+test=value/path`.
 
-2. **`pythonVersion = "3.14"` in basedpyright passes 3.13+ features silently** — code using `TypeVar(default=)` (PEP 696, 3.13+) or `typing.override` (3.12+) will pass type checking but fail at runtime on Python 3.11. Fix to `"3.11"` before writing a single line.
+2. **DatabricksConfig all-None validation gate (PITFALL-D2, CRITICAL)** — without a `model_validator(mode="after")` that requires either `uri` or all of `host`+`http_path`+`token`, `create_pool()` receives `{}` and fails with a cryptic driver error. Add this validator to `DatabricksConfig` before updating the translator, independent of the translator change.
 
-3. **Bare `except ImportError` on driver detection hides broken installations** — if `adbc_driver_snowflake` is installed but has an ABI mismatch, the ImportError is swallowed and falls through to "driver not found," giving a misleading error. Use `importlib.util.find_spec()` first: if the spec exists, import and let the error propagate; if the spec is absent, use the Foundry fallback.
+3. **`dbc` not in PATH — opaque failure (PITFALL-J1, CRITICAL)** — every justfile recipe that calls `dbc` must open with a `command -v dbc` guard inside a `#!/usr/bin/env bash` shebang recipe that prints a human-readable install instruction. Do not use just's `which()` function — it evaluates at parse time against the parent process PATH, not recipe execution PATH (PITFALL-J3, MODERATE).
 
-4. **DuckDB `:memory:` is connection-scoped** — each pool connection gets its own isolated empty database. Tests using `pool_size=1` pass; tests using `pool_size=2` fail with "table not found." Always use a named temp file for multi-connection DuckDB pool tests. Add a `model_validator` warning when `database=":memory:"` and `pool_size > 1`.
+4. **Driver installs to wrong path level (PITFALL-J4, MODERATE)** — `dbc install` without `--level env` installs to the user-level path, which `uv run python` does not search first. All `install-drivers` recipes must use `dbc install --level env [driver]` so drivers land in `$VIRTUAL_ENV/etc/adbc/drivers/` where `adbc_driver_manager` finds them.
 
-5. **Syrupy snapshots will contain non-deterministic Snowflake metadata** — `queryId`, `creationTime`, `elapsedTime` fields change on every run. Build a custom `SnowflakeArrowSnapshotSerializer` that strips these before serialization. Also audit snapshot files for credential residue (account identifier, username) before any commit.
+5. **Dead method re-introduction (PITFALL-R2, MODERATE)** — `_adbc_driver_key()` and `_pool_types.py` are already removed. Any plan or stale document that lists them as open work is incorrect. Do not add `_adbc_driver_key()` to any new config class. Use the `_PYPI_PACKAGES`/`_FOUNDRY_DRIVERS` dispatch tables instead.
+
+See `.planning/research/PITFALLS.md` for the full pitfall catalogue with code-level prevention patterns and unit test recipes.
 
 ## Implications for Roadmap
 
-Based on research, the dependency graph dictates a clear build order. Each layer can be tested in isolation before the next is built. No phase requires reversing an earlier decision.
+Based on the combined research, the recommended phase structure for v1.1.0 is:
 
-### Phase 1: Pre-flight Fixes
-**Rationale:** Two pre-existing config issues block all subsequent work. Must be resolved before any implementation code is written — they affect every downstream phase.
-**Delivers:** Correct basedpyright config targeting the minimum supported Python version; a release workflow free of cookiecutter artifacts.
-**Addresses:** PITFALL-21 (`pythonVersion = "3.11"`); `release.yml` cookiecutter placeholder.
-**Avoids:** Silent 3.13+ type feature acceptance that fails at runtime on 3.11; a broken first release.
+### Phase 1: Housekeeping, Infrastructure, and Databricks Fix
+**Rationale:** Three independent but foundational tasks that must precede all backend work. The `adbc-driver-manager` floor bump is required for Foundry manifest resolution to work correctly. The justfile tooling must exist before contributors can install and test Foundry drivers locally. The Databricks fix must land before MySQL, Teradata, or ClickHouse because those translators model themselves on the URI-first decomposed-field pattern — implementing them before the fix means following a broken template.
+**Delivers:** `adbc-driver-manager>=1.8.0` floor in `pyproject.toml`; justfile `dbc-install-cli`, `dbc-install-drivers`, `dbc-info`, `dbc-uninstall-drivers`, `dbc-search` recipes with `command -v` guards and `--level env`; DEVELOP.md "Foundry driver management" section; `DatabricksConfig` decomposed-field support with URL-encoding, validation gate, leading-slash normalisation, and URI-precedence warning; updated PROJECT.md closing the two already-completed tech debt items.
+**Avoids:** PITFALL-D1, PITFALL-D2, PITFALL-D3, PITFALL-D4, PITFALL-J1, PITFALL-J3, PITFALL-J4
+**Research flag:** No further research needed — all patterns and pitfalls are fully documented with code-level examples.
 
-### Phase 2: Dependency Declarations
-**Rationale:** `pyproject.toml` currently has `dependencies = []`. All subsequent implementation requires these runtime deps to be installable. Adding them now also confirms version resolution with `uv`.
-**Delivers:** Updated `pyproject.toml` with runtime deps, optional extras per warehouse, and the two missing dev deps (`pytest-mock`, `syrupy`). A passing `uv sync` with the new lock file.
-**Uses:** Stack recommendations from STACK.md — exact version ranges confirmed.
-**Avoids:** PITFALL-14 (document SQLAlchemy full-package dependency in README).
+### Phase 2: SQLite Backend (PyPI)
+**Rationale:** Lowest complexity of all new backends. Uses the DuckDB pattern almost exactly. Adding SQLite first validates that the PyPI slice mechanism still works cleanly after Phase 1 changes and gives confidence before tackling Foundry backends. This is also a short phase — it can be reviewed and merged quickly.
+**Delivers:** `SQLiteConfig`, `translate_sqlite()`, `sqlite` PyPI extra (`adbc-driver-sqlite>=1.0.0`), `pool_size=1` guard for `:memory:`, `_adbc_entrypoint()` override to `adbc_driver_sqlite_init`, full test coverage, `docs/src/guides/sqlite.md`.
+**Uses:** Apache ADBC `adbc-driver-sqlite>=1.0.0` (HIGH confidence, PyPI, stable ADBC 22)
+**Avoids:** Bare-import safety (DRIV-04 pattern — `find_spec` guard before import; config type goes in `_PYPI_PACKAGES`)
+**Research flag:** No further research needed. Entrypoint symbol and `:memory:` pool-size semantics are confirmed from official Apache ADBC docs.
 
-### Phase 3: Config Layer
-**Rationale:** Config models are the input to every other component. They have zero external ADBC or SQLAlchemy dependencies, making them the fastest to build and test. All downstream layers take config objects as input.
-**Delivers:** `_config_base.py`, `config_duckdb.py`, `config_snowflake.py`, `_exceptions.py` — all with unit tests covering valid construction, env var overrides, validation errors, and immutability.
-**Implements:** Config layer architecture component.
-**Avoids:** PITFALL-9 (SecretStr None handling), PITFALL-10 (env_prefix collision), PITFALL-11 (Snowflake private key PEM vs Path), PITFALL-12 (model_config inheritance), PITFALL-24 (DuckDB :memory: warning).
+### Phase 3: MySQL Backend (Foundry — public registry)
+**Rationale:** First Foundry backend of this milestone and the highest consumer-value addition (MySQL is the most-deployed open-source RDBMS; MariaDB, TiDB, and Vitess use the same driver). Depends on Phase 1 for both the DatabricksConfig fix (establishes URI-first decomposed-field pattern) and the justfile tooling (needed to install and test the driver). The Go DSN URI format (`user:pass@tcp(host:port)/db`) is the primary implementation complexity.
+**Delivers:** `MySQLConfig`, `translate_mysql()`, `_FOUNDRY_DRIVERS` entry with key `"mysql"`, full test coverage including the Go DSN format edge cases, `docs/src/guides/mysql.md`, updated justfile `dbc-install-drivers` recipe.
+**Avoids:** Anti-Pattern 3 (Foundry driver in `_FOUNDRY_DRIVERS`, not `_PYPI_PACKAGES`); Anti-Pattern 4 (empty dict when decomposed fields provided but URI absent)
+**Research flag:** MySQL individual kwarg key names for the decomposed-field path are MEDIUM confidence — quickstarts only show URI-based connections. Before writing the decomposed-field translator path, run `dbc install mysql` locally and confirm that `host`, `port`, `user`, `password`, `database` are accepted as separate kwargs (or establish that the driver is URI-only like Databricks).
 
-### Phase 4: Driver Detection and Translation
-**Rationale:** These two layers are independent of each other and of SQLAlchemy — both depend only on the config layer. Driver detection uses `importlib.util.find_spec()` + lazy imports; translation is pure dict construction. Both are fully testable with mocks and no real drivers.
-**Delivers:** `_translators.py` (config → ADBC kwargs), `_drivers.py` (PyPI + Foundry driver resolution), `_driver_api.py` (typed facade isolating `type: ignore`), with unit tests using `pytest-mock`.
-**Implements:** Translation and Driver Detection architecture components.
-**Avoids:** PITFALL-6 (bare ImportError swallowing), PITFALL-7 (driver module path vs package name), PITFALL-8 (lazy import enforcement), PITFALL-23 (ADBC typing facade).
+### Phase 4: ClickHouse Backend (Foundry — public registry)
+**Rationale:** Independent of MySQL. Low complexity — HTTP URI plus `username` and `password`; no DSN assembly. Grouped separately from MySQL because the `username` (not `user`) kwarg name is a non-obvious driver convention that deserves its own focused test class. Connection parameters are confirmed from live `adbc-quickstarts` code (HIGH confidence).
+**Delivers:** `ClickHouseConfig`, `translate_clickhouse()`, `_FOUNDRY_DRIVERS` entry with key `"clickhouse"`, full test coverage, `docs/src/guides/clickhouse.md`, updated justfile recipe.
+**Avoids:** `username` vs `user` field naming trap (FEATURES.md flags this as a silent auth failure if the wrong key is used)
+**Research flag:** No further research needed. Connection parameters confirmed from `columnar-tech/adbc-quickstarts` live Python code (HIGH confidence).
 
-### Phase 5: Pool Factory and DuckDB Integration
-**Rationale:** With config, translation, and driver detection solid, the factory layer only needs to wire them together and pass the result to QueuePool. DuckDB requires no credentials and tests the full end-to-end flow without CI secrets.
-**Delivers:** `factory.py` with `create_pool()`, updated `__init__.py`, DuckDB integration tests verifying pool construction, connection checkout, basic query execution, and pool disposal.
-**Uses:** SQLAlchemy QueuePool `creator` pattern; `pre_ping=False` default (PITFALL-3 / PITFALL-22).
-**Avoids:** PITFALL-1 (zero-arg creator closure), PITFALL-2 (connection thread safety docs), PITFALL-4 (Arrow memory release on checkin), PITFALL-5 (pool checkout timeout vs driver connect timeout), PITFALL-25 (pool.dispose() fixture teardown pattern).
-
-### Phase 6: Snowflake Integration and Snapshot Tests
-**Rationale:** Snowflake requires real credentials (CI secrets) and more complex auth config. Building it after DuckDB means the full pool machinery is validated before adding the credential and snapshot complexity.
-**Delivers:** Snowflake connection tests, syrupy snapshot infrastructure with `SnowflakeArrowSnapshotSerializer` (strips non-deterministic metadata), snapshot update workflow documentation, CI Snowflake test job.
-**Uses:** `syrupy>=4.0`; GitHub Actions secrets for Snowflake credentials.
-**Avoids:** PITFALL-17 (non-deterministic snapshot fields), PITFALL-18 (snapshot update workflow hygiene), PITFALL-19 (credential residue in snapshots), PITFALL-20 (Linux-only CI for Snowflake).
-
-### Phase 7: PyPI Publication
-**Rationale:** Publication is deferred until the library is functionally complete and tested. Several publication-specific checks must be added to the release workflow.
-**Delivers:** First PyPI release with verified wheel contents, `py.typed` marker included, OIDC trusted publisher configured, release workflow cookiecutter artifact resolved.
-**Avoids:** PITFALL-13 (optional extras Python version validation), PITFALL-15 (py.typed in wheel), PITFALL-16 (OIDC trusted publisher registration).
+### Phase 5: Teradata Backend (Foundry — private registry)
+**Rationale:** Last new backend because it requires private-registry authentication (`dbc auth login`) which adds friction to local testing. The URI pattern is confirmed from `adbc-quickstarts` (`teradata://user:pass@host:1025`). Start with URI-only, add decomposed fields only after key names are verified against a live driver. Justfile must document the `dbc auth login` prerequisite separately from the public-driver installation recipe.
+**Delivers:** `TeradataConfig`, `translate_teradata()`, `_FOUNDRY_DRIVERS` entry with key `"teradata"`, full test coverage, `docs/src/guides/teradata.md`, separate `dbc-install-private-drivers` justfile recipe that calls `dbc auth login` before `dbc install teradata`.
+**Avoids:** PITFALL-T2 (ODBC vs ADBC field name confusion — comment all accepted key names with `# VERIFIED from live dbc install teradata + connection test`)
+**Research flag:** Decomposed-field key names need live verification via `dbc auth login && dbc install teradata`. If private-registry access is unavailable, ship URI-only with a documented limitation and defer decomposed fields.
 
 ### Phase Ordering Rationale
 
-- Config before translation and drivers: all downstream modules take config objects as input; testing them in isolation is fast and requires only pydantic-settings.
-- Translation and drivers before factory: factory is a wiring layer; its integration tests catch wiring mistakes, not component mistakes. Build components first.
-- DuckDB before Snowflake: DuckDB requires no credentials; validates the full pool machinery before adding auth complexity.
-- Publication last: ensures all pre-publication checks (py.typed, OIDC registration, cookiecutter cleanup) happen after the library is functionally stable.
+- Phase 1 before all others: DatabricksConfig fix establishes the authoritative decomposed-field pattern; version floor and justfile tooling are prerequisites for Foundry driver testing.
+- Phase 2 (SQLite) before Phases 3-5: Validates the PyPI slice mechanism independently; lowest risk, highest confidence; builds confidence before Foundry work.
+- Phases 3-5 are independent of each other and can be parallelised or reordered. MySQL first for highest consumer value; ClickHouse second for lowest complexity; Teradata last for private-registry friction.
+- Every phase produces a fully shippable slice — no phase leaves the library in a partial state.
 
 ### Research Flags
 
-Phases likely needing deeper research during planning:
-- **Phase 4 (Driver Detection):** The ADBC Foundry driver path discovery mechanism (`adbc_driver_manager` Foundry lookup) needs implementation-time research against actual Foundry-installed driver paths. The ADBC Driver Foundry launched October 2025; exact API for programmatic path discovery may require consulting the `adbc_driver_manager` C extension documentation directly.
-- **Phase 6 (Snowflake Snapshots):** The custom syrupy serializer for Arrow RecordBatch results needs experimentation with the actual Snowflake ADBC driver response format. Metadata field names and Arrow schema structure should be verified against a real connection before finalizing the serializer design.
+Phases that can proceed without further research:
+- **Phase 1** (Housekeeping + Databricks fix): All pitfalls and patterns documented with code-level prevention steps. No unknowns.
+- **Phase 2** (SQLite): PyPI path, entrypoint name (`adbc_driver_sqlite_init`), and `:memory:` semantics all confirmed from official Apache ADBC docs and PyPI.
+- **Phase 4** (ClickHouse): Connection parameters confirmed from live `adbc-quickstarts` code (HIGH confidence).
 
-Phases with standard patterns (skip research-phase):
-- **Phase 1 (Pre-flight Fixes):** Mechanical config file changes; no research needed.
-- **Phase 2 (Dependency Declarations):** Version ranges are confirmed; `uv add` and `uv sync` are sufficient.
-- **Phase 3 (Config Layer):** Pydantic BaseSettings patterns are well-documented and confirmed. The pitfalls (SecretStr, env_prefix, model_config inheritance) are understood and solvable with known Pydantic patterns.
-- **Phase 5 (Pool Factory):** SQLAlchemy QueuePool `creator` pattern is extensively documented. The `pre_ping=False` decision is made. DuckDB integration tests are straightforward.
-- **Phase 7 (PyPI Publication):** OIDC trusted publishing, wheel validation, and release workflow patterns are standard and documented.
+Phases that need a local spike or live verification step before implementation:
+- **Phase 3** (MySQL): Decomposed-field individual kwarg names (not URI) are MEDIUM confidence. Run `dbc install mysql` locally and confirm the exact key strings before writing the decomposed-field translator path.
+- **Phase 5** (Teradata): Private-registry access required to confirm decomposed field names. URI-only path can be shipped without live verification; decomposed-field path cannot.
 
 ## Confidence Assessment
 
 | Area | Confidence | Notes |
 |------|------------|-------|
-| Stack | HIGH | All core stack choices are confirmed from `uv.lock` resolved at research date plus direct PyPI version knowledge. Two additions (pytest-mock, syrupy) are MEDIUM — versions are well-known, no compatibility concerns. |
-| Features | HIGH | Feature taxonomy derived from SQLAlchemy, psycopg3, asyncpg pool documentation plus ADBC-specific analysis. The table stakes / differentiator / anti-feature split is well-supported. |
-| Architecture | HIGH | The `creator` pattern is a first-class SQLAlchemy API. The layered module design is consistent with the existing codebase skeleton. The `pre_ping=False` recommendation is a documented SQLAlchemy behaviour, not an inference. |
-| Pitfalls | MEDIUM | Critical pitfalls (pre_ping, pythonVersion, ImportError swallowing, DuckDB :memory: isolation) are well-grounded. The Foundry driver path discovery mechanism and syrupy Arrow serializer design are less certain — these require implementation-time validation. |
+| Stack | HIGH | PyPI packages confirmed from `pypi.org` and official Apache ADBC blog; dbc CLI confirmed from `columnar-tech/dbc` GitHub; version pins from live release data (ADBC 22, dbc 0.2.0) |
+| Features | HIGH | Connection parameter shapes confirmed from `columnar-tech/adbc-quickstarts` live Python examples fetched via GitHub API (2026-03-01); dbc command reference from `columnar-tech/dbc/docs/reference/cli.md` (v0.2.0) |
+| Architecture | HIGH | Based on direct source inspection of all files in `src/adbc_poolhouse/`, `tests/`, `justfile`, `pyproject.toml`, `.planning/.continue-here.md`; dbc CLI reference fetched from GitHub |
+| Pitfalls | HIGH for Databricks and justfile risks; MEDIUM for Teradata field names | Databricks pitfalls derived from official driver docs (URI-only confirmed from `docs.adbc-drivers.org`); justfile pitfalls from `just` issue tracker and dbc docs; Teradata decomposed-field names MEDIUM because private-registry access was unavailable during research |
 
-**Overall confidence:** MEDIUM-HIGH
+**Overall confidence:** HIGH
 
 ### Gaps to Address
 
-- **Foundry driver path discovery:** How `adbc_driver_manager` programmatically locates Foundry-installed shared libraries is not fully specified in public documentation. The `_drivers.py` Foundry fallback path needs to be validated against an actual Foundry-installed driver during Phase 4.
-- **ADBC `db_kwargs` type constraint:** Research notes that all `db_kwargs` values must be `str`. Some ADBC driver parameters (booleans, integers) may technically accept non-string types. The translator's return type (`dict[str, str]`) should be verified against driver documentation for DuckDB and Snowflake before finalizing the translation layer.
-- **Snowflake private key format:** The ADBC Snowflake driver's expected format for the private key field (PEM string, DER bytes, or file path) needs verification against `adbc-driver-snowflake` documentation during Phase 3/6. Research recommends separate `private_key_path` and `private_key_pem` fields as the safe approach pending this verification.
-- **Arrow memory release on pool checkin:** PITFALL-4 identifies that ADBC connections hold Arrow allocators that may not be released on QueuePool checkin. A custom reset event listener may be needed. The correct approach should be prototyped during Phase 5 and validated with a memory-usage test before declaring the pool factory complete.
+- **MySQL decomposed-field kwarg names** (MEDIUM confidence): Quickstarts show only URI-based connections. Before writing the decomposed-field translator path, confirm that the Columnar MySQL ADBC driver accepts individual `host`, `port`, `user`, `password`, `database` kwargs — or establish that it is URI-only like Databricks, in which case decomposed fields assemble a URI rather than being passed as separate kwargs.
+
+- **Teradata private-registry access**: URI connection parameters are confirmed (`teradata://user:pass@host:1025`). Decomposed-field key names are inferred from the MSSQL pattern and are LOW confidence. Verify before adding decomposed fields to `TeradataConfig`. If access is unavailable, ship URI-only with a clear limitation note.
+
+- **`adbc-driver-manager>=1.8.0` floor impact**: Bumping from `>=1.0.0` is a breaking change for consumers pinned to versions below 1.8.0. Verify whether this warrants a semver bump beyond v1.1.0 before finalising the release plan.
+
+- **Stale PROJECT.md task list**: PROJECT.md lists `_adbc_driver_key()` removal and `_pool_types.py` deletion as open tasks. Both are confirmed complete from live source and `.planning/.continue-here.md`. Close these items in PROJECT.md before starting Phase 1 to avoid confusion when acting on the task list.
+
+- **`dbc` CLI version stability**: dbc is at v0.2.x (pre-1.0). The CLI interface may change before v1.2.0 planning. Monitor for breaking changes; consider pinning `uv tool install dbc==0.2.x` in CI if the interface changes affect justfile recipes.
 
 ## Sources
 
-### Primary (HIGH confidence)
-- `uv.lock` (resolved 2026-02-23) — confirmed versions: pytest 9.0.2, pytest-cov 7.0.0, basedpyright 1.38.1, ruff 0.15.2
-- `pyproject.toml`, `_notes/design-discussion.md`, `.planning/PROJECT.md`, `.planning/codebase/ARCHITECTURE.md` — project design constraints and existing decisions
-- SQLAlchemy pool documentation (`sqlalchemy.pool.QueuePool`, `sqlalchemy.pool.events`) — QueuePool creator pattern, pre_ping behaviour
-- psycopg3 / psycopg-pool documentation — `ConnectionPool`, `stats()`, background prefill patterns
-- asyncpg documentation — `asyncpg.create_pool`, pool-as-executor pattern (deliberately not adopted)
+### Primary — HIGH Confidence
+- `src/adbc_poolhouse/` (all source files, direct inspection, 2026-03-01) — architecture, dispatch table pattern, dead code status
+- `.planning/.continue-here.md` — confirms `_adbc_driver_key()` removed, `_pool_types.py` deleted in v0.1 cleanup
+- `columnar-tech/dbc/docs/reference/cli.md` (v0.2.0, GitHub, 2026-03-01) — dbc command reference
+- `columnar-tech/dbc/docs/reference/driver_list.md` (GitHub, 2026-03-01) — Teradata in dbc private registry confirmed
+- `columnar-tech/dbc/README.md` (GitHub, 2026-03-01) — `adbc-driver-manager>=1.8.0` requirement
+- `columnar-tech/adbc-quickstarts` Python examples (GitHub API, 2026-03-01) — MySQL, Teradata, ClickHouse, Oracle URI formats confirmed from live code
+- `docs.adbc-drivers.org/drivers/index.html` — public Foundry driver list (8 drivers; Teradata absent — private registry)
+- `docs.adbc-drivers.org/drivers/databricks/index.html` — Databricks driver is URI-only
+- `arrow.apache.org/adbc/current/driver/sqlite.html` — SQLite entrypoint symbol (`adbc_driver_sqlite_init`), `:memory:` semantics
+- `pypi.org/project/adbc-driver-sqlite/1.10.0` — confirmed stable, ADBC 22 release
+- `arrow.apache.org/blog/2026/01/09/adbc-22-release/` — ADBC 22 (v1.10.0) version reference
 
-### Secondary (MEDIUM confidence)
-- Apache Arrow ADBC documentation and driver packages — `adbc_driver_manager.dbapi.connect()` call patterns, db_kwargs structure, PyPI vs Foundry driver paths
-- ADBC Driver Foundry documentation (launched Oct 2025) — dual-channel driver distribution model
-- PyPI state at research date — version numbers for pydantic-settings, sqlalchemy, adbc-driver-manager, adbc-driver-snowflake, syrupy
+### Secondary — MEDIUM Confidence
+- `deepwiki.com/columnar-tech/dbc/4-commands-reference` — dbc command reference (indexed November 2025, pre-0.2.0)
+- `deepwiki.com/columnar-tech/dbc/5.1-configuration-levels` — dbc install paths per platform
+- `columnar.tech/blog/announcing-dbc-0.2.0/` (February 10, 2026) — dbc 0.2.0 feature summary including declarative `dbc.toml` and `dbc auth login`
+- `siliconangle.com/2025/10/29/columnar-launches-...` — MySQL Foundry driver launch (October 2025)
+- `api.github.com/orgs/adbc-drivers/repos` — 23 repositories confirmed including mysql, clickhouse
 
-### Tertiary (LOW confidence)
-- ADBC Foundry programmatic path discovery — sparse documentation; needs implementation-time validation
-- `adbc-driver-snowflake` Windows wheel availability — reported as historically incomplete; current state unconfirmed
+### Tertiary — LOW Confidence
+- `dbc install --level env` flag behaviour — documented but not tested in this environment
+- MySQL decomposed-field individual kwarg key names — inferred from MSSQL pattern; needs live driver verification
+- `just` issue #2597 (`which()` parse-time evaluation) — documented by maintainer, not independently reproduced
 
 ---
-*Research completed: 2026-02-23*
+*Research completed: 2026-03-01*
 *Ready for roadmap: yes*
