@@ -149,6 +149,45 @@ class TestApacheBackendConfigs:
         assert bq.pool_size == 7
 
 
+class TestPostgreSQLConfig:
+    """Unit tests for PostgreSQLConfig — individual fields and env prefix."""
+
+    def test_individual_fields_constructs(self) -> None:
+        """PostgreSQLConfig with host/user/database constructs and reads back correctly."""
+        c = PostgreSQLConfig(host="db.example.com", user="me", database="mydb")
+        assert c.host == "db.example.com"
+        assert c.user == "me"
+        assert c.database == "mydb"
+        assert c.port is None
+        assert isinstance(c, WarehouseConfig)
+
+    def test_password_is_secret_str(self) -> None:
+        """Password field is SecretStr — repr does not expose value."""
+        c = PostgreSQLConfig(
+            host="db.example.com",
+            user="me",
+            password=SecretStr("hunter2"),  # pragma: allowlist secret
+            database="mydb",
+        )
+        assert "hunter2" not in repr(c)
+
+    def test_env_prefix_loads_host(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """POSTGRESQL_HOST, POSTGRESQL_USER, POSTGRESQL_DATABASE load via env_prefix."""
+        monkeypatch.setenv("POSTGRESQL_HOST", "envhost")
+        monkeypatch.setenv("POSTGRESQL_USER", "envuser")
+        monkeypatch.setenv("POSTGRESQL_DATABASE", "envdb")
+        c = PostgreSQLConfig()
+        assert c.host == "envhost"
+        assert c.user == "envuser"
+        assert c.database == "envdb"
+
+    def test_env_prefix_pool_size(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """POSTGRESQL_POOL_SIZE env var sets pool_size via env_prefix."""
+        monkeypatch.setenv("POSTGRESQL_POOL_SIZE", "7")
+        c = PostgreSQLConfig()
+        assert c.pool_size == 7
+
+
 class TestFoundryBackendConfigs:
     """Smoke tests for Databricks, Redshift, Trino, MSSQL."""
 
