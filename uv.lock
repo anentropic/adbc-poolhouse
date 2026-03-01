@@ -146,6 +146,7 @@ snowflake = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "adbc-poolhouse", extra = ["duckdb"] },
     { name = "basedpyright" },
     { name = "coverage", extra = ["toml"] },
     { name = "ipython" },
@@ -185,6 +186,7 @@ provides-extras = ["duckdb", "snowflake", "postgresql", "flightsql", "bigquery",
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "adbc-poolhouse", extras = ["duckdb"] },
     { name = "basedpyright", specifier = ">=1.38.0" },
     { name = "coverage", extras = ["toml"] },
     { name = "ipython", specifier = ">=9.10.0" },

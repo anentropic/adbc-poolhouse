@@ -39,6 +39,7 @@ build-backend = "uv_build"
 
 [dependency-groups]
 dev = [
+    "adbc-poolhouse[duckdb]",
     "basedpyright>=1.38.0",
     "coverage[toml]",
     "ipython>=9.10.0",
