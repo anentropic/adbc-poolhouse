@@ -266,6 +266,46 @@ uv cache clean
 uv cache prune
 ```
 
+## Foundry Driver Management
+
+Some ADBC backends (MySQL, ClickHouse) use drivers distributed via the ADBC Driver Foundry rather than PyPI. The `dbc` CLI manages these drivers.
+
+### Install dbc
+
+```bash
+just install-dbc
+```
+
+This installs the `dbc` CLI if it is not already on your PATH. To install manually:
+
+```bash
+curl -LsSf https://dbc.columnar.tech/install.sh | sh
+```
+
+### Install Foundry drivers
+
+With an active virtualenv (`uv sync` or `source .venv/bin/activate`):
+
+```bash
+just install-foundry-drivers
+```
+
+This installs the MySQL and ClickHouse drivers into `$VIRTUAL_ENV/etc/adbc/drivers/`, where `adbc_driver_manager` resolves them automatically.
+
+### Verify installation
+
+```bash
+dbc info mysql
+dbc info clickhouse
+```
+
+### Uninstall
+
+```bash
+dbc uninstall mysql
+dbc uninstall clickhouse
+```
+
 ## Questions?
 
 Refer to official documentation:
