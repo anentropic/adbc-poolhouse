@@ -107,9 +107,9 @@ Isolates all type suppressions to dedicated internal modules.
 
 ### Foundry Tooling
 
-- [ ] **DBC-01**: `justfile` recipe `install-dbc` — installs `dbc` CLI binary; uses `command -v dbc` guard (not `which`, which evaluates at parse time in just)
-- [ ] **DBC-02**: `justfile` recipe `install-foundry-drivers` — runs `dbc install mysql clickhouse` with `--level env` to scope drivers to active virtualenv
-- [ ] **DBC-03**: `DEVELOP.md` updated with Foundry Driver Management section — install `dbc`, install drivers, verify with `dbc info`, uninstall
+- [x] **DBC-01**: `justfile` recipe `install-dbc` — installs `dbc` CLI binary; uses `command -v dbc` guard (not `which`, which evaluates at parse time in just)
+- [x] **DBC-02**: `justfile` recipe `install-foundry-drivers` — runs `dbc install mysql clickhouse` with `--level env` to scope drivers to active virtualenv
+- [x] **DBC-03**: `DEVELOP.md` updated with Foundry Driver Management section — install `dbc`, install drivers, verify with `dbc info`, uninstall
 
 ### SQLite
 
@@ -225,9 +225,9 @@ Isolates all type suppressions to dedicated internal modules.
 | SQLT-03 | Phase 10 | Pending |
 | SQLT-04 | Phase 10 | Pending |
 | SQLT-05 | Phase 10 | Pending |
-| DBC-01 | Phase 11 | Pending |
-| DBC-02 | Phase 11 | Pending |
-| DBC-03 | Phase 11 | Pending |
+| DBC-01 | Phase 11 | Complete |
+| DBC-02 | Phase 11 | Complete |
+| DBC-03 | Phase 11 | Complete |
 | MYSQL-01 | Phase 11 | Pending |
 | MYSQL-02 | Phase 11 | Pending |
 | MYSQL-03 | Phase 11 | Pending |
