@@ -127,8 +127,8 @@ class TestBigQueryTranslator:
 class TestPostgreSQLTranslator:
     """Unit tests for translate_postgresql()."""
 
-    def test_no_uri_empty(self) -> None:
-        """PostgreSQLConfig() with no uri → empty dict."""
+    def test_no_fields_empty(self) -> None:
+        """PostgreSQLConfig() with no fields → empty dict (libpq uses its own env)."""
         result = translate_postgresql(PostgreSQLConfig())
         assert result == {}
 
@@ -147,6 +147,54 @@ class TestPostgreSQLTranslator:
         result = translate_postgresql(PostgreSQLConfig(uri="postgresql://localhost/mydb"))
         assert "adbc.postgresql.use_copy" not in result
         assert "use_copy" not in result
+
+    def test_individual_fields_builds_uri(self) -> None:
+        """Individual fields → builds a libpq URI."""
+        result = translate_postgresql(
+            PostgreSQLConfig(host="db.example.com", user="me", database="mydb")
+        )
+        assert result == {"uri": "postgresql://me@db.example.com/mydb"}
+
+    def test_individual_fields_with_password(self) -> None:
+        """Password is URL-encoded and embedded in the URI."""
+        from pydantic import SecretStr
+
+        result = translate_postgresql(
+            PostgreSQLConfig(
+                host="db.example.com",
+                user="me",
+                password=SecretStr("s3cr+t"),  # pragma: allowlist secret
+                database="mydb",
+            )
+        )
+        assert (
+            result["uri"]
+            == "postgresql://me:s3cr%2Bt@db.example.com/mydb"  # pragma: allowlist secret
+        )
+
+    def test_individual_fields_with_port_and_sslmode(self) -> None:
+        """Port and sslmode are appended correctly."""
+        result = translate_postgresql(
+            PostgreSQLConfig(
+                host="db.example.com",
+                user="me",
+                port=5433,
+                database="mydb",
+                sslmode="require",
+            )
+        )
+        assert result == {"uri": "postgresql://me@db.example.com:5433/mydb?sslmode=require"}
+
+    def test_uri_takes_precedence_over_individual_fields(self) -> None:
+        """When uri is set, individual fields are ignored."""
+        result = translate_postgresql(
+            PostgreSQLConfig(
+                uri="postgresql://override@host/db",
+                host="ignored",
+                user="ignored",
+            )
+        )
+        assert result == {"uri": "postgresql://override@host/db"}
 
 
 class TestFlightSQLTranslator:
