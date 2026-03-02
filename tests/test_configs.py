@@ -20,6 +20,7 @@ from adbc_poolhouse import (
     TrinoConfig,
     WarehouseConfig,
 )
+from adbc_poolhouse._clickhouse_config import ClickHouseConfig
 
 
 class TestBaseWarehouseConfig:
@@ -471,3 +472,90 @@ class TestMSSQLConfig:
         monkeypatch.setenv("MSSQL_POOL_SIZE", "12")
         c = MSSQLConfig()
         assert c.pool_size == 12
+
+
+class TestClickHouseConfig:
+    """Unit tests for ClickHouseConfig — connection validation and env prefix."""
+
+    def test_no_args_raises(self) -> None:
+        """ClickHouseConfig() with no connection spec raises ValidationError."""
+        with pytest.raises(ValidationError):
+            ClickHouseConfig()
+
+    def test_uri_mode_constructs(self) -> None:
+        """ClickHouseConfig with uri= constructs successfully."""
+        c = ClickHouseConfig(
+            uri=SecretStr("http://user:pass@localhost:8123/db")
+        )  # pragma: allowlist secret
+        assert c.uri is not None
+        assert isinstance(c, WarehouseConfig)
+
+    def test_decomposed_host_and_username(self) -> None:
+        """ClickHouseConfig with host and username constructs — database is optional."""
+        c = ClickHouseConfig(host="localhost", username="default")
+        assert c.host == "localhost"
+        assert c.username == "default"
+        assert c.database is None
+        assert c.port == 8123
+        assert isinstance(c, WarehouseConfig)
+
+    def test_host_only_raises(self) -> None:
+        """ClickHouseConfig(host=...) without username raises ValidationError."""
+        with pytest.raises(ValidationError):
+            ClickHouseConfig(host="localhost")
+
+    def test_username_only_raises(self) -> None:
+        """ClickHouseConfig(username=...) without host raises ValidationError."""
+        with pytest.raises(ValidationError):
+            ClickHouseConfig(username="default")
+
+    def test_port_defaults_to_8123(self) -> None:
+        """HTTP interface port defaults to 8123, not 9000 (native protocol)."""
+        c = ClickHouseConfig(host="h", username="u")
+        assert c.port == 8123
+
+    def test_custom_port(self) -> None:
+        """ClickHouseConfig accepts a non-default port."""
+        c = ClickHouseConfig(host="h", username="u", port=8443)
+        assert c.port == 8443
+
+    def test_password_is_secret_str(self) -> None:
+        """Password field is SecretStr — repr does not expose value."""
+        c = ClickHouseConfig(
+            host="h",
+            username="u",
+            password=SecretStr("hunter2"),  # pragma: allowlist secret
+        )
+        assert "hunter2" not in repr(c)
+
+    def test_uri_is_secret_str(self) -> None:
+        """URI field is SecretStr — repr does not expose credentials."""
+        c = ClickHouseConfig(uri=SecretStr("http://u:p@h:8123/db"))  # pragma: allowlist secret
+        assert "p@h" not in repr(c)
+
+    def test_field_name_is_username_not_user(self) -> None:
+        """Config uses 'username' field, not 'user' — wrong key causes silent auth failure."""
+        c = ClickHouseConfig(host="h", username="default")
+        assert hasattr(c, "username")
+        assert not hasattr(c, "user")
+
+    def test_database_optional_in_decomposed_mode(self) -> None:
+        """Database is optional in decomposed mode — unlike MySQL which requires it."""
+        c = ClickHouseConfig(host="h", username="u", database="mydb")
+        assert c.database == "mydb"
+
+    def test_env_prefix_loads_host(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """CLICKHOUSE_HOST, CLICKHOUSE_USERNAME env vars load via env_prefix."""
+        monkeypatch.setenv("CLICKHOUSE_HOST", "envhost")
+        monkeypatch.setenv("CLICKHOUSE_USERNAME", "envuser")
+        c = ClickHouseConfig()
+        assert c.host == "envhost"
+        assert c.username == "envuser"
+
+    def test_env_prefix_pool_size(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """CLICKHOUSE_POOL_SIZE env var sets pool_size via env_prefix."""
+        monkeypatch.setenv("CLICKHOUSE_HOST", "h")
+        monkeypatch.setenv("CLICKHOUSE_USERNAME", "u")
+        monkeypatch.setenv("CLICKHOUSE_POOL_SIZE", "7")
+        c = ClickHouseConfig()
+        assert c.pool_size == 7
