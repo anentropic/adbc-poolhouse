@@ -245,10 +245,11 @@ Plans:
   3. REQUIREMENTS.md shows `[x]` Complete for SQLT-01–05; traceability table updated
   4. 10-01-SUMMARY.md, 10-02-SUMMARY.md, 10-03-SUMMARY.md all include `requirements-completed` frontmatter
   5. justfile `install-foundry-drivers` uses `dbc install --pre clickhouse` (--pre required for alpha driver)
-**Plans**: 1 plan
+**Plans**: 2 plans
 
 Plans:
-- [ ] 13-01-PLAN.md — Fix DBC-02 justfile, update SUMMARY frontmatter, update REQUIREMENTS.md checkboxes, create Phase 10 and Phase 11 VERIFICATION.md
+- [ ] 13-01-PLAN.md — Fix DBC-02 justfile, patch SUMMARY frontmatter, update REQUIREMENTS.md checkboxes and traceability table
+- [ ] 13-02-PLAN.md — Create Phase 10 VERIFICATION.md and Phase 11 VERIFICATION.md by reading source files
 
 ### Phase 14: Homepage Discovery Fix
 **Goal:** ClickHouseConfig and MySQLConfig are discoverable by new users landing on the homepage — both appear in the ADBC drivers install table and "First pool" config class list on index.md
@@ -285,5 +286,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | 10. SQLite Backend | 4/4 | Complete   | 2026-03-01 |
 | 11. Foundry Tooling and MySQL Backend | 4/4 | Complete   | 2026-03-01 |
 | 12. ClickHouse Backend | 4/4 | Complete    | 2026-03-02 |
-| 13. Verification and Tracking Fix | 0/1 | Not started | - |
+| 13. Verification and Tracking Fix | 0/2 | Not started | - |
 | 14. Homepage Discovery Fix | 0/1 | Not started | - |
