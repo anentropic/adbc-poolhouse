@@ -270,7 +270,7 @@ Plans:
 **Goal:** Syrupy is removed; Snowflake integration tests are migrated to cassette-based replay; Databricks cassette tests are added; all four integration tests pass in CI without credentials
 **Requirements**: TBD
 **Depends on:** Phase 14
-**Plans:** 3 plans
+**Plans:** 3/3 plans complete
 
 Plans:
 - [ ] 15-01-PLAN.md — Swap syrupy for pytest-adbc-replay in dev deps; configure adbc_auto_patch and adbc_cassette_dir in pyproject.toml; add .env.databricks to .gitignore

@@ -22,12 +22,12 @@ See: .planning/PROJECT.md (updated 2026-02-28)
 
 ## Current Position
 
-Phase: 14-homepage-discovery-fix (COMPLETE)
-Plan: 14-01 (complete) — ALL PLANS DONE
-Status: Phase complete — index.md restructured with PyPI/Foundry groups; ClickHouse and MySQL added to table and config class list; MYSQL-05 and CH-05 marked complete
-Last activity: 2026-03-02 — Phase 14 complete; index.md now shows all 12 backends; CH-05 and MYSQL-05 requirements closed
+Phase: 15-replace-syrupy-snapshot-tests-with-pytest-adbc-replay-vcr-style-record-replay-tests (COMPLETE)
+Plan: 15-03 (complete) — ALL PLANS DONE
+Status: Phase complete — syrupy replaced with pytest-adbc-replay; 4 cassette tests (2 Snowflake + 2 Databricks) pass in CI without credentials; 192 tests green
+Last activity: 2026-03-02 — Phase 15 complete; cassette workflow operational; credential gate removed from CI
 
-Progress: [██████████] 100% (14/14 phases complete)
+Progress: [██████████] 100% (15/15 phases complete)
 
 ## Performance Metrics
 
@@ -166,6 +166,14 @@ Recent decisions affecting current work:
 - [Phase 12-clickhouse-backend]: ClickHouseConfig placed alphabetically first in _FOUNDRY_DRIVERS and translate_config() dispatch; ruff auto-sorted imports to correct alphabetical position on first pre-commit run
 - [Phase 12-clickhouse-backend]: detect-secrets pragma must be on the same line as the string literal — ruff-format wraps to the next line but detect-secrets checks the literal's line
 - [Phase 12-clickhouse-backend]: clickhouse.md uses python/bash fenced blocks matching mysql.md style; ClickHouseConfig placed first in Foundry backends list alphabetically
+- [Phase 15-01]: pytest-adbc-replay _patched_connect() accepts **kwargs only; adbc_driver_manager.dbapi.connect() must use driver= keyword arg to avoid TypeError on pass-through for non-cassette unit tests
+- [Phase 15-01]: adbc-driver-snowflake added to dev deps — plugin silently skips uninstalled drivers (no mock injection); driver must be present for auto-patch replay in CI
+- [Phase 15-03]: Cassette file naming is {prefix}_query.sql / {prefix}_result.arrow / {prefix}_params.json (not 000.sql/arrow/json); SQL stored as sqlglot.parse_one(sql).sql(pretty=True, normalize=True) canonical form
+- [Phase 15-03]: Arrow IPC File format (ipc.new_file) used for cassettes — plugin reads via ipc.open_file() (file format, seekable, with footer)
+
+### Roadmap Evolution
+
+- Phase 15 added: Replace Syrupy snapshot tests with pytest-adbc-replay VCR-style record/replay tests
 
 ### Pending Todos
 
@@ -186,11 +194,11 @@ None yet.
 ### Blockers/Concerns
 
 - Phase 4 (Driver Detection): Foundry driver path discovery mechanism in `adbc_driver_manager` is sparsely documented — needs implementation-time research against actual Foundry-installed driver paths (ADBC Driver Foundry launched Oct 2025)
-- Phase 6 (Snowflake Snapshots): Snapshot recording requires real Snowflake credentials — snapshots not yet recorded; run `pytest --override-ini="addopts=" -m snowflake --snapshot-update` to record
+- Phase 6 (Snowflake Snapshots): RESOLVED — Phase 15 replaced Syrupy snapshots with pytest-adbc-replay cassettes; synthetic cassettes committed; no live credentials required for CI
 - Phase 11 (MySQL): Decomposed-field individual kwarg names are MEDIUM confidence — run `dbc install mysql` and confirm exact key strings before writing the decomposed-field translator path
 
 ## Session Continuity
 
 Last session: 2026-03-02
-Stopped at: Completed 12-03-PLAN.md — ClickHouse test suite complete; 27 tests across 4 files; full suite 188 tests green; Phase 12 complete
+Stopped at: Completed 15-03-PLAN.md — Phase 15 complete; syrupy replaced with pytest-adbc-replay; 192 tests green (188 unit + 4 integration cassette tests); no credentials required for CI
 Resume file: None
