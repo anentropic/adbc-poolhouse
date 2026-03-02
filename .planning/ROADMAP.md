@@ -17,9 +17,9 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 3: Config Layer** - Build typed Pydantic BaseSettings config models for all warehouses plus exceptions (completed 2026-02-24)
 - [x] **Phase 4: Translation and Driver Detection** - Pure translation functions, lazy driver resolution, and typed facades isolating type suppressions (completed 2026-02-24)
 - [x] **Phase 5: Pool Factory and DuckDB Integration** - Assemble the public `create_pool()` API and validate it end-to-end with DuckDB tests (completed 2026-02-24)
-- [ ] **Phase 6: Snowflake Integration** - Add syrupy snapshot tests for Snowflake with a custom serializer stripping non-deterministic fields
+- [x] **Phase 6: Snowflake Integration** - Add syrupy snapshot tests for Snowflake with a custom serializer stripping non-deterministic fields (superseded by Phase 15 — migrated to pytest-adbc-replay cassettes)
 - [x] **Phase 7: Documentation and PyPI Publication** - Write docs skill, author all guides, and publish to PyPI via OIDC trusted publisher (completed 2026-02-26)
-- [ ] **Phase 8: Review and Improve Docs** - Public API cleanup (close_pool, managed_pool) and comprehensive per-warehouse guide pages
+- [x] **Phase 8: Review and Improve Docs** - Public API cleanup (close_pool, managed_pool) and comprehensive per-warehouse guide pages (completed 2026-02-28)
 - [x] **Phase 9: Infrastructure and Databricks Fix** - Bump adbc-driver-manager floor, close stale PROJECT.md items, and fix the silent Databricks decomposed-field failure
 - [x] **Phase 10: SQLite Backend** - Add SQLite as a PyPI-distributed ADBC backend with full config, translation, tests, and docs (completed 2026-03-01)
 - [x] **Phase 11: Foundry Tooling and MySQL Backend** - Add dbc CLI justfile recipes and the MySQL Foundry backend (dbc recipes are prerequisites for testing MySQL locally) (completed 2026-03-01)
@@ -273,9 +273,9 @@ Plans:
 **Plans:** 3/3 plans complete
 
 Plans:
-- [ ] 15-01-PLAN.md — Swap syrupy for pytest-adbc-replay in dev deps; configure adbc_auto_patch and adbc_cassette_dir in pyproject.toml; add .env.databricks to .gitignore
-- [ ] 15-02-PLAN.md — Remove Syrupy from tests/integration/conftest.py; add databricks_pool session-scoped fixture
-- [ ] 15-03-PLAN.md — Generate cassette files; rewrite test_snowflake.py; create test_databricks.py; verify 4 integration tests pass in CI replay mode
+- [x] 15-01-PLAN.md — Swap syrupy for pytest-adbc-replay in dev deps; configure adbc_auto_patch and adbc_cassette_dir in pyproject.toml; add .env.databricks to .gitignore
+- [x] 15-02-PLAN.md — Remove Syrupy from tests/integration/conftest.py; add databricks_pool session-scoped fixture
+- [x] 15-03-PLAN.md — Generate cassette files; rewrite test_snowflake.py; create test_databricks.py; verify 4 integration tests pass in CI replay mode
 
 ---
 
@@ -300,3 +300,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | 12. ClickHouse Backend | 4/4 | Complete    | 2026-03-02 |
 | 13. Verification and Tracking Fix | 2/2 | Complete    | 2026-03-02 |
 | 14. Homepage Discovery Fix | 1/1 | Complete    | 2026-03-02 |
+| 15. Replace Syrupy with pytest-adbc-replay | 3/3 | Complete    | 2026-03-02 |
