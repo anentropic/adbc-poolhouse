@@ -125,7 +125,7 @@ Isolates all type suppressions to dedicated internal modules.
 - [x] **MYSQL-02**: `translate_mysql()` — constructs Go DSN URI (`user:pass@tcp(host:port)/db`) from decomposed fields when `uri` absent; URL-encodes password
 - [x] **MYSQL-03**: MySQL registered in `_FOUNDRY_DRIVERS` dict in `_drivers.py`
 - [x] **MYSQL-04**: Unit tests for `MySQLConfig` validation; unit tests for `translate_mysql()` asserting exact kwargs dict; mock-at-`create_adbc_connection` test asserting full pool-factory wiring
-- [ ] **MYSQL-05**: `MySQLConfig` exported from `__init__.py`; MySQL warehouse guide page in docs; API reference entry; `uv run mkdocs build --strict` passes
+- [x] **MYSQL-05**: `MySQLConfig` exported from `__init__.py`; MySQL warehouse guide page in docs; API reference entry; `uv run mkdocs build --strict` passes
 
 ### ClickHouse
 
@@ -133,7 +133,7 @@ Isolates all type suppressions to dedicated internal modules.
 - [x] **CH-02**: `translate_clickhouse()` — pure function mapping `ClickHouseConfig` fields to adbc_driver_manager kwargs
 - [x] **CH-03**: ClickHouse registered in `_FOUNDRY_DRIVERS` dict in `_drivers.py`
 - [x] **CH-04**: Unit tests for `ClickHouseConfig` validation; unit tests for `translate_clickhouse()` asserting exact kwargs dict; mock-at-`create_adbc_connection` test asserting full pool-factory wiring
-- [ ] **CH-05**: `ClickHouseConfig` exported from `__init__.py`; ClickHouse warehouse guide page in docs; API reference entry; `uv run mkdocs build --strict` passes
+- [x] **CH-05**: `ClickHouseConfig` exported from `__init__.py`; ClickHouse warehouse guide page in docs; API reference entry; `uv run mkdocs build --strict` passes
 
 ---
 
@@ -232,12 +232,12 @@ Isolates all type suppressions to dedicated internal modules.
 | MYSQL-02 | Phase 11 | Complete |
 | MYSQL-03 | Phase 11 | Complete |
 | MYSQL-04 | Phase 11 | Complete |
-| MYSQL-05 | Phase 14 | Pending |
+| MYSQL-05 | Phase 14 | Complete |
 | CH-01 | Phase 12 | Complete |
 | CH-02 | Phase 12 | Complete |
 | CH-03 | Phase 12 | Complete |
 | CH-04 | Phase 12 | Complete |
-| CH-05 | Phase 14 | Pending |
+| CH-05 | Phase 14 | Complete |
 
 **Coverage:**
 - v0.1 requirements: 44 total
@@ -251,4 +251,4 @@ Isolates all type suppressions to dedicated internal modules.
 
 ---
 *Requirements defined: 2026-02-23*
-*Last updated: 2026-03-02 — Phase 13 gap closure: SQLT-01–05 and DBC-02 checkboxes updated; traceability corrected to implementation phases (SQLT-01–05 → Phase 10, DBC-02 → Phase 11)*
+*Last updated: 2026-03-02 — Phase 14 gap closure: MYSQL-05 and CH-05 marked Complete (index.md now lists MySQL and ClickHouse in ADBC drivers table and config class list)*

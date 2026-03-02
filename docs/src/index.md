@@ -20,23 +20,28 @@ adbc-poolhouse manages the pool, not the driver. You also need an ADBC driver fo
 
 | Warehouse | Install command |
 |---|---|
-| DuckDB | `pip install adbc-poolhouse[duckdb]` |
-| Snowflake | `pip install adbc-poolhouse[snowflake]` |
-| BigQuery | `pip install adbc-poolhouse[bigquery]` |
-| PostgreSQL | `pip install adbc-poolhouse[postgresql]` |
+| **PyPI drivers** | |
 | Apache Arrow Flight SQL | `pip install adbc-poolhouse[flightsql]` |
+| BigQuery | `pip install adbc-poolhouse[bigquery]` |
+| DuckDB | `pip install adbc-poolhouse[duckdb]` |
+| PostgreSQL | `pip install adbc-poolhouse[postgresql]` |
+| Snowflake | `pip install adbc-poolhouse[snowflake]` |
 | SQLite | `pip install adbc-poolhouse[sqlite]` |
+| **Foundry-distributed drivers** | |
+| ClickHouse | Foundry-distributed — see [Foundry installation](guides/clickhouse.md) |
 | Databricks | Foundry-distributed — see [Foundry installation](guides/databricks.md) |
+| MSSQL / Azure SQL / Fabric | Foundry-distributed — see [Foundry installation](guides/mssql.md) |
+| MySQL | Foundry-distributed — see [Foundry installation](guides/mysql.md) |
 | Redshift | Foundry-distributed — see [Foundry installation](guides/redshift.md) |
 | Trino | Foundry-distributed — see [Foundry installation](guides/trino.md) |
-| MSSQL / Azure SQL / Fabric | Foundry-distributed — see [Foundry installation](guides/mssql.md) |
 
 ## First pool in five minutes
 
-All supported warehouses have a typed config class:
-`DuckDBConfig`, `SQLiteConfig`, `SnowflakeConfig`, `BigQueryConfig`, `PostgreSQLConfig`,
-`FlightSQLConfig`, `DatabricksConfig`, `RedshiftConfig`, `TrinoConfig`,
-`MSSQLConfig`.
+All supported warehouses have a typed config class.
+
+PyPI-installed: `BigQueryConfig`, `DuckDBConfig`, `FlightSQLConfig`, `PostgreSQLConfig`, `SnowflakeConfig`, `SQLiteConfig`.
+
+Foundry-distributed: `ClickHouseConfig`, `DatabricksConfig`, `MSSQLConfig`, `MySQLConfig`, `RedshiftConfig`, `TrinoConfig`.
 
 The example below uses DuckDB — no credentials or running server required.
 
