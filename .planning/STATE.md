@@ -22,10 +22,10 @@ See: .planning/PROJECT.md (updated 2026-02-28)
 
 ## Current Position
 
-Phase: 12-clickhouse-backend (COMPLETE)
-Plan: 12-03 (complete) — ALL PLANS DONE
-Status: Phase complete — Plans 01-03 done; 27 ClickHouse tests across 4 files; full suite 188 tests green
-Last activity: 2026-03-02 — Phase 12 Plan 03 complete; ClickHouse test suite complete
+Phase: 13-verification-and-tracking-fix (In Progress)
+Plan: 13-01 (complete) — 1 of 2 plans done
+Status: Plan 01 complete — justfile --pre flag fixed; REQUIREMENTS.md updated; SUMMARY frontmatter backfilled
+Last activity: 2026-03-02 — Phase 13 Plan 01 complete; tracking gaps closed for v1.0 audit
 
 Progress: [██████████] 100% (12/12 phases complete)
 
