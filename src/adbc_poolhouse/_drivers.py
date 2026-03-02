@@ -11,7 +11,7 @@ Three-path detection strategy (DRIV-01, DRIV-04):
       catches the NOT_FOUND status from ``adbc_driver_manager`` and re-raises it as
       a user-friendly ImportError pointing to https://docs.adbc-drivers.org/.
 
-  Foundry drivers (Databricks, Redshift, Trino, MSSQL, MySQL): skip find_spec
+  Foundry drivers (ClickHouse, Databricks, MSSQL, MySQL, Redshift, Trino): skip find_spec
       entirely — return the short driver name for manifest resolution directly.
 
   DuckDB is special: it bundles its ADBC driver as the ``_duckdb`` C extension
@@ -32,6 +32,7 @@ import importlib.util
 from typing import TYPE_CHECKING, Any
 
 from adbc_poolhouse._bigquery_config import BigQueryConfig
+from adbc_poolhouse._clickhouse_config import ClickHouseConfig
 from adbc_poolhouse._databricks_config import DatabricksConfig
 from adbc_poolhouse._duckdb_config import DuckDBConfig
 from adbc_poolhouse._flightsql_config import FlightSQLConfig
@@ -61,6 +62,7 @@ _PYPI_PACKAGES: dict[type, tuple[str, str]] = {
 # driver_manager_name is returned directly as the driver_path for adbc_driver_manager.
 # dbc_install_name is used in ImportError messages from _driver_api.py.
 _FOUNDRY_DRIVERS: dict[type, tuple[str, str]] = {
+    ClickHouseConfig: ("clickhouse", "clickhouse"),
     DatabricksConfig: ("databricks", "databricks"),
     MSSQLConfig: ("mssql", "mssql"),
     MySQLConfig: ("mysql", "mysql"),
