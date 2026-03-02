@@ -71,12 +71,14 @@ def create_adbc_connection(
 
     try:
         # All ADBC type suppressions are concentrated here (DRIV-03).
-        # connect() accepts (uri, entrypoint, db_kwargs, conn_kwargs, autocommit).
-        # We pass driver_path as uri; entrypoint is keyword-only when present.
+        # connect() accepts (driver, uri, entrypoint, db_kwargs, conn_kwargs, autocommit).
+        # We pass driver_path as driver=; using keyword form is required so that
+        # pytest-adbc-replay's monkeypatched connect() (which accepts **kwargs only)
+        # can still pass through to the real connect for non-cassette tests.
         # dict[str, str] is assignable to dict[str, str | Path]; the ignore
         # suppresses basedpyright's overload-resolution complaint on driver_path.
         conn = adbc_driver_manager.dbapi.connect(  # type: ignore[call-overload]
-            driver_path,
+            driver=driver_path,  # type: ignore[arg-type]
             entrypoint=entrypoint,  # type: ignore[arg-type]
             db_kwargs=kwargs,  # type: ignore[arg-type]
         )

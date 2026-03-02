@@ -51,7 +51,8 @@ dev = [
     "pytest>=8.0.0",
     "pytest-cov>=6.0.0",
     "ruff>=0.15.1",
-    "syrupy>=4.0",
+    "pytest-adbc-replay",
+    "adbc-driver-snowflake>=1.0.0",
 ]
 docs = [
     "mkdocs>=1.6.0",
@@ -63,10 +64,15 @@ docs = [
 ]
 
 [tool.pytest.ini_options]
-markers = [
-    "snowflake: requires real Snowflake credentials (run: pytest --override-ini='addopts=' -m snowflake; list: pytest --collect-only --override-ini='addopts=')",
+adbc_auto_patch = [
+    "adbc_driver_snowflake.dbapi",
+    "adbc_driver_manager.dbapi",
 ]
-addopts = "-m 'not snowflake'"
+adbc_cassette_dir = "tests/cassettes"
+markers = [
+    "snowflake: requires live Snowflake credentials (recording only; cassettes checked in for CI replay)",
+    "databricks: requires live Databricks credentials (recording only; cassettes checked in for CI replay)",
+]
 
 [tool.basedpyright]
 pythonVersion = "3.11"

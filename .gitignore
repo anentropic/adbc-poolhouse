@@ -142,6 +142,9 @@ celerybeat.pid
 # Snowflake credentials (never commit)
 .env.snowflake
 *.env.snowflake
+# Databricks credentials (never commit)
+.env.databricks
+*.env.databricks
 .venv
 env/
 venv/

@@ -167,6 +167,7 @@ sqlite = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "adbc-driver-snowflake" },
     { name = "adbc-poolhouse", extra = ["duckdb", "sqlite"] },
     { name = "basedpyright" },
     { name = "coverage", extra = ["toml"] },
@@ -174,9 +175,9 @@ dev = [
     { name = "pdbpp" },
     { name = "pyarrow" },
     { name = "pytest" },
+    { name = "pytest-adbc-replay" },
     { name = "pytest-cov" },
     { name = "ruff" },
-    { name = "syrupy" },
 ]
 docs = [
     { name = "mkdocs" },
@@ -209,6 +210,7 @@ provides-extras = ["duckdb", "snowflake", "postgresql", "flightsql", "bigquery",
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "adbc-driver-snowflake", specifier = ">=1.0.0" },
     { name = "adbc-poolhouse", extras = ["duckdb"] },
     { name = "adbc-poolhouse", extras = ["sqlite"] },
     { name = "basedpyright", specifier = ">=1.38.0" },
@@ -217,9 +219,9 @@ dev = [
     { name = "pdbpp", specifier = ">=0.12.0.post1" },
     { name = "pyarrow", specifier = ">=23.0.1" },
     { name = "pytest", specifier = ">=8.0.0" },
+    { name = "pytest-adbc-replay" },
     { name = "pytest-cov", specifier = ">=6.0.0" },
     { name = "ruff", specifier = ">=0.15.1" },
-    { name = "syrupy", specifier = ">=4.0" },
 ]
 docs = [
     { name = "mkdocs", specifier = ">=1.6.0" },
@@ -1331,6 +1333,21 @@ wheels = [
 ]
 
 [[package]]
+name = "pytest-adbc-replay"
+version = "1.0.0a1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "adbc-driver-manager" },
+    { name = "pyarrow" },
+    { name = "pytest" },
+    { name = "sqlglot" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/0b/99/28c7b1c1aa16e3977e8abfc7300a221bc3ff87c60c9a1a36b907bd0f0a2e/pytest_adbc_replay-1.0.0a1.tar.gz", hash = "sha256:620e021c95eb419a7f68911f5ec2fa1742fe2971877fc283966a761dff954172", size = 19052, upload-time = "2026-03-02T16:56:01.891Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/e6/57/2684bf2c726795769527b4df137c5c56ead25c8b3e39fd569609eaacb3c3/pytest_adbc_replay-1.0.0a1-py3-none-any.whl", hash = "sha256:8cb80e8e8a4949d3e6ce5e5428aa44921cd52600bedadc9c6dc821f3fb9cd034", size = 24055, upload-time = "2026-03-02T16:56:00.561Z" },
+]
+
+[[package]]
 name = "pytest-cov"
 version = "7.0.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1531,6 +1548,15 @@ wheels = [
 ]
 
 [[package]]
+name = "sqlglot"
+version = "29.0.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/61/12/c3f7533fde302fcd59bebcd4c2e46d5bf0eef21f183c67995bbb010fb578/sqlglot-29.0.1.tar.gz", hash = "sha256:0010b4f77fb996c8d25dd4b16f3654e6da163ff1866ceabc70b24e791c203048", size = 5760786, upload-time = "2026-02-23T21:41:20.178Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/ad/c9/f58c3a17beb650700f9d2eccd410726b6d96df8953663700764ca48636c7/sqlglot-29.0.1-py3-none-any.whl", hash = "sha256:06a473ea6c2b3632ac67bd38e687a6860265bf4156e66b54adeda15d07f00c65", size = 611448, upload-time = "2026-02-23T21:41:18.008Z" },
+]
+
+[[package]]
 name = "stack-data"
 version = "0.6.3"
 source = { registry = "https://pypi.org/simple" }
@@ -1542,18 +1568,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/28/e3/55dcc2cfbc3ca9c29519eb6884dd1415ecb53b0e934862d3559ddcb7e20b/stack_data-0.6.3.tar.gz", hash = "sha256:836a778de4fec4dcd1dcd89ed8abff8a221f58308462e1c4aa2a3cf30148f0b9", size = 44707, upload-time = "2023-09-30T13:58:05.479Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/f1/7b/ce1eafaf1a76852e2ec9b22edecf1daa58175c090266e9f6c64afcd81d91/stack_data-0.6.3-py3-none-any.whl", hash = "sha256:d5558e0c25a4cb0853cddad3d77da9891a08cb85dd9f9f91b9f8cd66e511e695", size = 24521, upload-time = "2023-09-30T13:58:03.53Z" },
-]
-
-[[package]]
-name = "syrupy"
-version = "5.1.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "pytest" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/2e/b0/24bca682d6a6337854be37f242d116cceeda9942571d5804c44bc1bdd427/syrupy-5.1.0.tar.gz", hash = "sha256:df543c7aa50d3cf1246e83d58fe490afe5f7dab7b41e74ecc0d8d23ae19bd4b8", size = 50495, upload-time = "2026-01-25T14:53:06.2Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/de/70/cf880c3b95a6034ef673e74b369941b42315c01f1554a5637a4f8b911009/syrupy-5.1.0-py3-none-any.whl", hash = "sha256:95162d2b05e61ed3e13f117b88dfab7c58bd6f90e66ebbf918e8a77114ad51c5", size = 51658, upload-time = "2026-01-25T14:53:05.105Z" },
 ]
 
 [[package]]
