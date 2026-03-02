@@ -1,14 +1,14 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.1
-milestone_name: Backend Expansion & Debt Cleanup
-status: in_progress
-last_updated: "2026-03-02T09:52:30.000Z"
+milestone: v1.0
+milestone_name: milestone
+status: unknown
+last_updated: "2026-03-02T09:57:15.728Z"
 progress:
   total_phases: 12
   completed_phases: 11
-  total_plans: 39
-  completed_plans: 40
+  total_plans: 43
+  completed_plans: 41
 ---
 
 # Project State
@@ -23,9 +23,9 @@ See: .planning/PROJECT.md (updated 2026-02-28)
 ## Current Position
 
 Phase: 12-clickhouse-backend (IN PROGRESS)
-Plan: 12-01 (complete), next: 12-02
-Status: In progress — Plan 01 complete; ClickHouseConfig and translate_clickhouse() implemented
-Last activity: 2026-03-02 — Phase 12 Plan 01 complete; config and translator ready, no wiring yet
+Plan: 12-02 (complete), next: 12-03
+Status: In progress — Plans 01-02 complete; ClickHouseConfig wired into _drivers.py, _translators.py, __init__.py
+Last activity: 2026-03-02 — Phase 12 Plan 02 complete; create_pool(ClickHouseConfig(...)) routes correctly
 
 Progress: [█████████░] 92% (11/12 phases complete)
 
@@ -66,6 +66,7 @@ Progress: [█████████░] 92% (11/12 phases complete)
 | Phase 09-infrastructure-and-databricks-fix P01 | 3 | 2 tasks | 3 files |
 | Phase 09-infrastructure-and-databricks-fix P02 | 8 | 3 tasks | 7 files |
 | Phase 12-clickhouse-backend P01 | 3 | 2 tasks | 4 files |
+| Phase 12-clickhouse-backend P02 | 2 | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -160,6 +161,7 @@ Recent decisions affecting current work:
 - [Phase 12-01]: ClickHouseConfig decomposed guard requires only host+username (not database) — ClickHouse's default database is 'default'; database is truly optional unlike MySQL
 - [Phase 12-01]: translate_clickhouse() returns individual kwargs dict in decomposed mode (not URI string) — Columnar ClickHouse driver accepts kwargs directly unlike MySQL Go DSN
 - [Phase 12-01]: Field named 'username' not 'user' — confirmed from columnar-tech/adbc-quickstarts; passing 'user' causes silent auth failure with no error raised
+- [Phase 12-clickhouse-backend]: ClickHouseConfig placed alphabetically first in _FOUNDRY_DRIVERS and translate_config() dispatch; ruff auto-sorted imports to correct alphabetical position on first pre-commit run
 
 ### Pending Todos
 
