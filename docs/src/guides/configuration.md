@@ -18,6 +18,7 @@ Each config class reads its fields from environment variables with a prefix matc
 | [`RedshiftConfig`][adbc_poolhouse.RedshiftConfig] | `REDSHIFT_` |
 | [`TrinoConfig`][adbc_poolhouse.TrinoConfig] | `TRINO_` |
 | [`MSSQLConfig`][adbc_poolhouse.MSSQLConfig] | `MSSQL_` |
+| [`ClickHouseConfig`][adbc_poolhouse.ClickHouseConfig] | `CLICKHOUSE_` |
 | [`MySQLConfig`][adbc_poolhouse.MySQLConfig] | `MYSQL_` |
 
 For example, setting `SNOWFLAKE_ACCOUNT=myorg-myaccount` in the environment is equivalent to passing `account="myorg-myaccount"` to `SnowflakeConfig(...)`.
@@ -69,7 +70,7 @@ Call `.get_secret_value()` when you need the raw string — for example, passing
 
 ## Foundry-distributed backends
 
-[`DatabricksConfig`][adbc_poolhouse.DatabricksConfig], [`MySQLConfig`][adbc_poolhouse.MySQLConfig], [`RedshiftConfig`][adbc_poolhouse.RedshiftConfig], [`TrinoConfig`][adbc_poolhouse.TrinoConfig], and [`MSSQLConfig`][adbc_poolhouse.MSSQLConfig] are present in the package but their ADBC drivers are not available on PyPI. They are distributed through the ADBC Driver Foundry. If you use one of these backends, follow the installation guide for your Foundry setup to get the correct driver package installed.
+[`ClickHouseConfig`][adbc_poolhouse.ClickHouseConfig], [`DatabricksConfig`][adbc_poolhouse.DatabricksConfig], [`MySQLConfig`][adbc_poolhouse.MySQLConfig], [`RedshiftConfig`][adbc_poolhouse.RedshiftConfig], [`TrinoConfig`][adbc_poolhouse.TrinoConfig], and [`MSSQLConfig`][adbc_poolhouse.MSSQLConfig] are present in the package but their ADBC drivers are not available on PyPI. They are distributed through the ADBC Driver Foundry. If you use one of these backends, follow the installation guide for your Foundry setup to get the correct driver package installed.
 
 ## See also
 

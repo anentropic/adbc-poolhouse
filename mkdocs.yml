@@ -104,6 +104,7 @@ nav:
       - Redshift: guides/redshift.md
       - Trino: guides/trino.md
       - MSSQL: guides/mssql.md
+      - ClickHouse: guides/clickhouse.md
       - MySQL: guides/mysql.md
       - SQLite: guides/sqlite.md
   - API Reference: reference/
