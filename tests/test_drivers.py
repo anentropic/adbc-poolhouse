@@ -20,6 +20,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from adbc_poolhouse._bigquery_config import BigQueryConfig
+from adbc_poolhouse._clickhouse_config import ClickHouseConfig
 from adbc_poolhouse._databricks_config import DatabricksConfig
 from adbc_poolhouse._drivers import resolve_driver
 from adbc_poolhouse._duckdb_config import DuckDBConfig
@@ -136,6 +137,13 @@ class TestResolveFoundryDriver:
             result = resolve_driver(MySQLConfig(host="h", user="u", database="db"))
         mock_find.assert_not_called()
         assert result == "mysql"
+
+    def test_clickhouse_returns_short_name(self) -> None:
+        """Foundry: ClickHouse returns 'clickhouse' without calling find_spec."""
+        with patch("importlib.util.find_spec") as mock_find:
+            result = resolve_driver(ClickHouseConfig(host="h", username="u"))
+        mock_find.assert_not_called()
+        assert result == "clickhouse"
 
     def test_trino_returns_short_name(self) -> None:
         """Foundry: Trino returns 'trino' without calling find_spec."""

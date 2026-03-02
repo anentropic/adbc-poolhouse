@@ -190,6 +190,66 @@ class TestMySQLPoolFactory:
         assert actual_kwargs.get("uri") == expected_uri
 
 
+class TestClickHousePoolFactory:
+    """Mock pool-factory wiring tests for ClickHouseConfig."""
+
+    def test_decomposed_fields_wiring(self) -> None:
+        """Decomposed ClickHouseConfig passes username/host/port directly to ADBC."""
+        from unittest.mock import MagicMock, patch
+
+        from pydantic import SecretStr
+
+        from adbc_poolhouse import ClickHouseConfig, create_pool
+
+        config = ClickHouseConfig(
+            host="localhost",
+            username="default",
+            password=SecretStr("secret"),  # pragma: allowlist secret
+            database="mydb",
+        )
+        mock_conn = MagicMock()
+        mock_conn.adbc_clone = MagicMock(return_value=MagicMock())
+
+        with patch(
+            "adbc_poolhouse._pool_factory.create_adbc_connection",
+            return_value=mock_conn,
+        ) as mock_factory:
+            pool = create_pool(config)
+            pool.dispose()
+
+        mock_factory.assert_called_once()
+        actual_kwargs = mock_factory.call_args.args[1]
+        assert actual_kwargs.get("username") == "default"
+        assert actual_kwargs.get("host") == "localhost"
+        assert "uri" not in actual_kwargs, "ClickHouse decomposed mode must not emit uri kwarg"
+
+    def test_uri_mode_wiring(self) -> None:
+        """URI ClickHouseConfig passes uri kwarg to create_adbc_connection."""
+        from unittest.mock import MagicMock, patch
+
+        from pydantic import SecretStr
+
+        from adbc_poolhouse import ClickHouseConfig, create_pool
+
+        config = ClickHouseConfig(
+            uri=SecretStr("http://user:pass@localhost:8123/db")
+        )  # pragma: allowlist secret
+        mock_conn = MagicMock()
+        mock_conn.adbc_clone = MagicMock(return_value=MagicMock())
+
+        with patch(
+            "adbc_poolhouse._pool_factory.create_adbc_connection",
+            return_value=mock_conn,
+        ) as mock_factory:
+            pool = create_pool(config)
+            pool.dispose()
+
+        mock_factory.assert_called_once()
+        actual_kwargs = mock_factory.call_args.args[1]
+        _expected = "http://user:pass@localhost:8123/db"  # pragma: allowlist secret
+        assert actual_kwargs.get("uri") == _expected
+
+
 class TestExceptionHierarchy:
     """Exception hierarchy: PoolhouseError, ConfigurationError, DuckDBConfig bounds."""
 
