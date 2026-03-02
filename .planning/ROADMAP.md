@@ -287,4 +287,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | 11. Foundry Tooling and MySQL Backend | 4/4 | Complete   | 2026-03-01 |
 | 12. ClickHouse Backend | 4/4 | Complete    | 2026-03-02 |
 | 13. Verification and Tracking Fix | 2/2 | Complete    | 2026-03-02 |
-| 14. Homepage Discovery Fix | 1/1 | Complete   | 2026-03-02 |
+| 14. Homepage Discovery Fix | 1/1 | Complete    | 2026-03-02 |
