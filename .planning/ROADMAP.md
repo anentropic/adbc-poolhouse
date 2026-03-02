@@ -265,6 +265,18 @@ Plans:
 Plans:
 - [ ] 14-01-PLAN.md — Add MySQL and ClickHouse to index.md install table and config class list; update REQUIREMENTS.md; verify mkdocs build --strict
 
+### Phase 15: Replace Syrupy snapshot tests with pytest-adbc-replay VCR-style record/replay tests
+
+**Goal:** Syrupy is removed; Snowflake integration tests are migrated to cassette-based replay; Databricks cassette tests are added; all four integration tests pass in CI without credentials
+**Requirements**: TBD
+**Depends on:** Phase 14
+**Plans:** 3 plans
+
+Plans:
+- [ ] 15-01-PLAN.md — Swap syrupy for pytest-adbc-replay in dev deps; configure adbc_auto_patch and adbc_cassette_dir in pyproject.toml; add .env.databricks to .gitignore
+- [ ] 15-02-PLAN.md — Remove Syrupy from tests/integration/conftest.py; add databricks_pool session-scoped fixture
+- [ ] 15-03-PLAN.md — Generate cassette files; rewrite test_snowflake.py; create test_databricks.py; verify 4 integration tests pass in CI replay mode
+
 ---
 
 ## Progress
