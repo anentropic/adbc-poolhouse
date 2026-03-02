@@ -227,7 +227,13 @@ Plans:
   3. `ClickHouseConfig` appears in `_FOUNDRY_DRIVERS` with key `"clickhouse"`; the missing-driver error message instructs `dbc install clickhouse`
   4. All ClickHouse unit tests pass — config validation, translator kwargs, and mock pool-factory wiring
   5. `from adbc_poolhouse import ClickHouseConfig` succeeds; `uv run mkdocs build --strict` passes with the ClickHouse warehouse guide page present
-**Plans**: TBD
+**Plans**: 4 plans
+
+Plans:
+- [ ] 12-01-PLAN.md — ClickHouseConfig class and translate_clickhouse() pure function
+- [ ] 12-02-PLAN.md — Wiring: _drivers.py, _translators.py, __init__.py
+- [ ] 12-03-PLAN.md — All ClickHouse tests: config, translator, driver resolution, mock pool wiring
+- [ ] 12-04-PLAN.md — ClickHouse warehouse guide, configuration.md row, mkdocs.yml nav, human checkpoint
 
 ---
 
@@ -249,4 +255,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | 9. Infrastructure and Databricks Fix | 2/2 | Complete   | 2026-03-01 |
 | 10. SQLite Backend | 0/TBD | Not started | - |
 | 11. Foundry Tooling and MySQL Backend | 3/4 | In Progress|  |
-| 12. ClickHouse Backend | 0/TBD | Not started | - |
+| 12. ClickHouse Backend | 0/4 | Not started | - |
