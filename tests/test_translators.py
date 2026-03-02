@@ -14,6 +14,8 @@ from pydantic import SecretStr
 
 from adbc_poolhouse._bigquery_config import BigQueryConfig
 from adbc_poolhouse._bigquery_translator import translate_bigquery
+from adbc_poolhouse._clickhouse_config import ClickHouseConfig
+from adbc_poolhouse._clickhouse_translator import translate_clickhouse
 from adbc_poolhouse._databricks_config import DatabricksConfig
 from adbc_poolhouse._databricks_translator import translate_databricks
 from adbc_poolhouse._duckdb_config import DuckDBConfig
@@ -516,4 +518,85 @@ class TestSQLiteTranslator:
     def test_output_has_only_uri_key(self) -> None:
         """translate_sqlite() returns exactly one key ('uri')."""
         result = translate_sqlite(SQLiteConfig())
+        assert list(result.keys()) == ["uri"]
+
+
+class TestClickHouseTranslator:
+    """Unit tests for translate_clickhouse()."""
+
+    def test_uri_mode_secret_extracted(self) -> None:
+        """URI mode returns SecretStr value directly in {'uri': ...}."""
+        config = ClickHouseConfig(
+            uri=SecretStr("http://user:pass@localhost:8123/db")  # pragma: allowlist secret
+        )
+        result = translate_clickhouse(config)
+        assert result == {"uri": "http://user:pass@localhost:8123/db"}  # pragma: allowlist secret
+
+    def test_decomposed_minimum(self) -> None:
+        """Decomposed minimum: host and username → three-key dict with port as string."""
+        config = ClickHouseConfig(host="localhost", username="default")
+        result = translate_clickhouse(config)
+        assert result == {"username": "default", "host": "localhost", "port": "8123"}
+
+    def test_decomposed_full(self) -> None:
+        """Full decomposed mode includes password and database."""
+        config = ClickHouseConfig(
+            host="localhost",
+            username="default",
+            password=SecretStr("secret"),  # pragma: allowlist secret
+            database="mydb",
+        )
+        result = translate_clickhouse(config)
+        assert result == {
+            "username": "default",
+            "host": "localhost",
+            "port": "8123",
+            "password": "secret",  # pragma: allowlist secret
+            "database": "mydb",
+        }
+
+    def test_port_is_string(self) -> None:
+        """Port is always str(config.port) — dict[str, str] contract."""
+        config = ClickHouseConfig(host="h", username="u")
+        result = translate_clickhouse(config)
+        assert result["port"] == "8123"
+        assert isinstance(result["port"], str)
+
+    def test_custom_port_as_string(self) -> None:
+        """Non-default port appears as string in output."""
+        config = ClickHouseConfig(host="h", username="u", port=8443)
+        result = translate_clickhouse(config)
+        assert result["port"] == "8443"
+
+    def test_password_omitted_when_none(self) -> None:
+        """Password key is absent from result when password is None."""
+        config = ClickHouseConfig(host="h", username="u")
+        result = translate_clickhouse(config)
+        assert "password" not in result  # pragma: allowlist secret
+
+    def test_database_omitted_when_none(self) -> None:
+        """Database key is absent from result when database is None."""
+        config = ClickHouseConfig(host="h", username="u")
+        result = translate_clickhouse(config)
+        assert "database" not in result
+
+    def test_username_key_not_user(self) -> None:
+        """Output dict uses 'username' key, not 'user' — critical for silent auth failure."""
+        config = ClickHouseConfig(host="h", username="default")
+        result = translate_clickhouse(config)
+        assert "username" in result
+        assert "user" not in result
+
+    def test_decomposed_mode_does_not_build_uri(self) -> None:
+        """Decomposed mode returns individual kwargs — no 'uri' key, unlike MySQL."""
+        config = ClickHouseConfig(host="h", username="u")
+        result = translate_clickhouse(config)
+        assert "uri" not in result
+
+    def test_uri_mode_returns_only_uri_key(self) -> None:
+        """URI mode returns exactly one key ('uri')."""
+        config = ClickHouseConfig(
+            uri=SecretStr("http://user:pass@h:8123/db")  # pragma: allowlist secret
+        )
+        result = translate_clickhouse(config)
         assert list(result.keys()) == ["uri"]
