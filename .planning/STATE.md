@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Backend Expansion & Debt Cleanup
 status: in_progress
-last_updated: "2026-03-01T00:00:00.000Z"
+last_updated: "2026-03-02T09:52:30.000Z"
 progress:
   total_phases: 12
   completed_phases: 11
   total_plans: 39
-  completed_plans: 39
+  completed_plans: 40
 ---
 
 # Project State
@@ -22,10 +22,10 @@ See: .planning/PROJECT.md (updated 2026-02-28)
 
 ## Current Position
 
-Phase: 11-foundry-tooling-and-mysql-backend (COMPLETE)
-Plan: 11-04 (complete), next: Phase 12
-Status: Complete — Phase 11 human-approved, ready for Phase 12
-Last activity: 2026-03-01 — Phase 11 complete; MySQL backend fully implemented, tested, and documented
+Phase: 12-clickhouse-backend (IN PROGRESS)
+Plan: 12-01 (complete), next: 12-02
+Status: In progress — Plan 01 complete; ClickHouseConfig and translate_clickhouse() implemented
+Last activity: 2026-03-02 — Phase 12 Plan 01 complete; config and translator ready, no wiring yet
 
 Progress: [█████████░] 92% (11/12 phases complete)
 
@@ -65,6 +65,7 @@ Progress: [█████████░] 92% (11/12 phases complete)
 | Phase 08-review-and-improve-docs P06 | 1 | 1 tasks | 1 files |
 | Phase 09-infrastructure-and-databricks-fix P01 | 3 | 2 tasks | 3 files |
 | Phase 09-infrastructure-and-databricks-fix P02 | 8 | 3 tasks | 7 files |
+| Phase 12-clickhouse-backend P01 | 3 | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -156,6 +157,9 @@ Recent decisions affecting current work:
 - [Phase 10-01]: SQLiteConfig._adbc_entrypoint() returns "AdbcDriverSqliteInit" (PascalCase) — spec said "adbc_driver_sqlite_init" but integration test confirmed PascalCase matches the C library export
 - [Phase 10-03]: adbc-driver-sqlite added to dev deps so CI runs SQLite integration tests — mirrors duckdb dev dep pattern
 - [Phase 10]: Three doc surfaces must be updated for every new backend: warehouse guide, configuration.md env_prefix table, index.md install table + config class list — human checkpoint caught two missing entries post-guide-creation
+- [Phase 12-01]: ClickHouseConfig decomposed guard requires only host+username (not database) — ClickHouse's default database is 'default'; database is truly optional unlike MySQL
+- [Phase 12-01]: translate_clickhouse() returns individual kwargs dict in decomposed mode (not URI string) — Columnar ClickHouse driver accepts kwargs directly unlike MySQL Go DSN
+- [Phase 12-01]: Field named 'username' not 'user' — confirmed from columnar-tech/adbc-quickstarts; passing 'user' causes silent auth failure with no error raised
 
 ### Pending Todos
 
@@ -181,6 +185,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-01
-Stopped at: Phase 10 complete — SQLite backend implemented (config, translator, wiring, tests, docs); ready for Phase 11
+Last session: 2026-03-02
+Stopped at: Completed 12-01-PLAN.md — ClickHouseConfig and translate_clickhouse() implemented; ready for 12-02 (wiring)
 Resume file: None

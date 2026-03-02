@@ -255,4 +255,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | 9. Infrastructure and Databricks Fix | 2/2 | Complete   | 2026-03-01 |
 | 10. SQLite Backend | 0/TBD | Not started | - |
 | 11. Foundry Tooling and MySQL Backend | 3/4 | In Progress|  |
-| 12. ClickHouse Backend | 0/4 | Not started | - |
+| 12. ClickHouse Backend | 1/4 | In Progress|  |

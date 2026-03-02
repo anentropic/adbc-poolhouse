@@ -129,8 +129,8 @@ Isolates all type suppressions to dedicated internal modules.
 
 ### ClickHouse
 
-- [ ] **CH-01**: `ClickHouseConfig` — Pydantic `BaseSettings`; `env_prefix="CLICKHOUSE_"`; `username` field mapping to `username` driver kwarg (not `user`)
-- [ ] **CH-02**: `translate_clickhouse()` — pure function mapping `ClickHouseConfig` fields to adbc_driver_manager kwargs
+- [x] **CH-01**: `ClickHouseConfig` — Pydantic `BaseSettings`; `env_prefix="CLICKHOUSE_"`; `username` field mapping to `username` driver kwarg (not `user`)
+- [x] **CH-02**: `translate_clickhouse()` — pure function mapping `ClickHouseConfig` fields to adbc_driver_manager kwargs
 - [ ] **CH-03**: ClickHouse registered in `_FOUNDRY_DRIVERS` dict in `_drivers.py`
 - [ ] **CH-04**: Unit tests for `ClickHouseConfig` validation; unit tests for `translate_clickhouse()` asserting exact kwargs dict; mock-at-`create_adbc_connection` test asserting full pool-factory wiring
 - [ ] **CH-05**: `ClickHouseConfig` exported from `__init__.py`; ClickHouse warehouse guide page in docs; API reference entry; `uv run mkdocs build --strict` passes
@@ -233,8 +233,8 @@ Isolates all type suppressions to dedicated internal modules.
 | MYSQL-03 | Phase 11 | Complete |
 | MYSQL-04 | Phase 11 | Complete |
 | MYSQL-05 | Phase 11 | Pending |
-| CH-01 | Phase 12 | Pending |
-| CH-02 | Phase 12 | Pending |
+| CH-01 | Phase 12 | Complete |
+| CH-02 | Phase 12 | Complete |
 | CH-03 | Phase 12 | Pending |
 | CH-04 | Phase 12 | Pending |
 | CH-05 | Phase 12 | Pending |
