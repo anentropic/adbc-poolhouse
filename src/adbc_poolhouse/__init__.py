@@ -2,6 +2,7 @@
 
 from adbc_poolhouse._base_config import BaseWarehouseConfig, WarehouseConfig
 from adbc_poolhouse._bigquery_config import BigQueryConfig
+from adbc_poolhouse._clickhouse_config import ClickHouseConfig
 from adbc_poolhouse._databricks_config import DatabricksConfig
 from adbc_poolhouse._duckdb_config import DuckDBConfig
 from adbc_poolhouse._exceptions import ConfigurationError, PoolhouseError
@@ -17,6 +18,7 @@ from adbc_poolhouse._trino_config import TrinoConfig
 
 __all__ = [
     "close_pool",
+    "ClickHouseConfig",
     "ConfigurationError",
     "PoolhouseError",
     "WarehouseConfig",

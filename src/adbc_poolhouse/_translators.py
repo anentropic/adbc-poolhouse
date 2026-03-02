@@ -2,7 +2,7 @@
 Translate any warehouse config to ADBC driver kwargs.
 
 This module is the dispatch coordinator for Phase 4. It imports all
-9 per-warehouse translator functions and exposes a single
+10 per-warehouse translator functions and exposes a single
 ``translate_config()`` entry point for Phase 5.
 
 Internal only — not exported from ``__init__.py``.
@@ -14,6 +14,8 @@ from typing import TYPE_CHECKING
 
 from adbc_poolhouse._bigquery_config import BigQueryConfig
 from adbc_poolhouse._bigquery_translator import translate_bigquery
+from adbc_poolhouse._clickhouse_config import ClickHouseConfig
+from adbc_poolhouse._clickhouse_translator import translate_clickhouse
 from adbc_poolhouse._databricks_config import DatabricksConfig
 from adbc_poolhouse._databricks_translator import translate_databricks
 from adbc_poolhouse._duckdb_config import DuckDBConfig
@@ -57,6 +59,8 @@ def translate_config(config: WarehouseConfig) -> dict[str, str]:
     """
     if isinstance(config, BigQueryConfig):
         return translate_bigquery(config)
+    if isinstance(config, ClickHouseConfig):
+        return translate_clickhouse(config)
     if isinstance(config, DatabricksConfig):
         return translate_databricks(config)
     if isinstance(config, DuckDBConfig):
