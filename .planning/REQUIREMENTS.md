@@ -133,7 +133,7 @@ Isolates all type suppressions to dedicated internal modules.
 - [x] **CH-02**: `translate_clickhouse()` — pure function mapping `ClickHouseConfig` fields to adbc_driver_manager kwargs
 - [x] **CH-03**: ClickHouse registered in `_FOUNDRY_DRIVERS` dict in `_drivers.py`
 - [x] **CH-04**: Unit tests for `ClickHouseConfig` validation; unit tests for `translate_clickhouse()` asserting exact kwargs dict; mock-at-`create_adbc_connection` test asserting full pool-factory wiring
-- [ ] **CH-05**: `ClickHouseConfig` exported from `__init__.py`; ClickHouse warehouse guide page in docs; API reference entry; `uv run mkdocs build --strict` passes
+- [x] **CH-05**: `ClickHouseConfig` exported from `__init__.py`; ClickHouse warehouse guide page in docs; API reference entry; `uv run mkdocs build --strict` passes
 
 ---
 
@@ -237,7 +237,7 @@ Isolates all type suppressions to dedicated internal modules.
 | CH-02 | Phase 12 | Complete |
 | CH-03 | Phase 12 | Complete |
 | CH-04 | Phase 12 | Complete |
-| CH-05 | Phase 12 | Pending |
+| CH-05 | Phase 12 | Complete |
 
 **Coverage:**
 - v0.1 requirements: 44 total

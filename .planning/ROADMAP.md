@@ -23,7 +23,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 9: Infrastructure and Databricks Fix** - Bump adbc-driver-manager floor, close stale PROJECT.md items, and fix the silent Databricks decomposed-field failure
 - [x] **Phase 10: SQLite Backend** - Add SQLite as a PyPI-distributed ADBC backend with full config, translation, tests, and docs
 - [ ] **Phase 11: Foundry Tooling and MySQL Backend** - Add dbc CLI justfile recipes and the MySQL Foundry backend (dbc recipes are prerequisites for testing MySQL locally)
-- [ ] **Phase 12: ClickHouse Backend** - Add ClickHouse as a Foundry-distributed ADBC backend with full config, translation, tests, and docs
+- [x] **Phase 12: ClickHouse Backend** - Add ClickHouse as a Foundry-distributed ADBC backend with full config, translation, tests, and docs (completed 2026-03-02)
 
 ## Phase Details
 
@@ -255,4 +255,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | 9. Infrastructure and Databricks Fix | 2/2 | Complete   | 2026-03-01 |
 | 10. SQLite Backend | 0/TBD | Not started | - |
 | 11. Foundry Tooling and MySQL Backend | 3/4 | In Progress|  |
-| 12. ClickHouse Backend | 3/4 | In Progress|  |
+| 12. ClickHouse Backend | 4/4 | Complete   | 2026-03-02 |

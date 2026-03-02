@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-last_updated: "2026-03-02T10:01:42.386Z"
+last_updated: "2026-03-02T10:05:04.387Z"
 progress:
   total_phases: 12
   completed_phases: 12
@@ -68,6 +68,7 @@ Progress: [██████████] 100% (12/12 phases complete)
 | Phase 12-clickhouse-backend P01 | 3 | 2 tasks | 4 files |
 | Phase 12-clickhouse-backend P02 | 2 | 2 tasks | 3 files |
 | Phase 12-clickhouse-backend P03 | 2 | 2 tasks | 4 files |
+| Phase 12-clickhouse-backend P04 | 5 | 1 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -164,6 +165,7 @@ Recent decisions affecting current work:
 - [Phase 12-01]: Field named 'username' not 'user' — confirmed from columnar-tech/adbc-quickstarts; passing 'user' causes silent auth failure with no error raised
 - [Phase 12-clickhouse-backend]: ClickHouseConfig placed alphabetically first in _FOUNDRY_DRIVERS and translate_config() dispatch; ruff auto-sorted imports to correct alphabetical position on first pre-commit run
 - [Phase 12-clickhouse-backend]: detect-secrets pragma must be on the same line as the string literal — ruff-format wraps to the next line but detect-secrets checks the literal's line
+- [Phase 12-clickhouse-backend]: clickhouse.md uses python/bash fenced blocks matching mysql.md style; ClickHouseConfig placed first in Foundry backends list alphabetically
 
 ### Pending Todos
 
