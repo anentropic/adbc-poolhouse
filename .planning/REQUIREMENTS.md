@@ -108,16 +108,16 @@ Isolates all type suppressions to dedicated internal modules.
 ### Foundry Tooling
 
 - [x] **DBC-01**: `justfile` recipe `install-dbc` — installs `dbc` CLI binary; uses `command -v dbc` guard (not `which`, which evaluates at parse time in just)
-- [ ] **DBC-02**: `justfile` recipe `install-foundry-drivers` — runs `dbc install mysql clickhouse` with `--level env` to scope drivers to active virtualenv
+- [x] **DBC-02**: `justfile` recipe `install-foundry-drivers` — runs `dbc install mysql clickhouse` with `--level env` to scope drivers to active virtualenv
 - [x] **DBC-03**: `DEVELOP.md` updated with Foundry Driver Management section — install `dbc`, install drivers, verify with `dbc info`, uninstall
 
 ### SQLite
 
-- [ ] **SQLT-01**: `SQLiteConfig` — Pydantic `BaseSettings`; `env_prefix="SQLITE_"`; `model_validator` raises `ValueError` for `uri=":memory:"` with `pool_size > 1` (same guard as DuckDB)
-- [ ] **SQLT-02**: `translate_sqlite()` — pure function mapping `SQLiteConfig` fields to adbc_driver_manager kwargs
-- [ ] **SQLT-03**: `sqlite` optional extra in pyproject.toml (`adbc-driver-sqlite>=1.0.0`); included in `[all]` meta-extra; uv.lock updated
-- [ ] **SQLT-04**: Unit tests for `SQLiteConfig` validation; unit tests for `translate_sqlite()` asserting exact kwargs dict; mock-at-`create_adbc_connection` test asserting full pool-factory wiring; integration test with in-memory SQLite database
-- [ ] **SQLT-05**: `SQLiteConfig` exported from `__init__.py`; SQLite warehouse guide page in docs; API reference entry; `uv run mkdocs build --strict` passes
+- [x] **SQLT-01**: `SQLiteConfig` — Pydantic `BaseSettings`; `env_prefix="SQLITE_"`; `model_validator` raises `ValueError` for `uri=":memory:"` with `pool_size > 1` (same guard as DuckDB)
+- [x] **SQLT-02**: `translate_sqlite()` — pure function mapping `SQLiteConfig` fields to adbc_driver_manager kwargs
+- [x] **SQLT-03**: `sqlite` optional extra in pyproject.toml (`adbc-driver-sqlite>=1.0.0`); included in `[all]` meta-extra; uv.lock updated
+- [x] **SQLT-04**: Unit tests for `SQLiteConfig` validation; unit tests for `translate_sqlite()` asserting exact kwargs dict; mock-at-`create_adbc_connection` test asserting full pool-factory wiring; integration test with in-memory SQLite database
+- [x] **SQLT-05**: `SQLiteConfig` exported from `__init__.py`; SQLite warehouse guide page in docs; API reference entry; `uv run mkdocs build --strict` passes
 
 ### MySQL
 
@@ -220,13 +220,13 @@ Isolates all type suppressions to dedicated internal modules.
 | INFRA-02 | Phase 9 | Complete |
 | DBX-01 | Phase 9 | Complete |
 | DBX-02 | Phase 9 | Complete |
-| SQLT-01 | Phase 13 | Pending |
-| SQLT-02 | Phase 13 | Pending |
-| SQLT-03 | Phase 13 | Pending |
-| SQLT-04 | Phase 13 | Pending |
-| SQLT-05 | Phase 13 | Pending |
+| SQLT-01 | Phase 10 | Complete |
+| SQLT-02 | Phase 10 | Complete |
+| SQLT-03 | Phase 10 | Complete |
+| SQLT-04 | Phase 10 | Complete |
+| SQLT-05 | Phase 10 | Complete |
 | DBC-01 | Phase 11 | Complete |
-| DBC-02 | Phase 13 | Pending |
+| DBC-02 | Phase 11 | Complete |
 | DBC-03 | Phase 11 | Complete |
 | MYSQL-01 | Phase 11 | Complete |
 | MYSQL-02 | Phase 11 | Complete |
@@ -251,4 +251,4 @@ Isolates all type suppressions to dedicated internal modules.
 
 ---
 *Requirements defined: 2026-02-23*
-*Last updated: 2026-03-02 — gap closure phases 13-14 added; SQLT-01–05, DBC-02, MYSQL-05, CH-05 reassigned to closure phases*
+*Last updated: 2026-03-02 — Phase 13 gap closure: SQLT-01–05 and DBC-02 checkboxes updated; traceability corrected to implementation phases (SQLT-01–05 → Phase 10, DBC-02 → Phase 11)*
