@@ -3,6 +3,9 @@ plan: 10-01
 phase: 10-sqlite-backend
 status: complete
 completed: 2026-03-01
+requirements-completed:
+  - SQLT-01
+  - SQLT-02
 ---
 
 # Plan 10-01: SQLiteConfig and translate_sqlite()

@@ -3,6 +3,8 @@ plan: 10-03
 phase: 10-sqlite-backend
 status: complete
 completed: 2026-03-01
+requirements-completed:
+  - SQLT-04
 ---
 
 # Plan 10-03: SQLite Test Suite

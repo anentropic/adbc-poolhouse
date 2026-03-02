@@ -3,6 +3,8 @@ plan: 10-02
 phase: 10-sqlite-backend
 status: complete
 completed: 2026-03-01
+requirements-completed:
+  - SQLT-03
 ---
 
 # Plan 10-02: Wire SQLiteConfig into Registries
