@@ -445,6 +445,12 @@ class TestTranslateConfig:
         config = SQLiteConfig()
         assert translate_config(config) == translate_sqlite(config)
 
+    def test_clickhouse_dispatch(self) -> None:
+        """translate_config() dispatches ClickHouseConfig to translate_clickhouse()."""
+        config = ClickHouseConfig(host="h", username="u")
+        result = translate_config(config)
+        assert "username" in result
+
     def test_unsupported_type_raises_type_error(self) -> None:
         """translate_config() with unknown type raises TypeError."""
         with pytest.raises(TypeError, match="Unsupported config type"):
