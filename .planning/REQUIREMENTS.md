@@ -108,7 +108,7 @@ Isolates all type suppressions to dedicated internal modules.
 ### Foundry Tooling
 
 - [x] **DBC-01**: `justfile` recipe `install-dbc` — installs `dbc` CLI binary; uses `command -v dbc` guard (not `which`, which evaluates at parse time in just)
-- [x] **DBC-02**: `justfile` recipe `install-foundry-drivers` — runs `dbc install mysql clickhouse` with `--level env` to scope drivers to active virtualenv
+- [ ] **DBC-02**: `justfile` recipe `install-foundry-drivers` — runs `dbc install mysql clickhouse` with `--level env` to scope drivers to active virtualenv
 - [x] **DBC-03**: `DEVELOP.md` updated with Foundry Driver Management section — install `dbc`, install drivers, verify with `dbc info`, uninstall
 
 ### SQLite
@@ -133,7 +133,7 @@ Isolates all type suppressions to dedicated internal modules.
 - [x] **CH-02**: `translate_clickhouse()` — pure function mapping `ClickHouseConfig` fields to adbc_driver_manager kwargs
 - [x] **CH-03**: ClickHouse registered in `_FOUNDRY_DRIVERS` dict in `_drivers.py`
 - [x] **CH-04**: Unit tests for `ClickHouseConfig` validation; unit tests for `translate_clickhouse()` asserting exact kwargs dict; mock-at-`create_adbc_connection` test asserting full pool-factory wiring
-- [x] **CH-05**: `ClickHouseConfig` exported from `__init__.py`; ClickHouse warehouse guide page in docs; API reference entry; `uv run mkdocs build --strict` passes
+- [ ] **CH-05**: `ClickHouseConfig` exported from `__init__.py`; ClickHouse warehouse guide page in docs; API reference entry; `uv run mkdocs build --strict` passes
 
 ---
 
@@ -220,24 +220,24 @@ Isolates all type suppressions to dedicated internal modules.
 | INFRA-02 | Phase 9 | Complete |
 | DBX-01 | Phase 9 | Complete |
 | DBX-02 | Phase 9 | Complete |
-| SQLT-01 | Phase 10 | Pending |
-| SQLT-02 | Phase 10 | Pending |
-| SQLT-03 | Phase 10 | Pending |
-| SQLT-04 | Phase 10 | Pending |
-| SQLT-05 | Phase 10 | Pending |
+| SQLT-01 | Phase 13 | Pending |
+| SQLT-02 | Phase 13 | Pending |
+| SQLT-03 | Phase 13 | Pending |
+| SQLT-04 | Phase 13 | Pending |
+| SQLT-05 | Phase 13 | Pending |
 | DBC-01 | Phase 11 | Complete |
-| DBC-02 | Phase 11 | Complete |
+| DBC-02 | Phase 13 | Pending |
 | DBC-03 | Phase 11 | Complete |
 | MYSQL-01 | Phase 11 | Complete |
 | MYSQL-02 | Phase 11 | Complete |
 | MYSQL-03 | Phase 11 | Complete |
 | MYSQL-04 | Phase 11 | Complete |
-| MYSQL-05 | Phase 11 | Pending |
+| MYSQL-05 | Phase 14 | Pending |
 | CH-01 | Phase 12 | Complete |
 | CH-02 | Phase 12 | Complete |
 | CH-03 | Phase 12 | Complete |
 | CH-04 | Phase 12 | Complete |
-| CH-05 | Phase 12 | Complete |
+| CH-05 | Phase 14 | Pending |
 
 **Coverage:**
 - v0.1 requirements: 44 total
@@ -251,4 +251,4 @@ Isolates all type suppressions to dedicated internal modules.
 
 ---
 *Requirements defined: 2026-02-23*
-*Last updated: 2026-03-01 — v1.1 traceability populated (Phases 9-12)*
+*Last updated: 2026-03-02 — gap closure phases 13-14 added; SQLT-01–05, DBC-02, MYSQL-05, CH-05 reassigned to closure phases*

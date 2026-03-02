@@ -21,8 +21,8 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 7: Documentation and PyPI Publication** - Write docs skill, author all guides, and publish to PyPI via OIDC trusted publisher (completed 2026-02-26)
 - [ ] **Phase 8: Review and Improve Docs** - Public API cleanup (close_pool, managed_pool) and comprehensive per-warehouse guide pages
 - [x] **Phase 9: Infrastructure and Databricks Fix** - Bump adbc-driver-manager floor, close stale PROJECT.md items, and fix the silent Databricks decomposed-field failure
-- [x] **Phase 10: SQLite Backend** - Add SQLite as a PyPI-distributed ADBC backend with full config, translation, tests, and docs
-- [ ] **Phase 11: Foundry Tooling and MySQL Backend** - Add dbc CLI justfile recipes and the MySQL Foundry backend (dbc recipes are prerequisites for testing MySQL locally)
+- [x] **Phase 10: SQLite Backend** - Add SQLite as a PyPI-distributed ADBC backend with full config, translation, tests, and docs (completed 2026-03-01)
+- [x] **Phase 11: Foundry Tooling and MySQL Backend** - Add dbc CLI justfile recipes and the MySQL Foundry backend (dbc recipes are prerequisites for testing MySQL locally) (completed 2026-03-01)
 - [x] **Phase 12: ClickHouse Backend** - Add ClickHouse as a Foundry-distributed ADBC backend with full config, translation, tests, and docs (completed 2026-03-02)
 
 ## Phase Details
@@ -235,6 +235,35 @@ Plans:
 - [ ] 12-03-PLAN.md — All ClickHouse tests: config, translator, driver resolution, mock pool wiring
 - [ ] 12-04-PLAN.md — ClickHouse warehouse guide, configuration.md row, mkdocs.yml nav, human checkpoint
 
+### Phase 13: Verification and Tracking Fix
+**Goal:** Phases 10 and 11 are formally verified and all requirement tracking gaps are closed — the 3-source cross-reference (VERIFICATION.md + SUMMARY frontmatter + REQUIREMENTS.md) passes for SQLT-01–05 and DBC-02
+**Requirements:** SQLT-01, SQLT-02, SQLT-03, SQLT-04, SQLT-05, DBC-02
+**Gap Closure:** Closes gaps from v1.0 audit (Phase 10 unverified, Phase 11 unverified, SQLT tracking, DBC-02 --pre flag)
+**Success Criteria** (what must be TRUE):
+  1. Phase 10 VERIFICATION.md exists and verifies all SQLT-01–05 truths (SQLiteConfig, translate_sqlite(), sqlite extra, tests, docs wired)
+  2. Phase 11 VERIFICATION.md exists and verifies DBC-01–03 and MYSQL-01–04 truths (MYSQL-05 noted as open pending Phase 14)
+  3. REQUIREMENTS.md shows `[x]` Complete for SQLT-01–05; traceability table updated
+  4. 10-01-SUMMARY.md, 10-02-SUMMARY.md, 10-03-SUMMARY.md all include `requirements-completed` frontmatter
+  5. justfile `install-foundry-drivers` uses `dbc install --pre clickhouse` (--pre required for alpha driver)
+**Plans**: 1 plan
+
+Plans:
+- [ ] 13-01-PLAN.md — Fix DBC-02 justfile, update SUMMARY frontmatter, update REQUIREMENTS.md checkboxes, create Phase 10 and Phase 11 VERIFICATION.md
+
+### Phase 14: Homepage Discovery Fix
+**Goal:** ClickHouseConfig and MySQLConfig are discoverable by new users landing on the homepage — both appear in the ADBC drivers install table and "First pool" config class list on index.md
+**Requirements:** CH-05, MYSQL-05
+**Gap Closure:** Closes post-verification integration gap (index.md omissions for MySQL and ClickHouse)
+**Success Criteria** (what must be TRUE):
+  1. `docs/src/index.md` ADBC drivers install table includes rows for MySQL and ClickHouse with correct `dbc install` commands
+  2. `docs/src/index.md` "First pool" config class list includes `MySQLConfig` and `ClickHouseConfig`
+  3. `uv run mkdocs build --strict` passes after changes
+  4. REQUIREMENTS.md shows `[x]` Complete for MYSQL-05; CH-05 traceability updated
+**Plans**: 1 plan
+
+Plans:
+- [ ] 14-01-PLAN.md — Add MySQL and ClickHouse to index.md install table and config class list; update REQUIREMENTS.md; verify mkdocs build --strict
+
 ---
 
 ## Progress
@@ -253,6 +282,8 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | 7. Documentation and PyPI Publication | 5/5 | Complete   | 2026-02-27 |
 | 8. Review and Improve Docs | 6/6 | Complete   | 2026-02-28 |
 | 9. Infrastructure and Databricks Fix | 2/2 | Complete   | 2026-03-01 |
-| 10. SQLite Backend | 0/TBD | Not started | - |
-| 11. Foundry Tooling and MySQL Backend | 3/4 | In Progress|  |
+| 10. SQLite Backend | 4/4 | Complete   | 2026-03-01 |
+| 11. Foundry Tooling and MySQL Backend | 4/4 | Complete   | 2026-03-01 |
 | 12. ClickHouse Backend | 4/4 | Complete    | 2026-03-02 |
+| 13. Verification and Tracking Fix | 0/1 | Not started | - |
+| 14. Homepage Discovery Fix | 0/1 | Not started | - |
