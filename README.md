@@ -12,7 +12,7 @@ One config in, one pool out — `create_pool(SnowflakeConfig(...))` returns a re
 pip install adbc-poolhouse
 ```
 
-Driver extras are available for each supported warehouse (DuckDB, Snowflake, BigQuery, PostgreSQL, FlightSQL). See the [documentation](https://anentropic.github.io/adbc-poolhouse/) for the full list.
+Driver extras are available for each supported warehouse (BigQuery, DuckDB, FlightSQL, PostgreSQL, Snowflake, SQLite). See the [documentation](https://anentropic.github.io/adbc-poolhouse/) for the full list.
 
 ## Quick example
 
@@ -38,15 +38,9 @@ close_pool(pool)
 
 ## Supported warehouses
 
-- DuckDB
-- Snowflake
-- BigQuery
-- PostgreSQL
-- FlightSQL
-- Databricks
-- Redshift
-- Trino
-- MSSQL / Azure SQL / Fabric
+**PyPI drivers:** BigQuery, DuckDB, FlightSQL, PostgreSQL, Snowflake, SQLite
+
+**Foundry-distributed drivers:** ClickHouse, Databricks, MSSQL / Azure SQL / Fabric, MySQL, Redshift, Trino
 
 ## Links
 

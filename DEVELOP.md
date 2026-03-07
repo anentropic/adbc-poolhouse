@@ -145,11 +145,11 @@ Tests requiring real credentials are gated behind the `snowflake` pytest marker 
 # Run Snowflake tests (requires SNOWFLAKE_* env vars)
 uv run pytest --override-ini="addopts=" -m snowflake
 
-# Record or update snapshots
-uv run pytest --override-ini="addopts=" -m snowflake --snapshot-update
+# Record or update cassettes
+uv run pytest --override-ini="addopts=" -m snowflake --adbc-record=once
 ```
 
-Snapshots are committed to `tests/` and replayed in CI without credentials.
+Cassettes are committed to `tests/cassettes/` and replayed in CI without credentials.
 
 ## Building and Distribution
 
