@@ -5,7 +5,7 @@ milestone_name: MVP + Backend Expansion
 status: completed
 stopped_at: Milestone v1.0.0 archived
 last_updated: "2026-03-07T12:30:00.000Z"
-last_activity: 2026-03-07 — Milestone v1.0.0 completed and archived
+last_activity: 2026-03-07 — Completed quick task 10: Rewrite integration tests to use pool API
 progress:
   total_phases: 15
   completed_phases: 15
@@ -27,7 +27,7 @@ See: .planning/PROJECT.md (updated 2026-03-07)
 
 Milestone: v1.0.0 — MVP + Backend Expansion (SHIPPED)
 Status: All 15 phases complete, 51/51 plans, 66/66 requirements satisfied
-Last activity: 2026-03-07 — Milestone archived
+Last activity: 2026-03-07 — Completed quick task 10: Rewrite integration tests to use pool API
 
 Progress: [##########] 100% (51/51 plans complete)
 
@@ -47,6 +47,12 @@ All decisions from v1.0.0 have been reviewed and marked with outcomes.
 ### Blockers/Concerns
 
 None — milestone complete.
+
+### Quick Tasks Completed
+
+| # | Description | Date | Commit | Status | Directory |
+|---|-------------|------|--------|--------|-----------|
+| 10 | Rewrite integration tests to use pool API and wire up conftest fixtures | 2026-03-07 | 7721866 | Verified | [10-rewrite-integration-tests-to-use-pool-ap](./quick/10-rewrite-integration-tests-to-use-pool-ap/) |
 
 ## Session Continuity
 
