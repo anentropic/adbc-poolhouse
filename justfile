@@ -25,4 +25,5 @@ install-dbc:
 # ClickHouse requires --pre: only alpha v0.1.0-alpha.1 is currently published.
 install-foundry-drivers:
     dbc install mysql
+    dbc install databricks
     dbc install --pre clickhouse
