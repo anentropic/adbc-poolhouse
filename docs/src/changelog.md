@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## Unreleased
+## [1.1.0] - 2026-03-07
 
 ### Bug Fixes
 
@@ -14,6 +14,7 @@ All notable changes to this project will be documented in this file.
 - Add autouse fixture clearing warehouse env vars before each test
 - Use per-warehouse dotenv files in integration tests
 - Resolve all v1.0 tech debt items
+- Add version headers and filter noise from changelog
 
 ### Features
 
@@ -44,6 +45,7 @@ All notable changes to this project will be documented in this file.
 - Pass --group docs to uv run in Justfile build/serve recipes
 - Close Phase 10 — update roadmap, state, and planning artifacts
 - Remove synthetic cassette files
+- Bump version to 1.1.0
 
 ### Testing
 
