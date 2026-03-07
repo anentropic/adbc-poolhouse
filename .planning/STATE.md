@@ -2,13 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: unknown
-last_updated: "2026-03-02T22:06:17.152Z"
+status: completed
+stopped_at: Completed 15-04-PLAN.md
+last_updated: "2026-03-07T10:03:22.868Z"
+last_activity: 2026-03-07 — Plan 15-04 complete; 147 unit tests pass regardless of env vars
 progress:
   total_phases: 15
-  completed_phases: 15
-  total_plans: 49
-  completed_plans: 49
+  completed_phases: 14
+  total_plans: 51
+  completed_plans: 50
+  percent: 98
 ---
 
 # Project State
@@ -22,12 +25,12 @@ See: .planning/PROJECT.md (updated 2026-02-28)
 
 ## Current Position
 
-Phase: 15-replace-syrupy-snapshot-tests-with-pytest-adbc-replay-vcr-style-record-replay-tests (COMPLETE)
-Plan: 15-03 (complete) — ALL PLANS DONE
-Status: Phase complete — syrupy replaced with pytest-adbc-replay; 4 cassette tests (2 Snowflake + 2 Databricks) pass in CI without credentials; 192 tests green
-Last activity: 2026-03-02 — Phase 15 complete; cassette workflow operational; credential gate removed from CI
+Phase: 15-replace-syrupy-snapshot-tests-with-pytest-adbc-replay-vcr-style-record-replay-tests
+Plan: 15-04 (complete) — 1 plan remaining (15-05)
+Status: Env var isolation complete; autouse fixture clears 13 warehouse prefixes; integration tests load per-warehouse dotenv files
+Last activity: 2026-03-07 — Plan 15-04 complete; 147 unit tests pass regardless of env vars
 
-Progress: [██████████] 100% (15/15 phases complete)
+Progress: [██████████] 98% (50/51 plans complete)
 
 ## Performance Metrics
 
@@ -69,6 +72,7 @@ Progress: [██████████] 100% (15/15 phases complete)
 | Phase 12-clickhouse-backend P02 | 2 | 2 tasks | 3 files |
 | Phase 12-clickhouse-backend P03 | 2 | 2 tasks | 4 files |
 | Phase 12-clickhouse-backend P04 | 5 | 1 tasks | 3 files |
+| Phase 15 P04 | 5 | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -170,6 +174,8 @@ Recent decisions affecting current work:
 - [Phase 15-01]: adbc-driver-snowflake added to dev deps — plugin silently skips uninstalled drivers (no mock injection); driver must be present for auto-patch replay in CI
 - [Phase 15-03]: Cassette file naming is {prefix}_query.sql / {prefix}_result.arrow / {prefix}_params.json (not 000.sql/arrow/json); SQL stored as sqlglot.parse_one(sql).sql(pretty=True, normalize=True) canonical form
 - [Phase 15-03]: Arrow IPC File format (ipc.new_file) used for cassettes — plugin reads via ipc.open_file() (file format, seekable, with footer)
+- [Phase 15-04]: monkeypatch.delenv over os.environ.pop: monkeypatch auto-restores on teardown, no manual cleanup needed
+- [Phase 15-04]: pyright: ignore[reportUnusedFunction] on autouse fixture: basedpyright strict mode flags underscore-prefixed conftest fixtures as unused; suppression required for autouse convention
 
 ### Roadmap Evolution
 
@@ -199,6 +205,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-02
-Stopped at: Completed 15-03-PLAN.md — Phase 15 complete; syrupy replaced with pytest-adbc-replay; 192 tests green (188 unit + 4 integration cassette tests); no credentials required for CI
+Last session: 2026-03-07T10:03:22.865Z
+Stopped at: Completed 15-04-PLAN.md
 Resume file: None
