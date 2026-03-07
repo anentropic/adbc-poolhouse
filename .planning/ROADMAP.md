@@ -276,8 +276,8 @@ Plans:
 - [x] 15-01-PLAN.md — Swap syrupy for pytest-adbc-replay in dev deps; configure adbc_auto_patch and adbc_cassette_dir in pyproject.toml; add .env.databricks to .gitignore
 - [x] 15-02-PLAN.md — Remove Syrupy from tests/integration/conftest.py; add databricks_pool session-scoped fixture
 - [x] 15-03-PLAN.md — Generate cassette files; rewrite test_snowflake.py; create test_databricks.py; verify 4 integration tests pass in CI replay mode
-- [ ] 15-04-PLAN.md — (gap closure) Fix env var contamination in unit tests; restore per-warehouse dotenv loading in integration tests
-- [ ] 15-05-PLAN.md — (gap closure) Record real Snowflake cassettes; verify full test suite passes with 0 failures
+- [x] 15-04-PLAN.md — (gap closure) Fix env var contamination in unit tests; restore per-warehouse dotenv loading in integration tests
+- [x] 15-05-PLAN.md — (gap closure) Record real Snowflake cassettes; verify full test suite passes with 0 failures
 
 ---
 
@@ -302,4 +302,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | 12. ClickHouse Backend | 4/4 | Complete    | 2026-03-02 |
 | 13. Verification and Tracking Fix | 2/2 | Complete    | 2026-03-02 |
 | 14. Homepage Discovery Fix | 1/1 | Complete    | 2026-03-02 |
-| 15. Replace Syrupy with pytest-adbc-replay | 5/5 | Complete   | 2026-03-07 |
+| 15. Replace Syrupy with pytest-adbc-replay | 5/5 | Complete    | 2026-03-07 |
