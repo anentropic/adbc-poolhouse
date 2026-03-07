@@ -34,7 +34,7 @@ def test_connection_health() -> None:
     Connect + SELECT 1 round-trip via adbc_driver_snowflake.
 
     In CI: replayed from tests/cassettes/snowflake_health/ (no credentials required).
-    To record: set SNOWFLAKE_ACCOUNT (+ auth) in .env.snowflake, then run
+    To record: set credentials in .env.snowflake, then run
         pytest --adbc-record=once -m snowflake
     """
     conn: Any = adbc_driver_snowflake.dbapi.connect(**_snowflake_kwargs())  # type: ignore[union-attr]
@@ -54,7 +54,7 @@ def test_arrow_round_trip() -> None:
     Arrow schema + rows round-trip correctly; cassette enforces stable output.
 
     In CI: replayed from tests/cassettes/snowflake_arrow_round_trip/ (no credentials required).
-    To record: set SNOWFLAKE_ACCOUNT (+ auth) in .env.snowflake, then run
+    To record: set credentials in .env.snowflake, then run
         pytest --adbc-record=once -m snowflake
     """
     conn: Any = adbc_driver_snowflake.dbapi.connect(**_snowflake_kwargs())  # type: ignore[union-attr]

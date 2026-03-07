@@ -36,8 +36,7 @@ def test_connection_health() -> None:
     Connect + SELECT 1 round-trip via adbc_driver_manager (Foundry/Databricks driver).
 
     In CI: replayed from tests/cassettes/databricks_health/ (no credentials required).
-    To record: set DATABRICKS_URI (or DATABRICKS_HOST/HTTP_PATH/TOKEN) in
-    .env.databricks, then run:
+    To record: set credentials in .env.databricks, then run:
         pytest --adbc-record=once -m databricks
     """
     driver, kwargs = _databricks_connect_kwargs()
@@ -58,8 +57,7 @@ def test_arrow_round_trip() -> None:
     Arrow round-trip via Databricks; cassette enforces stable schema.
 
     In CI: replayed from tests/cassettes/databricks_arrow_round_trip/ (no credentials required).
-    To record: set DATABRICKS_URI (or DATABRICKS_HOST/HTTP_PATH/TOKEN) in
-    .env.databricks, then run:
+    To record: set credentials in .env.databricks, then run:
         pytest --adbc-record=once -m databricks
     """
     driver, kwargs = _databricks_connect_kwargs()
