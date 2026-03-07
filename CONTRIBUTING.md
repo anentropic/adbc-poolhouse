@@ -1,63 +1,57 @@
 # Contributing to adbc-poolhouse
 
-## How to Record Snowflake Snapshots
+## How to Record Integration Test Cassettes
 
-Snowflake integration tests use [syrupy](https://github.com/syrupy-project/syrupy) snapshot testing.
-Snapshots are committed to the repository and replayed in CI without credentials.
+Integration tests use [pytest-adbc-replay](https://github.com/paulhendricks/pytest-adbc-replay) cassette-based record/replay.
+Cassettes are committed to `tests/cassettes/` and replayed in CI without credentials.
 
 ### Prerequisites
 
-1. A Snowflake account with a warehouse and database you can query.
-2. Create `.env.snowflake` in the project root (this file is gitignored — never commit it):
+1. A live account for the backend you want to test (Snowflake, Databricks, etc.).
+2. Create `.env` in the project root (this file is gitignored — never commit it):
 
    ```bash
-   # .env.snowflake — NEVER commit this file
+   # .env — NEVER commit this file
+
+   # Snowflake
    SNOWFLAKE_ACCOUNT=myorg-myaccount
    SNOWFLAKE_USER=myuser
    SNOWFLAKE_PASSWORD=mypassword
    SNOWFLAKE_WAREHOUSE=MY_WH
    SNOWFLAKE_DATABASE=MY_DB
+
+   # Databricks (URI mode)
+   DATABRICKS_URI=grpc+tls://my-workspace.cloud.databricks.com:443/sql/1.0/warehouses/abc?token=dapi...
+
+   # Databricks (decomposed mode — alternative to URI)
+   # DATABRICKS_HOST=my-workspace.cloud.databricks.com
+   # DATABRICKS_HTTP_PATH=/sql/1.0/warehouses/abc
+   # DATABRICKS_TOKEN=dapi...
    ```
 
-3. Install the Snowflake extra:
+3. Install the relevant extras:
 
    ```bash
    uv sync --extra snowflake
    ```
 
-### Recording Snapshots
+### Recording Cassettes
 
 ```bash
-pytest --override-ini="addopts=" -m snowflake --snapshot-update
+pytest --adbc-record=once -m snowflake
+pytest --adbc-record=once -m databricks
 ```
 
-This connects to Snowflake with real credentials, executes the test queries, and writes
-snapshot files to `tests/integration/__snapshots__/`.
+This connects with real credentials, executes the test queries, and writes cassette
+files to `tests/cassettes/`.
 
-> **Note:** `addopts` in `pyproject.toml` excludes the `snowflake` marker from default runs.
-> The `--override-ini="addopts="` flag clears that exclusion for this invocation.
+### CI Replay
 
-### Verifying Snapshots
+In CI, no credentials are set. Tests replay from committed cassettes automatically —
+no connection attempt is made. Default `uv run pytest` excludes the `snowflake` and
+`databricks` markers (configured via `addopts` in `pyproject.toml`).
 
-After recording, verify snapshots replay correctly without credentials by checking the
-snapshot files contain no account identifiers or credentials:
+### Committing Cassettes
 
-```bash
-# Verify no secrets in snapshots (detect-secrets should already catch this):
-uv run detect-secrets scan tests/integration/__snapshots__/
-
-# Verify snapshots match (no credentials in environment):
-unset SNOWFLAKE_ACCOUNT && pytest --override-ini="addopts=" -m snowflake
-# Expected: tests are skipped (SNOWFLAKE_ACCOUNT not set)
-```
-
-### Committing Snapshots
-
-Snapshot files in `tests/integration/__snapshots__/` are committed to the repository.
-Before committing, run `uv run prek` to ensure detect-secrets passes on the snapshot content.
-
-### CI Behavior
-
-In CI, `SNOWFLAKE_ACCOUNT` is not set. The `snowflake_pool` fixture detects this and calls
-`pytest.skip()`, skipping all Snowflake tests without any connection attempt. Default `uv run pytest`
-never runs the `snowflake` marker (excluded via `addopts` in `pyproject.toml`).
+Cassette files in `tests/cassettes/` are committed to the repository.
+Before committing, run `uv run prek` to ensure detect-secrets passes on the cassette content.

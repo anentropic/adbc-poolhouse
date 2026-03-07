@@ -12,9 +12,9 @@ from pathlib import Path
 import pytest
 from pydantic import SecretStr
 
+from adbc_poolhouse import ClickHouseConfig
 from adbc_poolhouse._bigquery_config import BigQueryConfig
 from adbc_poolhouse._bigquery_translator import translate_bigquery
-from adbc_poolhouse._clickhouse_config import ClickHouseConfig
 from adbc_poolhouse._clickhouse_translator import translate_clickhouse
 from adbc_poolhouse._databricks_config import DatabricksConfig
 from adbc_poolhouse._databricks_translator import translate_databricks

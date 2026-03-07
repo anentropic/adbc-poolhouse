@@ -1,53 +1,10 @@
 ---
+plan: 10-04
 phase: 10-sqlite-backend
-plan: 04
-subsystem: documentation
-tags: [mkdocs, sqlite, warehouse-guide, docs]
-
-# Dependency graph
-requires:
-  - phase: 10-02
-    provides: SQLiteConfig exported from __init__.py and wired into translators
-  - phase: 10-03
-    provides: All SQLite tests passing including integration test
-provides:
-  - SQLite warehouse guide at docs/src/guides/sqlite.md
-  - mkdocs.yml nav entry under Warehouse Guides
-  - SQLite entries in configuration reference env_prefix table
-  - SQLite rows in homepage ADBC drivers install table
-  - mkdocs build --strict passes with SQLite guide present
-affects: ["future-warehouse-additions", "documentation"]
-
-# Tech tracking
-tech-stack:
-  added: []
-  patterns:
-    - "Warehouse guides mirror duckdb.md structure with backend-specific differences called out explicitly"
-    - "In-memory SQLite behaviour (shared) documented distinctly from DuckDB (isolated)"
-
-key-files:
-  created:
-    - docs/src/guides/sqlite.md
-  modified:
-    - mkdocs.yml
-    - docs/src/guides/configuration.md
-    - docs/src/index.md
-
-key-decisions:
-  - "No read-only section in SQLite guide — SQLite ADBC driver does not expose this option"
-  - "In-memory wording explicitly says 'shared across all connections' to distinguish from DuckDB's isolated behaviour"
-  - "Configuration reference and homepage tables updated outside plan scope to fix omissions found during human review"
-
-patterns-established:
-  - "Human checkpoint catches doc gaps not visible in mkdocs build — env_prefix table and homepage install table both missed SQLite"
-  - "Three doc surfaces to update when adding a new backend: warehouse guide, configuration.md env_prefix table, index.md install table + config class list"
-
+status: complete
+completed: 2026-03-01
 requirements-completed:
   - SQLT-05
-
-# Metrics
-duration: ~30min
-completed: 2026-03-01
 ---
 
 # Plan 10-04: SQLite Warehouse Guide Summary

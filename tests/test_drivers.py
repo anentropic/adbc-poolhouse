@@ -19,8 +19,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from adbc_poolhouse import ClickHouseConfig
 from adbc_poolhouse._bigquery_config import BigQueryConfig
-from adbc_poolhouse._clickhouse_config import ClickHouseConfig
 from adbc_poolhouse._databricks_config import DatabricksConfig
 from adbc_poolhouse._drivers import resolve_driver
 from adbc_poolhouse._duckdb_config import DuckDBConfig

@@ -8,6 +8,7 @@ from pydantic import SecretStr, ValidationError
 from adbc_poolhouse import (
     BaseWarehouseConfig,
     BigQueryConfig,
+    ClickHouseConfig,
     DatabricksConfig,
     DuckDBConfig,
     FlightSQLConfig,
@@ -20,7 +21,6 @@ from adbc_poolhouse import (
     TrinoConfig,
     WarehouseConfig,
 )
-from adbc_poolhouse._clickhouse_config import ClickHouseConfig
 
 
 class TestBaseWarehouseConfig:
