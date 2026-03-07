@@ -19,7 +19,7 @@ def snowflake_pool():
     Used for recording cassettes locally. Skips if SNOWFLAKE_ACCOUNT is absent.
     Cassette tests do not depend on this fixture during CI replay.
     """
-    dotenv_path = Path(__file__).parent.parent.parent / ".env.snowflake"
+    dotenv_path = Path(__file__).parent.parent.parent / ".env"
     if dotenv_path.exists():
         load_dotenv(dotenv_path=dotenv_path, override=False)
 
@@ -41,7 +41,7 @@ def databricks_pool():
     Used for recording cassettes locally. Skips if Databricks credentials are absent.
     Cassette tests do not depend on this fixture during CI replay.
     """
-    dotenv_path = Path(__file__).parent.parent.parent / ".env.databricks"
+    dotenv_path = Path(__file__).parent.parent.parent / ".env"
     if dotenv_path.exists():
         load_dotenv(dotenv_path=dotenv_path, override=False)
 

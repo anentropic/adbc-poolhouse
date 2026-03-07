@@ -13,14 +13,14 @@ from adbc_poolhouse import SnowflakeConfig
 from adbc_poolhouse._translators import translate_config
 
 
-def _snowflake_kwargs() -> dict[str, str]:
+def _snowflake_db_kwargs() -> dict[str, str]:
     """
-    Build connect kwargs from .env.snowflake / environment.
+    Build db_kwargs dict from .env / environment.
 
     Returns an empty dict when credentials are absent — replay mode ignores
     kwargs entirely, so the tests still pass in CI without any env vars set.
     """
-    load_dotenv(Path(__file__).parent.parent.parent / ".env.snowflake", override=False)
+    load_dotenv(Path(__file__).parent.parent.parent / ".env", override=False)
     try:
         return translate_config(SnowflakeConfig())  # type: ignore[call-arg]
     except Exception:
@@ -34,10 +34,10 @@ def test_connection_health() -> None:
     Connect + SELECT 1 round-trip via adbc_driver_snowflake.
 
     In CI: replayed from tests/cassettes/snowflake_health/ (no credentials required).
-    To record: set credentials in .env.snowflake, then run
+    To record: set credentials in .env, then run
         pytest --adbc-record=once -m snowflake
     """
-    conn: Any = adbc_driver_snowflake.dbapi.connect(**_snowflake_kwargs())  # type: ignore[union-attr]
+    conn: Any = adbc_driver_snowflake.dbapi.connect(db_kwargs=_snowflake_db_kwargs())  # type: ignore[union-attr]
     cur: Any = conn.cursor()
     cur.execute("SELECT 1")
     row: Any = cur.fetchone()
@@ -54,10 +54,10 @@ def test_arrow_round_trip() -> None:
     Arrow schema + rows round-trip correctly; cassette enforces stable output.
 
     In CI: replayed from tests/cassettes/snowflake_arrow_round_trip/ (no credentials required).
-    To record: set credentials in .env.snowflake, then run
+    To record: set credentials in .env, then run
         pytest --adbc-record=once -m snowflake
     """
-    conn: Any = adbc_driver_snowflake.dbapi.connect(**_snowflake_kwargs())  # type: ignore[union-attr]
+    conn: Any = adbc_driver_snowflake.dbapi.connect(db_kwargs=_snowflake_db_kwargs())  # type: ignore[union-attr]
     cur: Any = conn.cursor()
     cur.execute("SELECT 1 AS n, 'hello' AS s")
     table: Any = cur.fetch_arrow_table()

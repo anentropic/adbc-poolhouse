@@ -16,12 +16,12 @@ from adbc_poolhouse._translators import translate_config
 
 def _databricks_connect_kwargs() -> tuple[str, dict[str, str]]:
     """
-    Build (driver_path, kwargs) from .env.databricks / environment.
+    Build (driver_path, kwargs) from .env / environment.
 
     Returns ("", {}) when credentials are absent — replay mode ignores
     kwargs entirely, so the tests still pass in CI without any env vars set.
     """
-    load_dotenv(Path(__file__).parent.parent.parent / ".env.databricks", override=False)
+    load_dotenv(Path(__file__).parent.parent.parent / ".env", override=False)
     try:
         config = DatabricksConfig()  # type: ignore[call-arg]
         return resolve_driver(config), translate_config(config)
@@ -36,7 +36,7 @@ def test_connection_health() -> None:
     Connect + SELECT 1 round-trip via adbc_driver_manager (Foundry/Databricks driver).
 
     In CI: replayed from tests/cassettes/databricks_health/ (no credentials required).
-    To record: set credentials in .env.databricks, then run:
+    To record: set credentials in .env, then run:
         pytest --adbc-record=once -m databricks
     """
     driver, kwargs = _databricks_connect_kwargs()
@@ -57,7 +57,7 @@ def test_arrow_round_trip() -> None:
     Arrow round-trip via Databricks; cassette enforces stable schema.
 
     In CI: replayed from tests/cassettes/databricks_arrow_round_trip/ (no credentials required).
-    To record: set credentials in .env.databricks, then run:
+    To record: set credentials in .env, then run:
         pytest --adbc-record=once -m databricks
     """
     driver, kwargs = _databricks_connect_kwargs()
