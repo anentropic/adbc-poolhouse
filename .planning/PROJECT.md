@@ -2,20 +2,11 @@
 
 ## What This Is
 
-A focused Python library that takes a typed warehouse configuration and returns a pooled ADBC connection. Extracted from `dbt-open-sl` as shared infrastructure needed by two consumers: `dbt-open-sl` (profiles.yml → ADBC) and a planned Semantic ORM (direct config). Published to PyPI for pip-installable use.
+A focused Python library that takes a typed warehouse configuration and returns a pooled ADBC connection. Supports 12 warehouse backends (DuckDB, Snowflake, BigQuery, PostgreSQL, FlightSQL, Databricks, Redshift, Trino, MSSQL, SQLite, MySQL, ClickHouse) with both PyPI and Foundry driver detection. Published to PyPI as `adbc-poolhouse`.
 
 ## Core Value
 
 One config in, one pool out — `create_pool(SnowflakeConfig(...))` returns a ready-to-use SQLAlchemy QueuePool in a single call.
-
-## Current Milestone: v1.1.0 — Backend Expansion & Debt Cleanup
-
-**Goal:** Harden the existing backend surface (fix silent failures, remove dead code), add developer tooling for Foundry driver management, and expand ADBC backend coverage based on research findings.
-
-**Target features:**
-- Tech debt cleanup: DatabricksConfig decomposed-field gap, remove AdbcCreatorFn and _adbc_driver_key() dead code, verify Teradata field names
-- Foundry driver tooling: justfile recipes to install `dbc` CLI and install/verify all supported Foundry drivers
-- New ADBC backends: research-driven additions to config, translation, and docs layers
 
 ## Requirements
 
@@ -26,23 +17,21 @@ One config in, one pool out — `create_pool(SnowflakeConfig(...))` returns a re
 - ✓ Docs infrastructure: mkdocs-material + mkdocstrings — existing
 - ✓ CI: GitHub Actions, Python 3.11 + 3.14 matrix — existing
 - ✓ Cliff.toml changelog generation — existing
-
-### Validated
-
-- ✓ Full config + translation layer for 9 warehouses (DuckDB, Snowflake, BigQuery, PostgreSQL, FlightSQL, Databricks, Redshift, Trino, MSSQL) — v1.0
-- ✓ `create_pool()`, `close_pool()`, `managed_pool()` public API — v1.0
-- ✓ Driver detection: PyPI path (find_spec) + Foundry path (adbc_driver_manager) — v1.0
-- ✓ Full documentation site (mkdocs-material + mkdocstrings) + per-warehouse guides — v1.0
-- ✓ PyPI publication at `pip install adbc-poolhouse` via OIDC trusted publisher — v1.0
+- ✓ Full config + translation layer for 12 warehouses — v1.0.0
+- ✓ `create_pool()`, `close_pool()`, `managed_pool()` public API — v1.0.0
+- ✓ Driver detection: PyPI path (find_spec) + Foundry path (adbc_driver_manager) — v1.0.0
+- ✓ Full documentation site with per-warehouse guides — v1.0.0
+- ✓ PyPI publication via OIDC trusted publisher — v1.0.0
+- ✓ DatabricksConfig decomposed-field fix (URI-first pattern) — v1.0.0
+- ✓ Foundry tooling: justfile recipes for `dbc` CLI + driver management — v1.0.0
+- ✓ SQLite, MySQL, ClickHouse backends — v1.0.0
+- ✓ VCR-style integration tests via pytest-adbc-replay cassettes — v1.0.0
 
 ### Active
 
-- [x] Fix DatabricksConfig decomposed-field gap (host/http_path/token silently produce empty dict when URI absent) — fixed in Phase 9 (DBX-01/DBX-02)
-- [x] Remove AdbcCreatorFn unused type alias from _pool_types.py — removed in v1.0
-- [x] Remove _adbc_driver_key() dead abstract method from BaseWarehouseConfig and all 10 subclasses — removed in v1.0
 - [ ] Verify Teradata field names against real Columnar ADBC Teradata driver
-- [ ] Justfile recipes for Foundry driver management: install dbc CLI, install and verify supported drivers
-- [ ] New ADBC backends (to be scoped after research)
+- [ ] Live integration tests for non-DuckDB, non-Snowflake backends (blocked on test account availability)
+- [ ] Async pool support (blocked on ADBC adding async dbapi interface)
 
 ### Out of Scope
 
@@ -50,21 +39,25 @@ One config in, one pool out — `create_pool(SnowflakeConfig(...))` returns a re
 - Query execution — pool gives a connection, consumers execute
 - Knowledge of dbt, profiles.yml, semantic layers, or MetricFlow
 - REST/HTTP/Flight SQL serving
-- BigQuery, PostgreSQL, Databricks, Redshift, Trino, MSSQL — all Future warehouses
 - OAuth / SSO auth logic — delegated entirely to ADBC drivers
-- Async connection pools — ADBC dbapi is synchronous; async is out of scope for v1
+- Async connection pools — ADBC dbapi is synchronous
+- Teradata — private Foundry registry (requires paid Columnar access)
+- Oracle — private Foundry registry
+- ClickHouse via Apache ADBC — github.com/ClickHouse/adbc_clickhouse is WIP with many NotImplemented stubs
 
 ## Context
 
-Extracted from `dbt-open-sl` during initialization (2026-02-23) when it became clear two consumers needed the same ADBC config + pool layer. The codebase has a full scaffold (tooling, CI, docs infra) but zero production code — all implementation is greenfield within the existing structure.
+Shipped v1.0.0 with 2,373 LOC Python across 12 warehouse backends.
+Tech stack: Pydantic BaseSettings, SQLAlchemy QueuePool, ADBC Driver Manager, mkdocs-material.
+Published to PyPI: `pip install adbc-poolhouse`.
 
-Two concrete consumers waiting:
+Two concrete consumers:
 1. **dbt-open-sl** — provides a `translate_to_poolhouse_config()` shim from `profiles.yml` to this lib's config models
 2. **Semantic ORM** (planned) — uses the config models directly as its own user-facing config
 
-ADBC Driver Foundry (launched Oct 2025) provides drivers for warehouses not on PyPI (Databricks, Redshift, Trino, etc.) via `dbc` CLI + `adbc_driver_manager`. v1 targets only the two Apache ADBC drivers (`duckdb`, `adbc-driver-snowflake`); the Foundry detection path is implemented but exercised by future warehouse additions.
+Integration tests use pytest-adbc-replay cassettes (VCR-style record/replay) for Snowflake and Databricks — CI runs without credentials.
 
-Snowflake integration tests use syrupy snapshots: recorded locally against a real Snowflake account, committed to the repo, replayed in CI without credentials.
+192 tests (188 unit + 4 integration) passing.
 
 ## Constraints
 
@@ -78,14 +71,15 @@ Snowflake integration tests use syrupy snapshots: recorded locally against a rea
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| Pydantic BaseSettings for config | Typed, validated, env-var support comes free | — Pending |
-| SQLAlchemy QueuePool (not hand-rolled) | Battle-tested thread-safe pool; imports only pool submodule | — Pending |
-| One pool per call, no multi-warehouse routing | Keep lib simple; routing is consumer business logic | — Pending |
-| Config + pool only, no execution | Execution semantics differ per consumer | — Pending |
-| Support PyPI and Foundry drivers | Apache drivers on PyPI; Foundry drivers via `adbc_driver_manager` | — Pending |
-| Syrupy snapshot tests for Snowflake | Real-credential recording locally; snapshot replay in CI avoids creds in CI | — Pending |
-| v1 = DuckDB + Snowflake only | DuckDB for dev/test (no creds); Snowflake for first production consumer | — Pending |
-| PyPI as v1 "done" bar | Library is only useful when consumers can install it | — Pending |
+| Pydantic BaseSettings for config | Typed, validated, env-var support comes free | ✓ Good — 12 warehouse configs with zero boilerplate |
+| SQLAlchemy QueuePool (not hand-rolled) | Battle-tested thread-safe pool; imports only pool submodule | ✓ Good — stable, Arrow cleanup via reset event |
+| One pool per call, no multi-warehouse routing | Keep lib simple; routing is consumer business logic | ✓ Good — simple API, no global state |
+| Config + pool only, no execution | Execution semantics differ per consumer | ✓ Good — clean separation |
+| Support PyPI and Foundry drivers | Apache drivers on PyPI; Foundry drivers via `adbc_driver_manager` | ✓ Good — both paths tested and working |
+| Syrupy → pytest-adbc-replay | Syrupy snapshots fragile; cassette replay is deterministic and CI-safe | ✓ Good — 4 integration tests in 0.03s replay |
+| URI-first with decomposed-field fallback | Databricks, MySQL, ClickHouse need both modes | ✓ Good — consistent pattern across all backends |
+| Open lower bounds only (no upper caps) | Tight bounds cause unnecessary consumer dep conflicts | ✓ Good — no reports of dep conflicts |
+| `pre_ping=False` default | pre_ping silently no-ops on standalone QueuePool without a dialect; `recycle=3600` is the health mechanism | ✓ Good — correct for standalone pool |
 
 ---
-*Last updated: 2026-02-28 after v1.1.0 milestone start*
+*Last updated: 2026-03-07 after v1.0.0 milestone*

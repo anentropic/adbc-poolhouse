@@ -139,6 +139,20 @@ None - no external service configuration required.
 - Pattern template established for MySQL (Phase 11) and ClickHouse (Phase 12) translators
 - Phase 9 complete: both plans done, ready for Phase 10 (test wiring TEST-WIRING-01)
 
+## Self-Check: PASSED
+
+- FOUND: src/adbc_poolhouse/_databricks_config.py
+- FOUND: src/adbc_poolhouse/_databricks_translator.py
+- FOUND: tests/test_configs.py (databricks tests)
+- FOUND: tests/test_translators.py (databricks tests)
+- FOUND: tests/test_pool_factory.py (TestDatabricksPoolFactory)
+- FOUND: tests/test_drivers.py (updated test)
+- FOUND: docs/src/guides/databricks.md
+- FOUND commit: 07ebac0 (Task 1)
+- FOUND commit: aed826b (Task 2)
+- FOUND commit: ca30683 (Task 3)
+- FOUND commit: 25f0d05 (metadata)
+
 ---
 *Phase: 09-infrastructure-and-databricks-fix*
 *Completed: 2026-03-01*

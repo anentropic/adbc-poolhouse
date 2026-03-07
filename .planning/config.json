@@ -14,8 +14,8 @@
   "parallelization": true,
   "brave_search": false,
   "mode": "yolo",
-  "depth": "standard",
   "git": {
     "branching_strategy": "milestone"
-  }
+  },
+  "granularity": "standard"
 }
