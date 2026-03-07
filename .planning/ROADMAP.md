@@ -270,7 +270,7 @@ Plans:
 **Goal:** Syrupy is removed; Snowflake integration tests are migrated to cassette-based replay; Databricks cassette tests are added; all four integration tests pass in CI without credentials
 **Requirements**: TBD
 **Depends on:** Phase 14
-**Plans:** 4/5 plans executed
+**Plans:** 5/5 plans complete
 
 Plans:
 - [x] 15-01-PLAN.md — Swap syrupy for pytest-adbc-replay in dev deps; configure adbc_auto_patch and adbc_cassette_dir in pyproject.toml; add .env.databricks to .gitignore
@@ -302,4 +302,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | 12. ClickHouse Backend | 4/4 | Complete    | 2026-03-02 |
 | 13. Verification and Tracking Fix | 2/2 | Complete    | 2026-03-02 |
 | 14. Homepage Discovery Fix | 1/1 | Complete    | 2026-03-02 |
-| 15. Replace Syrupy with pytest-adbc-replay | 4/5 | In Progress|  |
+| 15. Replace Syrupy with pytest-adbc-replay | 5/5 | Complete   | 2026-03-07 |

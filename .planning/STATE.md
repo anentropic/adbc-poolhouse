@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: completed
-stopped_at: Completed 15-04-PLAN.md
-last_updated: "2026-03-07T10:03:22.868Z"
-last_activity: 2026-03-07 — Plan 15-04 complete; 147 unit tests pass regardless of env vars
+stopped_at: Completed 15-05-PLAN.md
+last_updated: "2026-03-07T11:23:10Z"
+last_activity: 2026-03-07 — Plan 15-05 complete; real Snowflake cassettes recorded; phase 15 complete
 progress:
   total_phases: 15
-  completed_phases: 14
+  completed_phases: 15
   total_plans: 51
-  completed_plans: 50
-  percent: 98
+  completed_plans: 51
+  percent: 100
 ---
 
 # Project State
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-02-28)
 ## Current Position
 
 Phase: 15-replace-syrupy-snapshot-tests-with-pytest-adbc-replay-vcr-style-record-replay-tests
-Plan: 15-04 (complete) — 1 plan remaining (15-05)
-Status: Env var isolation complete; autouse fixture clears 13 warehouse prefixes; integration tests load per-warehouse dotenv files
-Last activity: 2026-03-07 — Plan 15-04 complete; 147 unit tests pass regardless of env vars
+Plan: 15-05 (complete) — Phase 15 complete (5/5 plans)
+Status: All Snowflake cassettes recorded; 192 tests pass (188 unit + 4 integration); phase complete
+Last activity: 2026-03-07 — Plan 15-05 complete; real Snowflake cassettes recorded and committed
 
-Progress: [██████████] 98% (50/51 plans complete)
+Progress: [██████████] 100% (51/51 plans complete)
 
 ## Performance Metrics
 
@@ -73,6 +73,7 @@ Progress: [██████████] 98% (50/51 plans complete)
 | Phase 12-clickhouse-backend P03 | 2 | 2 tasks | 4 files |
 | Phase 12-clickhouse-backend P04 | 5 | 1 tasks | 3 files |
 | Phase 15 P04 | 5 | 2 tasks | 4 files |
+| Phase 15 P05 | 9 | 2 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -176,6 +177,8 @@ Recent decisions affecting current work:
 - [Phase 15-03]: Arrow IPC File format (ipc.new_file) used for cassettes — plugin reads via ipc.open_file() (file format, seekable, with footer)
 - [Phase 15-04]: monkeypatch.delenv over os.environ.pop: monkeypatch auto-restores on teardown, no manual cleanup needed
 - [Phase 15-04]: pyright: ignore[reportUnusedFunction] on autouse fixture: basedpyright strict mode flags underscore-prefixed conftest fixtures as unused; suppression required for autouse convention
+- [Phase 15-05]: Unified .env file replaces per-warehouse .env.snowflake/.env.databricks — user preference for single credential file
+- [Phase 15-05]: Snowflake connect() uses db_kwargs= named parameter (not **kwargs spreading) — pytest-adbc-replay plugin intercepts connect(**kwargs) and re-spreads as connect_fn(**db_kwargs); using db_kwargs= ensures correct nesting through plugin chain
 
 ### Roadmap Evolution
 
@@ -205,6 +208,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-07T10:03:22.865Z
-Stopped at: Completed 15-04-PLAN.md
+Last session: 2026-03-07T11:23:10Z
+Stopped at: Completed 15-05-PLAN.md — Phase 15 complete
 Resume file: None
