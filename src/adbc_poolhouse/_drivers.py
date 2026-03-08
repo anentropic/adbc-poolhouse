@@ -104,6 +104,36 @@ def resolve_driver(config: WarehouseConfig) -> str:
     raise TypeError(f"Unsupported config type: {type(config).__name__}")
 
 
+def resolve_dbapi_module(config: WarehouseConfig) -> str | None:
+    """
+    Return the DBAPI module name for PyPI drivers, or None for Foundry/DuckDB.
+
+    When a PyPI driver is installed, its own ``.dbapi.connect()`` should be
+    used instead of routing through ``adbc_driver_manager.dbapi``.  This
+    ensures that tools which monkeypatch per-driver DBAPI modules (e.g.
+    pytest-adbc-replay) intercept at the correct location.
+
+    SQLite is excluded because its ``dbapi.connect()`` has an incompatible
+    signature (takes ``uri`` positionally, no ``db_kwargs``).
+
+    Args:
+        config: A warehouse config model instance.
+
+    Returns:
+        A dotted module name such as ``"adbc_driver_snowflake.dbapi"`` when
+        the driver package is installed, or ``None`` for Foundry drivers,
+        DuckDB, SQLite, and PyPI drivers that are not currently installed.
+    """
+    config_type = type(config)
+    if config_type is SQLiteConfig:
+        return None
+    if config_type in _PYPI_PACKAGES:
+        pkg_name, _ = _PYPI_PACKAGES[config_type]
+        if importlib.util.find_spec(pkg_name) is not None:
+            return f"{pkg_name}.dbapi"
+    return None
+
+
 def _resolve_duckdb() -> str:
     """
     Locate the DuckDB ADBC C extension (_duckdb) inside the duckdb wheel.

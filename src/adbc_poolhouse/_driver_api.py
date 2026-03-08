@@ -16,6 +16,7 @@ Internal only — not exported from ``__init__.py``.
 
 from __future__ import annotations
 
+import importlib
 from typing import TYPE_CHECKING
 
 import adbc_driver_manager
@@ -32,12 +33,19 @@ def create_adbc_connection(
     kwargs: dict[str, str],
     *,
     entrypoint: str | None = None,
+    dbapi_module: str | None = None,
 ) -> Connection:
     """
     Create an ADBC DBAPI connection.
 
     All ``cast()`` and ``# type: ignore`` suppressions for the ADBC driver
     manager are concentrated in this module (DRIV-03).
+
+    When ``dbapi_module`` is provided (PyPI drivers like Snowflake, BigQuery),
+    the connection is created through that driver's own ``.dbapi.connect()``
+    instead of routing through ``adbc_driver_manager.dbapi``. This ensures
+    tools that monkeypatch per-driver DBAPI modules (e.g. pytest-adbc-replay)
+    intercept at the correct module.
 
     For Foundry drivers (Databricks, Redshift, Trino, MSSQL, MySQL):
     if the driver manifest is not found, ``adbc_driver_manager`` raises an
@@ -56,6 +64,11 @@ def create_adbc_connection(
             ``translate_config()``.
         entrypoint: Optional ADBC entry-point symbol. Required for DuckDB
             (``entrypoint='duckdb_adbc_init'``).
+        dbapi_module: Dotted module name for a PyPI driver's own DBAPI module
+            (e.g. ``"adbc_driver_snowflake.dbapi"``). When provided, the
+            connection is created through that module instead of
+            ``adbc_driver_manager.dbapi``. ``None`` falls back to the
+            manager path.
 
     Returns:
         An open ADBC DBAPI connection.
@@ -64,6 +77,11 @@ def create_adbc_connection(
         ImportError: When a Foundry driver manifest is absent (NOT_FOUND).
             Message contains ``https://docs.adbc-drivers.org/``.
     """
+    if dbapi_module is not None:
+        mod = importlib.import_module(dbapi_module)
+        conn = mod.connect(db_kwargs=kwargs)  # type: ignore[no-any-return]
+        return conn  # type: ignore[return-value]
+
     # Build a reverse lookup: short driver name → dbc install name.
     # Used to construct the ImportError message when a Foundry driver manifest
     # is missing (adbc_driver_manager raises NOT_FOUND in that case).

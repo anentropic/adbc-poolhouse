@@ -2,60 +2,45 @@
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 
 import pytest
-from dotenv import load_dotenv
+from dotenv import dotenv_values
 
-from adbc_poolhouse import DatabricksConfig, SnowflakeConfig, create_pool
+from adbc_poolhouse import DatabricksConfig, SnowflakeConfig, close_pool, create_pool
+
+_dotenv_path = Path(__file__).parent.parent.parent / ".env"
+_dotenv_values: dict[str, str] = (
+    {k: v for k, v in dotenv_values(dotenv_path=_dotenv_path).items() if v is not None}
+    if _dotenv_path.exists()
+    else {}
+)
 
 
-@pytest.fixture(scope="session")
-def snowflake_pool():
-    """
-    Session-scoped Snowflake pool.
+def _restore_dotenv(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Re-inject .env values after the root conftest's autouse clear."""
+    for key, val in _dotenv_values.items():
+        monkeypatch.setenv(key, val)
 
-    Used for recording cassettes locally. Skips if SNOWFLAKE_ACCOUNT is absent.
-    Cassette tests do not depend on this fixture during CI replay.
-    """
-    dotenv_path = Path(__file__).parent.parent.parent / ".env"
-    if dotenv_path.exists():
-        load_dotenv(dotenv_path=dotenv_path, override=False)
 
-    if not os.environ.get("SNOWFLAKE_ACCOUNT"):
-        pytest.skip("SNOWFLAKE_ACCOUNT not set — skipping live Snowflake; use cassette replay")
-
+@pytest.fixture
+def snowflake_pool(monkeypatch: pytest.MonkeyPatch):
+    """Snowflake pool — function-scoped so each test gets its own cassette path."""
+    # Restore warehouse env vars cleared by the autouse _clear_warehouse_env_vars
+    # fixture in the root conftest. Integration tests need credentials available
+    # when constructing configs.
+    _restore_dotenv(monkeypatch)
     config = SnowflakeConfig()  # type: ignore[call-arg]  # reads SNOWFLAKE_* env vars
     pool = create_pool(config)
     yield pool
-    pool.dispose()
-    pool._adbc_source.close()  # type: ignore[attr-defined]
+    close_pool(pool)
 
 
-@pytest.fixture(scope="session")
-def databricks_pool():
-    """
-    Session-scoped Databricks pool.
-
-    Used for recording cassettes locally. Skips if Databricks credentials are absent.
-    Cassette tests do not depend on this fixture during CI replay.
-    """
-    dotenv_path = Path(__file__).parent.parent.parent / ".env"
-    if dotenv_path.exists():
-        load_dotenv(dotenv_path=dotenv_path, override=False)
-
-    has_uri = bool(os.environ.get("DATABRICKS_URI"))
-    has_decomposed = all(
-        os.environ.get(k) for k in ["DATABRICKS_HOST", "DATABRICKS_HTTP_PATH", "DATABRICKS_TOKEN"]
-    )
-    if not has_uri and not has_decomposed:
-        pytest.skip(
-            "Databricks credentials not set — skipping live Databricks; use cassette replay"
-        )
-
+@pytest.fixture
+def databricks_pool(monkeypatch: pytest.MonkeyPatch):
+    """Databricks pool — function-scoped so each test gets its own cassette path."""
+    _restore_dotenv(monkeypatch)
     config = DatabricksConfig()  # type: ignore[call-arg]  # reads DATABRICKS_* env vars
     pool = create_pool(config)
     yield pool
-    pool.dispose()
-    pool._adbc_source.close()  # type: ignore[attr-defined]
+    close_pool(pool)

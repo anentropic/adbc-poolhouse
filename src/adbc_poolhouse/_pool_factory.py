@@ -18,7 +18,7 @@ import sqlalchemy.pool
 from sqlalchemy import event
 
 from adbc_poolhouse._driver_api import create_adbc_connection
-from adbc_poolhouse._drivers import resolve_driver
+from adbc_poolhouse._drivers import resolve_dbapi_module, resolve_driver
 from adbc_poolhouse._translators import translate_config
 
 if TYPE_CHECKING:
@@ -75,7 +75,14 @@ def create_pool(
     kwargs = translate_config(config)
     entrypoint = config._adbc_entrypoint()
 
-    source = create_adbc_connection(driver_path, kwargs, entrypoint=entrypoint)
+    dbapi_module = resolve_dbapi_module(config)
+
+    source = create_adbc_connection(
+        driver_path,
+        kwargs,
+        entrypoint=entrypoint,
+        dbapi_module=dbapi_module,
+    )
 
     pool = sqlalchemy.pool.QueuePool(
         source.adbc_clone,  # type: ignore[arg-type]
