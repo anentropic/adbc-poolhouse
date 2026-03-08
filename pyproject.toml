@@ -51,7 +51,7 @@ dev = [
     "pytest>=8.0.0",
     "pytest-cov>=6.0.0",
     "ruff>=0.15.1",
-    "pytest-adbc-replay",
+    "pytest-adbc-replay>=1.0.0a3",
     "adbc-driver-snowflake>=1.0.0",
 ]
 docs = [

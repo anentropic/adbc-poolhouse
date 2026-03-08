@@ -137,9 +137,15 @@ adbc-poolhouse/
 - Fixtures defined in `tests/conftest.py` for reuse
 - Test naming convention: `test_<specific_behavior>`
 
-### Snowflake integration tests
+### Integration tests (pytest-adbc-replay)
 
-Tests requiring real credentials are gated behind the `snowflake` pytest marker and excluded from default runs.
+Tests requiring real credentials are marked with `snowflake` and `databricks` pytest markers. The `conftest` will fail fast if driver-specific credential env vars are not set.
+
+Credentials are loaded via dotenv. First copy `.env.example` to `.env` and then fill in the details.
+
+These integration tests use [`pytest-adbc-replay`](https://github.com/paulbenschmidt/pytest-adbc-replay) to do a VCR-style record/replay of the db session, so that CI tests can run without a real Snowflake or Databricks db connection. The idea is that you will run it locally to record the cassettes, whenever it needs to change, then commit the result.
+
+Once your `.env` is configured you can run the tests normally:
 
 ```bash
 # Run Snowflake tests (requires SNOWFLAKE_* env vars)
@@ -150,6 +156,7 @@ uv run pytest --override-ini="addopts=" -m snowflake --adbc-record=once
 ```
 
 Cassettes are committed to `tests/cassettes/` and replayed in CI without credentials.
+
 
 ## Building and Distribution
 

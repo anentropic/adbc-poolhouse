@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Refactoring
+
+- Route PyPI drivers through their own DBAPI module so pytest-adbc-replay monkeypatches intercept at the correct location
+
 ## [1.1.0] - 2026-03-07
 
 ### Bug Fixes
