@@ -209,9 +209,9 @@ You should see: `Server running on http://localhost:8000`
 
 Open `app.py` and add this code:
 ```python
-@app.route("/hello")
+@app.route('/hello')
 def hello():
-    return {"message": "Hello, World!"}
+    return {'message': 'Hello, World!'}
 ```
 
 Start the server:
