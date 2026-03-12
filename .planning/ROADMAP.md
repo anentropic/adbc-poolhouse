@@ -20,7 +20,16 @@
   - [x] 01-01-PLAN.md — Create tests/imports/ with 12 backend test classes
   - [x] 01-02-PLAN.md — Add install-all-drivers justfile recipe
 
-- [ ] Phase 2: Registry Infrastructure (0/2 plans)
+- [ ] Phase 2: Registry Infrastructure (0/2 plans) — not started
+
+  **Goal:** Backend registry replaces hardcoded isinstance dispatch, enabling runtime registration of new backends.
+
+  **Requirements:** REG-01, REG-02, REG-03, TEST-INFRA-01
+
+  Plans:
+  - [ ] 02-01-PLAN.md — Create registry core + exceptions + test infrastructure
+  - [ ] 02-02-PLAN.md — Integrate registry with translators/drivers + export APIs
+
 - [ ] Phase 3: Entry Point Discovery (0/2 plans)
 - [ ] Phase 4: Plugin Author Documentation (0/2 plans)
 
