@@ -1,10 +1,18 @@
 default:
     @just --list
 
-setup-claude:
-    npx get-shit-done-cc --claude --local
-    npx skills add abatilo/vimrc/plugins/abatilo-core/skills/diataxis-documentation -a claude-code -y
-    npx skills add blader/humanizer -a claude-code -y
+# Set up the agent cli with GSD and skills based on agent name [claude|opencode]
+setup-agents agent="claude":
+    @selected_agent="{{agent}}"; \
+    selected_agent="${selected_agent#agent=}"; \
+    case "${selected_agent}" in \
+        claude) gsd_name="claude"; skills_name="claude-code" ;; \
+        opencode) gsd_name="opencode"; skills_name="opencode" ;; \
+        *) echo "Invalid agent '${selected_agent}'. Expected 'claude' or 'opencode'."; exit 1 ;; \
+    esac; \
+    npx get-shit-done-cc --"${gsd_name}" --local; \
+    npx skills add abatilo/vimrc/plugins/abatilo-core/skills/diataxis-documentation -a "${skills_name}" -y; \
+    npx skills add blader/humanizer -a "${skills_name}" -y
 
 # Build the docs site (strict mode)
 docs-build:
