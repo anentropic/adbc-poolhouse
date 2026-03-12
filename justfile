@@ -2,7 +2,7 @@ default:
     @just --list
 
 # Set up the agent cli with GSD and skills based on agent name [claude|opencode]
-setup-agents agent="claude":
+setup-agent-cli agent="claude":
     @selected_agent="{{agent}}"; \
     selected_agent="${selected_agent#agent=}"; \
     case "${selected_agent}" in \
@@ -34,4 +34,16 @@ install-dbc:
 install-foundry-drivers:
     dbc install mysql
     dbc install databricks
+    dbc install --pre clickhouse
+
+# Install all 12 ADBC drivers (PyPI + Foundry) for semi-integration tests.
+# PyPI drivers: duckdb, snowflake, bigquery, postgresql, flightsql, sqlite
+# Foundry drivers: databricks, redshift, trino, mssql, mysql, clickhouse
+install-all-drivers: install-dbc
+    uv pip install -e ".[duckdb,snowflake,bigquery,postgresql,flightsql,sqlite]"
+    dbc install databricks
+    dbc install redshift
+    dbc install trino
+    dbc install mssql
+    dbc install mysql
     dbc install --pre clickhouse
