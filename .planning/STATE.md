@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: milestone
-status: completed
-stopped_at: Phase 02 context gathered
-last_updated: "2026-03-12T16:51:50.215Z"
-last_activity: "2026-03-12 — Completed Phase 1: Driver Import Semi-Integration Tests"
+status: in_progress
+stopped_at: Completed 02-01-PLAN.md
+last_updated: "2026-03-12T18:27:21.658Z"
+last_activity: "2026-03-12 — Completed 02-01: Backend Registry Core"
 progress:
-  total_phases: 0
-  completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
+  total_phases: 4
+  completed_phases: 1
+  total_plans: 3
+  completed_plans: 1
   percent: 25
 ---
 
@@ -26,8 +26,8 @@ See: .planning/PROJECT.md (updated 2026-03-07)
 ## Current Position
 
 Milestone: v1.2.0 — Plugin/Extensibility API (IN PROGRESS)
-Status: Phase 1 complete, 1/4 phases complete
-Last activity: 2026-03-12 — Completed Phase 1: Driver Import Semi-Integration Tests
+Status: Phase 2 in progress, 1/4 phases complete, Plan 02-01 complete
+Last activity: 2026-03-12 — Completed 02-01: Backend Registry Core
 
 Progress: [███-------] 25% (1/4 phases complete)
 
@@ -48,6 +48,12 @@ All decisions from v1.0.0 have been reviewed and marked with outcomes.
 - All 12 backend tests must pass - no skipping for missing drivers
 - [Phase 01]: PyPI drivers use conditional mock target based on driver installation status — When driver is installed, mock its own dbapi.connect; when not installed, fall back to adbc_driver_manager.dbapi.connect
 
+**Plan 02-01 decisions:**
+- Use module-level dicts for registry storage (simple, no external deps)
+- Dual lookup: _registry (name → data) and _config_to_name (config_class → name)
+- Lazy registration via _lazy_registrations dict for built-in backends
+- Runtime validation of config_class and translator
+
 ### Roadmap Evolution
 
 - 15 phases completed across v1.0.0 milestone
@@ -67,6 +73,6 @@ None — execution proceeding normally.
 
 ## Session Continuity
 
-Last session: 2026-03-12T16:51:50.206Z
-Stopped at: Phase 02 context gathered
-Next step: Plan Phase 2 with `/gsd-plan-phase 02`
+Last session: 2026-03-12T18:26:24Z
+Stopped at: Completed 02-01-PLAN.md
+Next step: Continue Phase 2 with `/gsd-execute-phase 02`
