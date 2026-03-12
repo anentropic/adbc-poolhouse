@@ -1,27 +1,9 @@
 """
 Resolve the ADBC driver path or short name for a given warehouse config.
 
-Three-path detection strategy (DRIV-01, DRIV-04):
-
-  Path 1 — PyPI driver installed: use ``importlib.util.find_spec()`` to locate
-      the package, then call ``pkg._driver_path()`` to get the shared library path.
-  Path 2 — PyPI driver absent, manifest may exist: return the package name so
-      ``adbc_driver_manager`` can attempt manifest-based resolution at connect time.
-  Path 3 — manifest also absent: ``create_adbc_connection()`` in ``_driver_api.py``
-      catches the NOT_FOUND status from ``adbc_driver_manager`` and re-raises it as
-      a user-friendly ImportError pointing to https://docs.adbc-drivers.org/.
-
-  Foundry drivers (ClickHouse, Databricks, MSSQL, MySQL, Redshift, Trino): skip find_spec
-      entirely — return the short driver name for manifest resolution directly.
-
-  DuckDB is special: it bundles its ADBC driver as the ``_duckdb`` C extension
-      inside the ``duckdb`` wheel (no separate ``adbc_driver_duckdb`` package).
-      find_spec("_duckdb") locates the C extension; if absent, raise ImportError
-      immediately (no manifest fallback for DuckDB).
-
-All warehouse-specific driver imports are kept inside function bodies to preserve
-bare-import safety (DRIV-04). Only config class imports (no ADBC driver packages)
-appear at module level.
+Queries the backend registry for the appropriate driver_path, All
+12 built-in backends are registered lazily on avoid importing all translator
+modules at startup.
 
 Internal only — not exported from ``__init__.py``.
 """
@@ -40,6 +22,7 @@ from adbc_poolhouse._mssql_config import MSSQLConfig
 from adbc_poolhouse._mysql_config import MySQLConfig
 from adbc_poolhouse._postgresql_config import PostgreSQLConfig
 from adbc_poolhouse._redshift_config import RedshiftConfig
+from adbc_poolhouse._registry import ensure_registered, get_driver_path, register_lazy
 from adbc_poolhouse._snowflake_config import SnowflakeConfig
 from adbc_poolhouse._sqlite_config import SQLiteConfig
 from adbc_poolhouse._trino_config import TrinoConfig
@@ -47,9 +30,9 @@ from adbc_poolhouse._trino_config import TrinoConfig
 if TYPE_CHECKING:
     from adbc_poolhouse._base_config import WarehouseConfig
 
+
 # PyPI-installed warehouse drivers: (package_name, pip_extra_name).
-# package_name is passed to find_spec() and used for Path 2 fallback.
-# pip_extra_name is the adbc-poolhouse[extra] install name for error messages.
+# Used by resolve_dbapi_module() to determine if driver is installed.
 _PYPI_PACKAGES: dict[type, tuple[str, str]] = {
     SnowflakeConfig: ("adbc_driver_snowflake", "snowflake"),
     BigQueryConfig: ("adbc_driver_bigquery", "bigquery"),
@@ -58,50 +41,26 @@ _PYPI_PACKAGES: dict[type, tuple[str, str]] = {
     SQLiteConfig: ("adbc_driver_sqlite", "sqlite"),
 }
 
-# Foundry (manifest-based) drivers: (driver_manager_name, dbc_install_name).
-# driver_manager_name is returned directly as the driver_path for adbc_driver_manager.
-# dbc_install_name is used in ImportError messages from _driver_api.py.
-_FOUNDRY_DRIVERS: dict[type, tuple[str, str]] = {
-    ClickHouseConfig: ("clickhouse", "clickhouse"),
-    DatabricksConfig: ("databricks", "databricks"),
-    MSSQLConfig: ("mssql", "mssql"),
-    MySQLConfig: ("mysql", "mysql"),
-    RedshiftConfig: ("redshift", "redshift"),
-    TrinoConfig: ("trino", "trino"),
-}
-
 
 def resolve_driver(config: WarehouseConfig) -> str:
     """
     Resolve the ADBC driver path or short name for a warehouse config.
 
-    Uses the 3-path detection strategy described in this module's docstring.
+    Queries the backend registry for the appropriate driver_path.
 
     Returns:
-        For DuckDB (Path 1): absolute path to ``_duckdb`` shared library.
-        For PyPI drivers (Path 1): absolute path returned by ``pkg._driver_path()``.
-        For PyPI drivers (Path 2 fallback): the package name string.
+        For DuckDB: absolute path to ``_duckdb`` shared library.
+        For PyPI drivers: absolute path returned by ``pkg._driver_path()`` or
+            package name for manifest fallback.
         For Foundry drivers: the short driver name string (e.g. ``"databricks"``).
 
     Raises:
         ImportError: For DuckDB when ``_duckdb`` C extension is not installed.
             Message includes ``pip install adbc-poolhouse[duckdb]``.
-        TypeError: If ``config`` is not a recognised WarehouseConfig subclass.
+        BackendNotRegisteredError: If ``config`` is not a registered WarehouseConfig subclass.
     """
-    config_type = type(config)
-
-    if config_type is DuckDBConfig:
-        return _resolve_duckdb()
-
-    if config_type in _PYPI_PACKAGES:
-        pkg_name, extra = _PYPI_PACKAGES[config_type]
-        return _resolve_pypi_driver(pkg_name, extra)
-
-    if config_type in _FOUNDRY_DRIVERS:
-        driver_name, _ = _FOUNDRY_DRIVERS[config_type]
-        return driver_name
-
-    raise TypeError(f"Unsupported config type: {type(config).__name__}")
+    ensure_registered(config)
+    return get_driver_path(config)
 
 
 def resolve_dbapi_module(config: WarehouseConfig) -> str | None:
@@ -180,3 +139,163 @@ def _resolve_pypi_driver(pkg_name: str, extra: str) -> str:  # noqa: ARG001
     # If manifest is also absent, create_adbc_connection() will catch NOT_FOUND
     # and raise ImportError with the install instructions.
     return pkg_name
+
+
+def _setup_lazy_registrations() -> None:
+    """
+    Register lazy initialization functions for all 12 built-in backends.
+
+    Each lazy registration function imports the translator and config class,
+    resolves the driver path, and calls register_backend().
+    """
+    from adbc_poolhouse._registry import register_backend
+
+    # DuckDB - special case, uses _resolve_duckdb()
+    def _register_duckdb() -> None:
+        from adbc_poolhouse._duckdb_translator import translate_duckdb
+
+        register_backend(
+            name="adbc_driver_duckdb",
+            config_class=DuckDBConfig,
+            translator=translate_duckdb,  # type: ignore[arg-type]
+            driver_path=_resolve_duckdb(),
+        )
+
+    # Snowflake
+    def _register_snowflake() -> None:
+        from adbc_poolhouse._snowflake_translator import translate_snowflake
+
+        register_backend(
+            name="adbc_driver_snowflake",
+            config_class=SnowflakeConfig,
+            translator=translate_snowflake,  # type: ignore[arg-type]
+            driver_path=_resolve_pypi_driver("adbc_driver_snowflake", "snowflake"),
+        )
+
+    # BigQuery
+    def _register_bigquery() -> None:
+        from adbc_poolhouse._bigquery_translator import translate_bigquery
+
+        register_backend(
+            name="adbc_driver_bigquery",
+            config_class=BigQueryConfig,
+            translator=translate_bigquery,  # type: ignore[arg-type]
+            driver_path=_resolve_pypi_driver("adbc_driver_bigquery", "bigquery"),
+        )
+
+    # PostgreSQL
+    def _register_postgresql() -> None:
+        from adbc_poolhouse._postgresql_translator import translate_postgresql
+
+        register_backend(
+            name="adbc_driver_postgresql",
+            config_class=PostgreSQLConfig,
+            translator=translate_postgresql,  # type: ignore[arg-type]
+            driver_path=_resolve_pypi_driver("adbc_driver_postgresql", "postgresql"),
+        )
+
+    # FlightSQL
+    def _register_flightsql() -> None:
+        from adbc_poolhouse._flightsql_translator import translate_flightsql
+
+        register_backend(
+            name="adbc_driver_flightsql",
+            config_class=FlightSQLConfig,
+            translator=translate_flightsql,  # type: ignore[arg-type]
+            driver_path=_resolve_pypi_driver("adbc_driver_flightsql", "flightsql"),
+        )
+
+    # SQLite
+    def _register_sqlite() -> None:
+        from adbc_poolhouse._sqlite_translator import translate_sqlite
+
+        register_backend(
+            name="adbc_driver_sqlite",
+            config_class=SQLiteConfig,
+            translator=translate_sqlite,  # type: ignore[arg-type]
+            driver_path=_resolve_pypi_driver("adbc_driver_sqlite", "sqlite"),
+        )
+
+    # ClickHouse (Foundry)
+    def _register_clickhouse() -> None:
+        from adbc_poolhouse._clickhouse_translator import translate_clickhouse
+
+        register_backend(
+            name="__dbc__clickhouse",
+            config_class=ClickHouseConfig,
+            translator=translate_clickhouse,  # type: ignore[arg-type]
+            driver_path="clickhouse",
+        )
+
+    # Databricks (Foundry)
+    def _register_databricks() -> None:
+        from adbc_poolhouse._databricks_translator import translate_databricks
+
+        register_backend(
+            name="__dbc__databricks",
+            config_class=DatabricksConfig,
+            translator=translate_databricks,  # type: ignore[arg-type]
+            driver_path="databricks",
+        )
+
+    # MSSQL (Foundry)
+    def _register_mssql() -> None:
+        from adbc_poolhouse._mssql_translator import translate_mssql
+
+        register_backend(
+            name="__dbc__mssql",
+            config_class=MSSQLConfig,
+            translator=translate_mssql,  # type: ignore[arg-type]
+            driver_path="mssql",
+        )
+
+    # MySQL (Foundry)
+    def _register_mysql() -> None:
+        from adbc_poolhouse._mysql_translator import translate_mysql
+
+        register_backend(
+            name="__dbc__mysql",
+            config_class=MySQLConfig,
+            translator=translate_mysql,  # type: ignore[arg-type]
+            driver_path="mysql",
+        )
+
+    # Redshift (Foundry)
+    def _register_redshift() -> None:
+        from adbc_poolhouse._redshift_translator import translate_redshift
+
+        register_backend(
+            name="__dbc__redshift",
+            config_class=RedshiftConfig,
+            translator=translate_redshift,  # type: ignore[arg-type]
+            driver_path="redshift",
+        )
+
+    # Trino (Foundry)
+    def _register_trino() -> None:
+        from adbc_poolhouse._trino_translator import translate_trino
+
+        register_backend(
+            name="__dbc__trino",
+            config_class=TrinoConfig,
+            translator=translate_trino,  # type: ignore[arg-type]
+            driver_path="trino",
+        )
+
+    # Register all lazy handlers
+    register_lazy(DuckDBConfig, _register_duckdb)
+    register_lazy(SnowflakeConfig, _register_snowflake)
+    register_lazy(BigQueryConfig, _register_bigquery)
+    register_lazy(PostgreSQLConfig, _register_postgresql)
+    register_lazy(FlightSQLConfig, _register_flightsql)
+    register_lazy(SQLiteConfig, _register_sqlite)
+    register_lazy(ClickHouseConfig, _register_clickhouse)
+    register_lazy(DatabricksConfig, _register_databricks)
+    register_lazy(MSSQLConfig, _register_mssql)
+    register_lazy(MySQLConfig, _register_mysql)
+    register_lazy(RedshiftConfig, _register_redshift)
+    register_lazy(TrinoConfig, _register_trino)
+
+
+# Set up lazy registrations at module import time
+_setup_lazy_registrations()

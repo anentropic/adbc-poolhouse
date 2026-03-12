@@ -15,9 +15,13 @@ Patch target for find_spec: "importlib.util.find_spec"
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
 from unittest.mock import MagicMock, patch
 
 import pytest
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 from adbc_poolhouse import ClickHouseConfig
 from adbc_poolhouse._bigquery_config import BigQueryConfig
@@ -36,6 +40,11 @@ from adbc_poolhouse._trino_config import TrinoConfig
 
 class TestResolveDuckDB:
     """Tests for DuckDB special-case driver detection (no manifest fallback)."""
+
+    @pytest.fixture(autouse=True)
+    def _clean_registry(self, clean_registry: Generator[None, None, None]) -> None:
+        """Clear registry before/after each test to ensure fresh driver resolution."""
+        pass
 
     def test_path1_duckdb_found_via_find_spec(self) -> None:
         """Path 1: find_spec('_duckdb') returns spec with origin."""
@@ -66,6 +75,11 @@ class TestResolveDuckDB:
 
 class TestResolvePyPIDriver:
     """Tests for PyPI-installed warehouse driver detection (Paths 1 and 2)."""
+
+    @pytest.fixture(autouse=True)
+    def _clean_registry(self, clean_registry: Generator[None, None, None]) -> None:
+        """Clear registry before/after each test to ensure fresh driver resolution."""
+        pass
 
     def test_path2_snowflake_missing_returns_package_name(self) -> None:
         """Path 2: find_spec None -> returns package name for manifest fallback."""
@@ -112,6 +126,11 @@ class TestResolvePyPIDriver:
 
 class TestResolveFoundryDriver:
     """Tests for Foundry (manifest-based) driver detection (skip find_spec)."""
+
+    @pytest.fixture(autouse=True)
+    def _clean_registry(self, clean_registry: Generator[None, None, None]) -> None:
+        """Clear registry before/after each test to ensure fresh driver resolution."""
+        pass
 
     def test_databricks_returns_short_name_without_find_spec(self) -> None:
         """Foundry: resolve_driver returns driver name without calling find_spec."""
@@ -163,13 +182,23 @@ class TestResolveFoundryDriver:
 class TestResolveDriverEdgeCases:
     """Tests for edge cases and unsupported config types."""
 
-    def test_unknown_config_raises_type_error(self) -> None:
-        """Custom class not in dispatch map -> TypeError raised."""
+    @pytest.fixture(autouse=True)
+    def _clean_registry(self, clean_registry: Generator[None, None, None]) -> None:
+        """Clear registry before/after each test to ensure fresh driver resolution."""
+        pass
+
+    def test_unknown_config_raises_backend_not_registered_error(self) -> None:
+        """Custom class not in registry -> BackendNotRegisteredError raised."""
 
         class CustomConfig:
             pass
 
-        with pytest.raises(TypeError, match=r"Unsupported config type: CustomConfig"):
+        from adbc_poolhouse._exceptions import BackendNotRegisteredError
+
+        with pytest.raises(
+            BackendNotRegisteredError,
+            match=r"Backend for config type 'CustomConfig' is not registered",
+        ):
             resolve_driver(CustomConfig())  # type: ignore[arg-type]
 
 

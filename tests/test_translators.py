@@ -451,9 +451,13 @@ class TestTranslateConfig:
         result = translate_config(config)
         assert "username" in result
 
-    def test_unsupported_type_raises_type_error(self) -> None:
-        """translate_config() with unknown type raises TypeError."""
-        with pytest.raises(TypeError, match="Unsupported config type"):
+    def test_unsupported_type_raises_backend_not_registered_error(self) -> None:
+        """translate_config() with unknown type raises BackendNotRegisteredError."""
+        from adbc_poolhouse._exceptions import BackendNotRegisteredError
+
+        with pytest.raises(
+            BackendNotRegisteredError, match=r"Backend for config type 'str' is not registered"
+        ):
             translate_config("not a config")  # type: ignore[arg-type]
 
 

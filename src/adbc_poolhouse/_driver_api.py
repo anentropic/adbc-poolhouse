@@ -22,8 +22,6 @@ from typing import TYPE_CHECKING
 import adbc_driver_manager
 import adbc_driver_manager.dbapi  # runtime import — adbc-driver-manager always present
 
-from adbc_poolhouse._drivers import _FOUNDRY_DRIVERS
-
 if TYPE_CHECKING:
     from adbc_driver_manager.dbapi import Connection
 
@@ -85,7 +83,14 @@ def create_adbc_connection(
     # Build a reverse lookup: short driver name → dbc install name.
     # Used to construct the ImportError message when a Foundry driver manifest
     # is missing (adbc_driver_manager raises NOT_FOUND in that case).
-    _foundry_name_to_install: dict[str, str] = {v[0]: v[1] for v in _FOUNDRY_DRIVERS.values()}
+    _foundry_name_to_install: dict[str, str] = {
+        "clickhouse": "clickhouse",
+        "databricks": "databricks",
+        "mssql": "mssql",
+        "mysql": "mysql",
+        "redshift": "redshift",
+        "trino": "trino",
+    }
 
     try:
         # All ADBC type suppressions are concentrated here (DRIV-03).

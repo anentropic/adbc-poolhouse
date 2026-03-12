@@ -225,3 +225,19 @@ class TestDummyBackend:
         # Verify driver_path
         driver_path = get_driver_path(config)  # type: ignore[arg-type]
         assert driver_path == dummy_backend["driver_path"]
+
+
+class TestRegistryIntegration:
+    """Tests for registry integration with translate_config() and resolve_driver()."""
+
+    def test_translate_config_unregistered_raises(
+        self, dummy_backend: dict[str, object], clean_registry: None
+    ) -> None:
+        """translate_config() with unregistered config raises BackendNotRegisteredError."""
+        from adbc_poolhouse._translators import translate_config
+
+        config = dummy_backend["config_instance"]
+        config_type_name = type(config).__name__
+
+        with pytest.raises(BackendNotRegisteredError, match=config_type_name):
+            translate_config(config)  # type: ignore[arg-type]
