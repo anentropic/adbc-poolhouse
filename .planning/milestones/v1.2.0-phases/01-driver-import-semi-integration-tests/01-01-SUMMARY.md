@@ -24,8 +24,7 @@ tech-stack:
 
 key-files:
   created:
-    - tests/imports/__init__.py
-    - tests/imports/test_driver_imports.py
+    - tests/test_driver_imports.py
   modified: []
 
 key-decisions:
@@ -57,7 +56,7 @@ completed: 2026-03-12
 
 ## Accomplishments
 
-- Created `tests/imports/` package with comprehensive driver import tests
+- Created `tests/test_driver_imports.py` with comprehensive driver import tests
 - Implemented 12 test classes, one per backend (DuckDB, Snowflake, BigQuery, PostgreSQL, FlightSQL, SQLite, Databricks, Redshift, Trino, MSSQL, MySQL, ClickHouse)
 - Each test verifies the full driver import → pool creation → connection attempt flow
 - Implemented conditional mock target selection for PyPI drivers based on installation status
@@ -70,8 +69,7 @@ Each task was committed atomically:
 
 ## Files Created/Modified
 
-- `tests/imports/__init__.py` - Package marker with docstring
-- `tests/imports/test_driver_imports.py` - 12 test classes for all backends with conditional mock targets
+- `tests/test_driver_imports.py` - 12 test classes for all backends with conditional mock targets
 
 ## Decisions Made
 
@@ -112,8 +110,7 @@ None - no external service configuration required.
 
 ## Self-Check: PASSED
 
-- tests/imports/__init__.py: FOUND
-- tests/imports/test_driver_imports.py: FOUND
+- tests/test_driver_imports.py: FOUND
 - Commit 81e5a15: FOUND
 
 ---

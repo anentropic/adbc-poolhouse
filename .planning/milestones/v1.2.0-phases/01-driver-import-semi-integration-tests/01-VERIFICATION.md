@@ -19,7 +19,7 @@ re_verification: false
 
 | #   | Truth                                                                       | Status       | Evidence                                                                                 |
 | --- | --------------------------------------------------------------------------- | ------------ | ---------------------------------------------------------------------------------------- |
-| 1   | All 12 backend tests pass when running pytest tests/imports/                | ✓ VERIFIED   | `uv run pytest tests/imports/test_driver_imports.py -v` → 12 passed in 0.24s            |
+| 1   | All 12 backend tests pass when running pytest tests/                       | ✓ VERIFIED   | `uv run pytest tests/test_driver_imports.py -v` → 12 passed in 0.24s            |
 | 2   | Each test imports the real driver package (not mocked)                      | ✓ VERIFIED   | All tests import from `adbc_poolhouse` (DuckDBConfig, SnowflakeConfig, etc.)            |
 | 3   | Foundry drivers + DuckDB + SQLite mock adbc_driver_manager.dbapi.connect    | ✓ VERIFIED   | Lines 54, 228, 254, 276, 298, 320, 342, 364 in test_driver_imports.py                   |
 | 4   | PyPI drivers mock their own dbapi.connect when installed                    | ✓ VERIFIED   | Conditional mock targets at lines 80, 117, 154, 191 (snowflake, bigquery, pg, flightsql) |
@@ -34,19 +34,18 @@ re_verification: false
 
 | Artifact                              | Expected                        | Status      | Details                                              |
 | ------------------------------------- | ------------------------------- | ----------- | ---------------------------------------------------- |
-| `tests/imports/__init__.py`           | Package marker                  | ✓ VERIFIED  | 1 line, docstring present                            |
-| `tests/imports/test_driver_imports.py`| 12 test classes, one per backend| ✓ VERIFIED  | 373 lines, 12 classes, all backends covered          |
+| `tests/test_driver_imports.py`         | 12 test classes, one per backend| ✓ VERIFIED  | 373 lines, 12 classes, all backends covered          |
 | `justfile`                            | install-all-drivers recipe      | ✓ VERIFIED  | Lines 39-49, recipe exists with proper dependencies  |
 
 ### Key Link Verification
 
 | From                                    | To                                      | Via                     | Status      | Details                            |
 | --------------------------------------- | --------------------------------------- | ----------------------- | ----------- | ---------------------------------- |
-| tests/imports/test_driver_imports.py    | adbc_driver_manager.dbapi.connect       | unittest.mock.patch     | ✓ WIRED     | 12 occurrences (Foundry/DuckDB/SQLite + PyPI fallback) |
-| tests/imports/test_driver_imports.py    | adbc_driver_snowflake.dbapi.connect     | unittest.mock.patch     | ✓ WIRED     | Line 80, conditional on driver installed |
-| tests/imports/test_driver_imports.py    | adbc_driver_bigquery.dbapi.connect      | unittest.mock.patch     | ✓ WIRED     | Line 117, conditional on driver installed |
-| tests/imports/test_driver_imports.py    | adbc_driver_postgresql.dbapi.connect    | unittest.mock.patch     | ✓ WIRED     | Line 154, conditional on driver installed |
-| tests/imports/test_driver_imports.py    | adbc_driver_flightsql.dbapi.connect     | unittest.mock.patch     | ✓ WIRED     | Line 191, conditional on driver installed |
+| tests/test_driver_imports.py           | adbc_driver_manager.dbapi.connect       | unittest.mock.patch     | ✓ WIRED     | 12 occurrences (Foundry/DuckDB/SQLite + PyPI fallback) |
+| tests/test_driver_imports.py           | adbc_driver_snowflake.dbapi.connect     | unittest.mock.patch     | ✓ WIRED     | Line 80, conditional on driver installed |
+| tests/test_driver_imports.py           | adbc_driver_bigquery.dbapi.connect      | unittest.mock.patch     | ✓ WIRED     | Line 117, conditional on driver installed |
+| tests/test_driver_imports.py           | adbc_driver_postgresql.dbapi.connect    | unittest.mock.patch     | ✓ WIRED     | Line 154, conditional on driver installed |
+| tests/test_driver_imports.py           | adbc_driver_flightsql.dbapi.connect     | unittest.mock.patch     | ✓ WIRED     | Line 191, conditional on driver installed |
 | justfile                                | PyPI + Foundry drivers                  | uv pip + dbc install    | ✓ WIRED     | install-all-drivers recipe installs all 12 |
 
 ### Requirements Coverage
