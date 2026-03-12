@@ -2,12 +2,19 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING, Any
+
+import pytest
+
 from adbc_poolhouse._exceptions import (
     BackendAlreadyRegisteredError,
     BackendNotRegisteredError,
     PoolhouseError,
     RegistryError,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 
 class TestRegistryExceptions:
@@ -36,3 +43,136 @@ class TestRegistryExceptions:
     def test_registry_error_inherits_from_poolhouse_error(self) -> None:
         """RegistryError inherits from PoolhouseError."""
         assert issubclass(RegistryError, PoolhouseError)
+
+
+@pytest.fixture
+def clean_registry() -> Generator[None, Any, None]:
+    """Clear registry state before and after each test."""
+    from adbc_poolhouse._registry import _config_to_name, _registry
+
+    # Clear before test
+    _registry.clear()
+    _config_to_name.clear()
+    yield
+    # Clear after test
+    _registry.clear()
+    _config_to_name.clear()
+
+
+class TestRegisterBackend:
+    """Tests for register_backend() validation and registration."""
+
+    def test_valid_registration_succeeds(
+        self, dummy_backend: dict[str, object], clean_registry: None
+    ) -> None:
+        """register_backend() with valid params succeeds (no exception)."""
+        from adbc_poolhouse._registry import register_backend
+
+        # Should not raise any exception
+        register_backend(
+            name=str(dummy_backend["name"]),
+            config_class=dummy_backend["config_class"],  # type: ignore[arg-type]
+            translator=dummy_backend["translator"],  # type: ignore[arg-type]
+            driver_path=str(dummy_backend["driver_path"]),
+        )
+
+    def test_duplicate_name_raises(
+        self, dummy_backend: dict[str, object], clean_registry: None
+    ) -> None:
+        """register_backend() with duplicate name raises BackendAlreadyRegisteredError."""
+        from adbc_poolhouse._registry import register_backend
+
+        name = str(dummy_backend["name"])
+        register_backend(
+            name=name,
+            config_class=dummy_backend["config_class"],  # type: ignore[arg-type]
+            translator=dummy_backend["translator"],  # type: ignore[arg-type]
+            driver_path=str(dummy_backend["driver_path"]),
+        )
+
+        # Second registration with same name should raise
+        with pytest.raises(BackendAlreadyRegisteredError, match=name):
+            register_backend(
+                name=name,
+                config_class=dummy_backend["config_class"],  # type: ignore[arg-type]
+                translator=dummy_backend["translator"],  # type: ignore[arg-type]
+                driver_path=str(dummy_backend["driver_path"]),
+            )
+
+    def test_none_config_class_raises_type_error(
+        self, dummy_backend: dict[str, object], clean_registry: None
+    ) -> None:
+        """register_backend() with None config_class raises TypeError."""
+        from adbc_poolhouse._registry import register_backend
+
+        with pytest.raises(TypeError, match="config_class must be a class"):
+            register_backend(
+                name="test_backend",
+                config_class=None,  # type: ignore[arg-type]
+                translator=dummy_backend["translator"],  # type: ignore[arg-type]
+                driver_path=str(dummy_backend["driver_path"]),
+            )
+
+    def test_non_callable_translator_raises_type_error(
+        self, dummy_backend: dict[str, object], clean_registry: None
+    ) -> None:
+        """register_backend() with non-callable translator raises TypeError."""
+        from adbc_poolhouse._registry import register_backend
+
+        with pytest.raises(TypeError, match="translator must be callable"):
+            register_backend(
+                name="test_backend",
+                config_class=dummy_backend["config_class"],  # type: ignore[arg-type]
+                translator="not_callable",  # type: ignore[arg-type]
+                driver_path=str(dummy_backend["driver_path"]),
+            )
+
+
+class TestRegistryLookup:
+    """Tests for get_translator() and get_driver_path() lookups."""
+
+    def test_get_translator_returns_correct_translator(
+        self, dummy_backend: dict[str, object], clean_registry: None
+    ) -> None:
+        """get_translator() returns correct translator for registered backend."""
+        from adbc_poolhouse._registry import get_translator, register_backend
+
+        register_backend(
+            name=str(dummy_backend["name"]),
+            config_class=dummy_backend["config_class"],  # type: ignore[arg-type]
+            translator=dummy_backend["translator"],  # type: ignore[arg-type]
+            driver_path=str(dummy_backend["driver_path"]),
+        )
+
+        config = dummy_backend["config_instance"]
+        translator = get_translator(config)  # type: ignore[arg-type]
+        assert translator is dummy_backend["translator"]
+
+    def test_get_driver_path_returns_correct_path(
+        self, dummy_backend: dict[str, object], clean_registry: None
+    ) -> None:
+        """get_driver_path() returns correct driver_path for registered backend."""
+        from adbc_poolhouse._registry import get_driver_path, register_backend
+
+        register_backend(
+            name=str(dummy_backend["name"]),
+            config_class=dummy_backend["config_class"],  # type: ignore[arg-type]
+            translator=dummy_backend["translator"],  # type: ignore[arg-type]
+            driver_path=str(dummy_backend["driver_path"]),
+        )
+
+        config = dummy_backend["config_instance"]
+        driver_path = get_driver_path(config)  # type: ignore[arg-type]
+        assert driver_path == dummy_backend["driver_path"]
+
+    def test_get_translator_unregistered_raises(
+        self, dummy_backend: dict[str, object], clean_registry: None
+    ) -> None:
+        """get_translator() for unregistered config raises BackendNotRegisteredError."""
+        from adbc_poolhouse._registry import get_translator
+
+        config = dummy_backend["config_instance"]
+        config_type_name = type(config).__name__
+
+        with pytest.raises(BackendNotRegisteredError, match=config_type_name):
+            get_translator(config)  # type: ignore[arg-type]

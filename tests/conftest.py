@@ -13,8 +13,15 @@ CI secrets) happen to be loaded in the process.
 from __future__ import annotations
 
 import os
+from typing import TYPE_CHECKING
 
 import pytest
+from pydantic_settings import SettingsConfigDict
+
+if TYPE_CHECKING:
+    from adbc_poolhouse._base_config import WarehouseConfig
+
+from adbc_poolhouse._base_config import BaseWarehouseConfig
 
 _WAREHOUSE_ENV_PREFIXES: tuple[str, ...] = (
     "BIGQUERY_",
@@ -31,6 +38,56 @@ _WAREHOUSE_ENV_PREFIXES: tuple[str, ...] = (
     "TERADATA_",
     "TRINO_",
 )
+
+
+class DummyConfig(BaseWarehouseConfig):
+    """
+    Minimal config class for testing registry without real drivers.
+
+    Inherits from BaseWarehouseConfig to satisfy the WarehouseConfig Protocol.
+    Uses SettingsConfigDict(extra="forbid") to catch typos in tests.
+    """
+
+    model_config = SettingsConfigDict(extra="forbid")
+
+    def _adbc_entrypoint(self) -> str | None:
+        """Return None - no entry point required for dummy backend."""
+        return None
+
+
+def dummy_translator(config: WarehouseConfig) -> dict[str, str]:
+    """
+    Minimal translator function for testing registry.
+
+    Args:
+        config: A DummyConfig instance (typed as WarehouseConfig for Protocol).
+
+    Returns:
+        A dict with dummy connection kwargs.
+    """
+    return {"dummy_key": "dummy_value"}
+
+
+@pytest.fixture
+def dummy_backend() -> dict[str, object]:
+    """
+    Fixture providing a complete dummy backend for registry testing.
+
+    Returns:
+        A dict with keys:
+        - name: Backend name string
+        - config_class: The DummyConfig class
+        - translator: The dummy_translator function
+        - driver_path: A test driver path string
+        - config_instance: A DummyConfig instance
+    """
+    return {
+        "name": "test_dummy_backend",
+        "config_class": DummyConfig,
+        "translator": dummy_translator,
+        "driver_path": "test_driver_path",
+        "config_instance": DummyConfig(),
+    }
 
 
 @pytest.fixture(autouse=True)
