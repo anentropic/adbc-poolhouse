@@ -41,8 +41,7 @@ build-backend = "uv_build"
 
 [dependency-groups]
 dev = [
-    "adbc-poolhouse[duckdb]",
-    "adbc-poolhouse[sqlite]",
+    "adbc-poolhouse[all]",
     "basedpyright>=1.38.0",
     "coverage[toml]",
     "ipython>=9.10.0",
@@ -52,7 +51,6 @@ dev = [
     "pytest-cov>=6.0.0",
     "ruff>=0.15.1",
     "pytest-adbc-replay>=1.0.0a3",
-    "adbc-driver-snowflake>=1.0.0",
 ]
 docs = [
     "mkdocs>=1.6.0",

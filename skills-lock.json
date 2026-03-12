@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "skills": {
+    "diataxis-documentation": {
+      "source": "abatilo/vimrc",
+      "sourceType": "github",
+      "computedHash": "f86a3fd1f361a8f63e39c73da24cb99a9ea958fbcd8eae34705d8089fc825561"
+    },
+    "humanizer": {
+      "source": "blader/humanizer",
+      "sourceType": "github",
+      "computedHash": "67bd72223e92b4f520a1abbc9ff9db50641ed84128ba9521028d9b151dbd2429"
+    }
+  }
+}

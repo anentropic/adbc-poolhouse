@@ -171,8 +171,7 @@ sqlite = [
 
 [package.dev-dependencies]
 dev = [
-    { name = "adbc-driver-snowflake" },
-    { name = "adbc-poolhouse", extra = ["duckdb", "sqlite"] },
+    { name = "adbc-poolhouse", extra = ["all"] },
     { name = "basedpyright" },
     { name = "coverage", extra = ["toml"] },
     { name = "ipython", version = "9.10.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
@@ -215,9 +214,7 @@ provides-extras = ["duckdb", "snowflake", "postgresql", "flightsql", "bigquery",
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "adbc-driver-snowflake", specifier = ">=1.0.0" },
-    { name = "adbc-poolhouse", extras = ["duckdb"] },
-    { name = "adbc-poolhouse", extras = ["sqlite"] },
+    { name = "adbc-poolhouse", extras = ["all"] },
     { name = "basedpyright", specifier = ">=1.38.0" },
     { name = "coverage", extras = ["toml"] },
     { name = "ipython", specifier = ">=9.10.0" },

@@ -27,20 +27,11 @@ docs-serve port="8000":
 install-dbc:
     command -v dbc || curl -LsSf https://dbc.columnar.tech/install.sh | sh
 
-# Install MySQL and ClickHouse Foundry ADBC drivers into the active virtualenv.
-# dbc detects VIRTUAL_ENV automatically — no --level flag required.
-# Two separate calls: dbc install with multiple args is not confirmed by official docs.
-# ClickHouse requires --pre: only alpha v0.1.0-alpha.1 is currently published.
-install-foundry-drivers:
-    dbc install mysql
-    dbc install databricks
-    dbc install --pre clickhouse
-
 # Install all 12 ADBC drivers (PyPI + Foundry) for semi-integration tests.
 # PyPI drivers: duckdb, snowflake, bigquery, postgresql, flightsql, sqlite
 # Foundry drivers: databricks, redshift, trino, mssql, mysql, clickhouse
 install-all-drivers: install-dbc
-    uv pip install -e ".[duckdb,snowflake,bigquery,postgresql,flightsql,sqlite]"
+    uv sync --dev
     dbc install databricks
     dbc install redshift
     dbc install trino

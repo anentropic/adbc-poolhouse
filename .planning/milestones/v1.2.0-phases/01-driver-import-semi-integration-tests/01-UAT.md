@@ -8,21 +8,21 @@ updated: 2026-03-12T09:45:00Z
 
 ## Current Test
 
-number: 1
-name: All 12 backend tests pass
+number: 3
+name: Install All Drivers Recipe Works
 expected: |
-  Running `uv run pytest tests/test_driver_imports.py -v` shows all 12 tests pass (one per backend: DuckDB, Snowflake, BigQuery, PostgreSQL, FlightSQL, SQLite, Databricks, Redshift, Trino, MSSQL, MySQL, ClickHouse)
+  Running `just install-all-drivers` installs all 12 drivers (6 PyPI + 6 Foundry) without errors
 awaiting: user response
 
 ## Tests
 
 ### 1. All 12 Backend Tests Pass
 expected: Running `uv run pytest tests/test_driver_imports.py -v` shows all 12 tests pass (one per backend)
-result: pending
+result: pass
 
 ### 2. Install All Drivers Recipe Exists
 expected: Running `just --list` shows `install-all-drivers` as an available recipe
-result: pending
+result: pass
 
 ### 3. Install All Drivers Recipe Works
 expected: Running `just install-all-drivers` installs all 12 drivers (6 PyPI + 6 Foundry) without errors
@@ -31,9 +31,9 @@ result: pending
 ## Summary
 
 total: 3
-passed: 0
+passed: 2
 issues: 0
-pending: 3
+pending: 1
 skipped: 0
 
 ## Gaps
