@@ -176,3 +176,52 @@ class TestRegistryLookup:
 
         with pytest.raises(BackendNotRegisteredError, match=config_type_name):
             get_translator(config)  # type: ignore[arg-type]
+
+
+class TestDummyBackend:
+    """Tests for the dummy backend fixture."""
+
+    def test_fixture_can_be_registered(
+        self, dummy_backend: dict[str, object], clean_registry: None
+    ) -> None:
+        """The fixture can be used with register_backend()."""
+        from adbc_poolhouse._registry import register_backend
+
+        # Should not raise any exception
+        register_backend(
+            name=str(dummy_backend["name"]),
+            config_class=dummy_backend["config_class"],  # type: ignore[arg-type]
+            translator=dummy_backend["translator"],  # type: ignore[arg-type]
+            driver_path=str(dummy_backend["driver_path"]),
+        )
+
+    def test_registered_dummy_backend_returns_correct_translator(
+        self, dummy_backend: dict[str, object], clean_registry: None
+    ) -> None:
+        """Registered dummy backend returns correct translator and driver_path."""
+        from adbc_poolhouse._registry import (
+            get_driver_path,
+            get_translator,
+            register_backend,
+        )
+
+        register_backend(
+            name=str(dummy_backend["name"]),
+            config_class=dummy_backend["config_class"],  # type: ignore[arg-type]
+            translator=dummy_backend["translator"],  # type: ignore[arg-type]
+            driver_path=str(dummy_backend["driver_path"]),
+        )
+
+        config = dummy_backend["config_instance"]
+
+        # Verify translator
+        translator = get_translator(config)  # type: ignore[arg-type]
+        assert translator is dummy_backend["translator"]
+
+        # Verify translator works and returns expected output
+        result = translator(config)  # type: ignore[arg-type]
+        assert result == {"dummy_key": "dummy_value"}
+
+        # Verify driver_path
+        driver_path = get_driver_path(config)  # type: ignore[arg-type]
+        assert driver_path == dummy_backend["driver_path"]
