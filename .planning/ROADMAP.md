@@ -2,9 +2,29 @@
 
 ## Milestones
 
+- v1.2.0 **Plugin/Extensibility API** — Phases 1-4 (planned)
 - v1.0.0 **MVP + Backend Expansion** — Phases 1-15 (shipped 2026-03-07)
 
 ## Phases
+
+<details>
+<summary>v1.2.0 Plugin/Extensibility API (Phases 1-4) — PLANNED</summary>
+
+- [ ] Phase 1: Driver Import Semi-Integration Tests (2 plans)
+
+  **Goal:** All 12 backend semi-integration tests pass with real driver imports and mocked connections.
+
+  **Requirements:** TEST-01, TEST-02, TEST-03, TEST-04
+
+  Plans:
+  - [ ] 01-01-PLAN.md — Create tests/imports/ with 12 backend test classes
+  - [ ] 01-02-PLAN.md — Add install-all-drivers justfile recipe
+
+- [ ] Phase 2: Registry Infrastructure (0/2 plans)
+- [ ] Phase 3: Entry Point Discovery (0/2 plans)
+- [ ] Phase 4: Plugin Author Documentation (0/2 plans)
+
+</details>
 
 <details>
 <summary>v1.0.0 MVP + Backend Expansion (Phases 1-15) — SHIPPED 2026-03-07</summary>
@@ -30,6 +50,12 @@
 ## Progress
 
 | Phase | Milestone | Plans Complete | Status | Completed |
+|-------|-----------|----------------|--------|-----------|
+| 1. Driver Import Semi-Integration Tests | v1.2.0 | 0/2 | Not started | - |
+| 2. Registry Infrastructure | v1.2.0 | 0/2 | Not started | - |
+| 3. Entry Point Discovery | v1.2.0 | 0/2 | Not started | - |
+| 4. Plugin Author Documentation | v1.2.0 | 0/2 | Not started | - |
+|-------|-----------|----------------|--------|-----------|
 |-------|-----------|----------------|--------|-----------|
 | 1. Pre-flight Fixes | v1.0.0 | 1/1 | Complete | 2026-02-23 |
 | 2. Dependency Declarations | v1.0.0 | 2/2 | Complete | 2026-02-23 |
