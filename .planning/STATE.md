@@ -1,16 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.0.0
-milestone_name: MVP + Backend Expansion
+milestone: v1.2
+milestone_name: milestone
 status: completed
-stopped_at: Milestone v1.0.0 archived
-last_updated: "2026-03-07T12:30:00.000Z"
-last_activity: 2026-03-07 — Completed quick task 10: Rewrite integration tests to use pool API
+stopped_at: Phase 1 context gathered
+last_updated: "2026-03-12T00:22:28.807Z"
+last_activity: "2026-03-07 — Completed quick task 10: Rewrite integration tests to use pool API"
 progress:
-  total_phases: 15
-  completed_phases: 15
-  total_plans: 51
-  completed_plans: 51
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
   percent: 100
 ---
 
@@ -43,6 +43,7 @@ All decisions from v1.0.0 have been reviewed and marked with outcomes.
 - 15 phases completed across v1.0.0 milestone
 - Phase 6 (syrupy) superseded by Phase 15 (pytest-adbc-replay cassettes)
 - Gap closure phases (13-14) added after milestone audit
+- v1.2.0 phases renumbered: Phase 1 (Driver Import Tests) inserted, Registry Infrastructure → Phase 2, Entry Point Discovery → Phase 3, Plugin Author Documentation → Phase 4
 
 ### Blockers/Concerns
 
@@ -56,6 +57,6 @@ None — milestone complete.
 
 ## Session Continuity
 
-Last session: 2026-03-07
-Stopped at: Milestone v1.0.0 archived
-Resume file: None
+Last session: 2026-03-12T00:22:28.802Z
+Stopped at: Phase 1 context gathered
+Resume file: .planning/milestones/v1.2.0-phases/01-driver-import-semi-integration-tests/01-CONTEXT.md
