@@ -25,3 +25,50 @@ class ConfigurationError(PoolhouseError, ValueError):
         # raises pydantic.ValidationError (which wraps ConfigurationError,
         # and ValidationError itself inherits from ValueError)
     """
+
+
+class RegistryError(PoolhouseError):
+    """
+    Base exception for all registry-related errors.
+
+    All backend registration and lookup errors inherit from this class.
+    Consumers can use ``except RegistryError`` to catch any registry error.
+    """
+
+
+class BackendAlreadyRegisteredError(RegistryError):
+    """
+    Raised when attempting to register a backend name that already exists.
+
+    Args:
+        name: The backend name that was already registered.
+
+    Example::
+
+        register_backend("my_backend", MyConfig, my_translator, "driver_path")
+        register_backend("my_backend", OtherConfig, other_translator, "path")
+        # raises BackendAlreadyRegisteredError("my_backend")
+    """
+
+    def __init__(self, name: str) -> None:
+        super().__init__(f"Backend '{name}' is already registered")
+
+
+class BackendNotRegisteredError(RegistryError):
+    """
+    Raised when looking up a backend that has not been registered.
+
+    Args:
+        config_name: The name of the config type that has no registered backend.
+
+    Example::
+
+        create_pool(UnregisteredConfig())
+        # raises BackendNotRegisteredError("UnregisteredConfig")
+    """
+
+    def __init__(self, config_name: str) -> None:
+        super().__init__(
+            f"Backend for config type '{config_name}' is not registered. "
+            f"Call register_backend() to register a custom backend."
+        )
