@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 from adbc_poolhouse._exceptions import (
@@ -11,14 +10,13 @@ from adbc_poolhouse._exceptions import (
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from adbc_poolhouse._base_config import WarehouseConfig
 
 
-# Type alias for translator function signature
-TranslatorFunc = Callable[["WarehouseConfig"], dict[str, str]]
-
-# Registration data: (config_class, translator, driver_path)
-_Registration = tuple[type["WarehouseConfig"], TranslatorFunc, str]
+# Registration data: (config_class, driver_path)
+_Registration = tuple[type["WarehouseConfig"], str]
 
 # Forward lookup: name → registration
 _registry: dict[str, _Registration] = {}
@@ -33,7 +31,6 @@ _lazy_registrations: dict[type[WarehouseConfig], Callable[[], None]] = {}
 def register_backend(
     name: str,
     config_class: type[WarehouseConfig],
-    translator: TranslatorFunc,
     driver_path: str,
 ) -> None:
     """
@@ -42,12 +39,11 @@ def register_backend(
     Args:
         name: Unique backend name (e.g., "adbc_driver_snowflake", "my_custom_backend").
         config_class: The config class for this backend (must be a class, not instance).
-        translator: Function that translates config to ADBC connection kwargs.
         driver_path: Path or name passed to adbc_driver_manager.dbapi.connect(driver=...).
 
     Raises:
         BackendAlreadyRegisteredError: If a backend with this name already exists.
-        TypeError: If config_class is not a class or translator is not callable.
+        TypeError: If config_class is not a class.
     """
     if name in _registry:
         raise BackendAlreadyRegisteredError(name)
@@ -55,32 +51,8 @@ def register_backend(
     if not isinstance(config_class, type):  # pyright: ignore[reportUnnecessaryIsInstance]
         raise TypeError(f"config_class must be a class, got {type(config_class).__name__}")
 
-    if not callable(translator):
-        raise TypeError(f"translator must be callable, got {type(translator).__name__}")
-
-    _registry[name] = (config_class, translator, driver_path)
+    _registry[name] = (config_class, driver_path)
     _config_to_name[config_class] = name
-
-
-def get_translator(config: WarehouseConfig) -> TranslatorFunc:
-    """
-    Get the translator function for a config instance.
-
-    Args:
-        config: A warehouse config instance.
-
-    Returns:
-        The translator function registered for this config type.
-
-    Raises:
-        BackendNotRegisteredError: If no backend is registered for this config type.
-    """
-    config_type = type(config)
-    if config_type not in _config_to_name:
-        raise BackendNotRegisteredError(config_type.__name__)
-
-    name = _config_to_name[config_type]
-    return _registry[name][1]
 
 
 def get_driver_path(config: WarehouseConfig) -> str:
@@ -101,7 +73,7 @@ def get_driver_path(config: WarehouseConfig) -> str:
         raise BackendNotRegisteredError(config_type.__name__)
 
     name = _config_to_name[config_type]
-    return _registry[name][2]
+    return _registry[name][1]
 
 
 def ensure_registered(config: WarehouseConfig) -> None:
@@ -144,7 +116,7 @@ def register_lazy(
 
     The registration function will be called the first time a config of this
     type is encountered in ensure_registered(). This is used internally for
-    built-in backends to avoid importing all translator modules at startup.
+    built-in backends to avoid importing all driver modules at startup.
 
     Args:
         config_class: The config class to register lazily.
