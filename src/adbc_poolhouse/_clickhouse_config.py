@@ -66,6 +66,39 @@ class ClickHouseConfig(BaseWarehouseConfig):
     database: str | None = None
     """ClickHouse database name. Optional. Env: CLICKHOUSE_DATABASE."""
 
+    def to_adbc_kwargs(self) -> dict[str, str]:
+        """
+        Convert config to ADBC driver connection kwargs.
+
+        Supports two modes:
+
+        - URI mode (``uri`` set): returns ``{uri: ...}`` with the secret
+          value extracted.
+        - Decomposed mode (``host`` + ``username`` set): returns individual
+          kwargs with ``port`` as a string. ``password`` and ``database``
+          are omitted when ``None``.
+
+        Returns:
+            Dict of ADBC driver kwargs for ``adbc_driver_manager.dbapi.connect()``.
+        """
+        if self.uri is not None:
+            return {"uri": self.uri.get_secret_value()}
+
+        # Decomposed mode -- model_validator guarantees host and username are set
+        assert self.host is not None
+        assert self.username is not None
+
+        result: dict[str, str] = {
+            "username": self.username,
+            "host": self.host,
+            "port": str(self.port),
+        }
+        if self.password is not None:
+            result["password"] = self.password.get_secret_value()  # pragma: allowlist secret
+        if self.database is not None:
+            result["database"] = self.database
+        return result
+
     @model_validator(mode="after")
     def check_connection_spec(self) -> Self:
         """Raise ConfigurationError if neither uri nor minimum decomposed fields are set."""

@@ -790,3 +790,94 @@ class TestClickHouseTranslator:
         )
         result = translate_clickhouse(config)
         assert list(result.keys()) == ["uri"]
+
+
+class TestClickHouseToAdbcKwargs:
+    """Unit tests for ClickHouseConfig.to_adbc_kwargs() method."""
+
+    def test_uri_mode_secret_extracted(self) -> None:
+        """URI mode extracts SecretStr value via to_adbc_kwargs()."""
+        config = ClickHouseConfig(
+            uri=SecretStr("http://user:pass@localhost:8123/db")  # pragma: allowlist secret
+        )
+        result = config.to_adbc_kwargs()
+        assert result == {"uri": "http://user:pass@localhost:8123/db"}  # pragma: allowlist secret
+
+    def test_decomposed_minimum(self) -> None:
+        """Decomposed minimum via to_adbc_kwargs(): host, username, port as string."""
+        config = ClickHouseConfig(host="localhost", username="default")
+        result = config.to_adbc_kwargs()
+        assert result == {"username": "default", "host": "localhost", "port": "8123"}
+
+    def test_decomposed_full(self) -> None:
+        """Full decomposed mode via to_adbc_kwargs() includes password and database."""
+        config = ClickHouseConfig(
+            host="localhost",
+            username="default",
+            password=SecretStr("secret"),  # pragma: allowlist secret
+            database="mydb",
+        )
+        result = config.to_adbc_kwargs()
+        assert result == {
+            "username": "default",
+            "host": "localhost",
+            "port": "8123",
+            "password": "secret",  # pragma: allowlist secret
+            "database": "mydb",
+        }
+
+    def test_port_is_string(self) -> None:
+        """Port is always str via to_adbc_kwargs()."""
+        config = ClickHouseConfig(host="h", username="u")
+        result = config.to_adbc_kwargs()
+        assert result["port"] == "8123"
+        assert isinstance(result["port"], str)
+
+    def test_custom_port_as_string(self) -> None:
+        """Non-default port appears as string via to_adbc_kwargs()."""
+        config = ClickHouseConfig(host="h", username="u", port=8443)
+        result = config.to_adbc_kwargs()
+        assert result["port"] == "8443"
+
+    def test_password_omitted_when_none(self) -> None:
+        """Password absent from to_adbc_kwargs() when password is None."""
+        config = ClickHouseConfig(host="h", username="u")
+        result = config.to_adbc_kwargs()
+        assert "password" not in result  # pragma: allowlist secret
+
+    def test_database_omitted_when_none(self) -> None:
+        """Database absent from to_adbc_kwargs() when database is None."""
+        config = ClickHouseConfig(host="h", username="u")
+        result = config.to_adbc_kwargs()
+        assert "database" not in result
+
+    def test_username_key_not_user(self) -> None:
+        """to_adbc_kwargs() uses 'username' key, not 'user'."""
+        config = ClickHouseConfig(host="h", username="default")
+        result = config.to_adbc_kwargs()
+        assert "username" in result
+        assert "user" not in result
+
+    def test_matches_translate_clickhouse(self) -> None:
+        """to_adbc_kwargs() produces identical output to translate_clickhouse()."""
+        config = ClickHouseConfig(
+            host="localhost",
+            username="default",
+            password=SecretStr("secret"),  # pragma: allowlist secret
+            database="mydb",
+        )
+        assert config.to_adbc_kwargs() == translate_clickhouse(config)
+
+    def test_uri_mode_matches_translate_clickhouse(self) -> None:
+        """to_adbc_kwargs() in URI mode matches translate_clickhouse()."""
+        config = ClickHouseConfig(
+            uri=SecretStr("http://user:pass@h:8123/db")  # pragma: allowlist secret
+        )
+        assert config.to_adbc_kwargs() == translate_clickhouse(config)
+
+    def test_no_pool_fields_in_output(self) -> None:
+        """Pool tuning fields excluded from to_adbc_kwargs() output."""
+        config = ClickHouseConfig(host="h", username="u")
+        result = config.to_adbc_kwargs()
+        for key in ("pool_size", "max_overflow", "timeout", "recycle"):
+            assert key not in result
