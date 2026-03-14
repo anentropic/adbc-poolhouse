@@ -107,6 +107,73 @@ class TestSnowflakeTranslator:
         assert result["adbc.snowflake.sql.client_option.jwt_private_key"] == "/tmp/key.pem"
 
 
+class TestSnowflakeToAdbcKwargs:
+    """Unit tests for SnowflakeConfig.to_adbc_kwargs() method."""
+
+    def test_account_only(self) -> None:
+        """SnowflakeConfig.to_adbc_kwargs() with only account set."""
+        result = SnowflakeConfig(account="myorg-myaccount").to_adbc_kwargs()
+        assert result["adbc.snowflake.sql.account"] == "myorg-myaccount"
+        assert "username" not in result
+        assert "password" not in result  # pragma: allowlist secret
+
+    def test_user_and_password(self) -> None:
+        """SnowflakeConfig.to_adbc_kwargs() with user+password."""
+        secret = SecretStr("s3cr3t")  # pragma: allowlist secret
+        result = SnowflakeConfig(account="a", user="bob", password=secret).to_adbc_kwargs()
+        assert result["username"] == "bob"
+        assert result["password"] == "s3cr3t"  # pragma: allowlist secret
+
+    def test_schema_mapping(self) -> None:
+        """schema_ Python attribute maps to ADBC key via to_adbc_kwargs()."""
+        config = SnowflakeConfig.model_validate({"account": "a", "schema": "PUBLIC"})
+        result = config.to_adbc_kwargs()
+        assert result["adbc.snowflake.sql.schema"] == "PUBLIC"
+
+    def test_bool_defaults_as_strings(self) -> None:
+        """Default boolean flags always appear as 'true'/'false' strings via to_adbc_kwargs()."""
+        result = SnowflakeConfig(account="a").to_adbc_kwargs()
+        assert result["adbc.snowflake.sql.client_option.tls_skip_verify"] == "false"
+        assert result["adbc.snowflake.sql.client_option.ocsp_fail_open_mode"] == "true"
+
+    def test_private_key_path(self) -> None:
+        """private_key_path maps to jwt_private_key ADBC key via to_adbc_kwargs()."""
+        key_path = Path("/tmp/key.pem")
+        result = SnowflakeConfig(account="a", private_key_path=key_path).to_adbc_kwargs()
+        assert result["adbc.snowflake.sql.client_option.jwt_private_key"] == "/tmp/key.pem"
+
+    def test_matches_translate_snowflake(self) -> None:
+        """to_adbc_kwargs() produces identical output to translate_snowflake()."""
+        config = SnowflakeConfig.model_validate(
+            {
+                "account": "org-acct",
+                "user": "alice",
+                "password": "pw",  # pragma: allowlist secret
+                "database": "mydb",
+                "schema": "PUBLIC",
+                "warehouse": "wh",
+                "tls_skip_verify": True,
+            }
+        )
+        assert config.to_adbc_kwargs() == translate_snowflake(config)
+
+    def test_no_pool_fields_in_output(self) -> None:
+        """Pool tuning fields (pool_size, max_overflow, timeout, recycle) excluded."""
+        result = SnowflakeConfig(account="a").to_adbc_kwargs()
+        for key in ("pool_size", "max_overflow", "timeout", "recycle"):
+            assert key not in result
+
+    def test_oauth_token(self) -> None:
+        """oauth_token SecretStr extracted via to_adbc_kwargs()."""
+        config = SnowflakeConfig(
+            account="a",
+            auth_type="auth_oauth",
+            oauth_token=SecretStr("tok"),  # pragma: allowlist secret
+        )
+        result = config.to_adbc_kwargs()
+        assert result["adbc.snowflake.sql.client_option.auth_token"] == "tok"
+
+
 class TestBigQueryTranslator:
     """Unit tests for translate_bigquery()."""
 

@@ -129,3 +129,107 @@ class SnowflakeConfig(BaseWarehouseConfig):
                 "private_key_pem for inline PEM content."
             )
         return self
+
+    def to_adbc_kwargs(self) -> dict[str, str]:
+        """
+        Convert config to ADBC driver connection kwargs.
+
+        Returns a dict[str, str] suitable for passing as ``db_kwargs`` to
+        ``adbc_driver_manager.dbapi.connect()``. All values are strings;
+        None fields are omitted. Boolean fields are always included as
+        ``'true'``/``'false'`` strings.
+
+        Key names follow adbc_driver_snowflake ``DatabaseOptions`` and
+        ``AuthType`` enums. ``'username'`` and ``'password'`` are plain
+        string keys (not prefixed with ``'adbc.snowflake.sql.*'``).
+        """
+        kwargs: dict[str, str] = {}
+
+        # --- Identity (always include) ---
+        kwargs["adbc.snowflake.sql.account"] = self.account
+
+        # --- Auth (include only if not None) ---
+        if self.user is not None:
+            kwargs["username"] = self.user
+        if self.password is not None:
+            kwargs["password"] = self.password.get_secret_value()  # pragma: allowlist secret
+        if self.auth_type is not None:
+            kwargs["adbc.snowflake.sql.auth_type"] = self.auth_type
+
+        # --- JWT / private key (include only if not None) ---
+        if self.private_key_path is not None:
+            kwargs["adbc.snowflake.sql.client_option.jwt_private_key"] = str(self.private_key_path)
+        if self.private_key_pem is not None:
+            kwargs["adbc.snowflake.sql.client_option.jwt_private_key_pkcs8_value"] = (
+                self.private_key_pem.get_secret_value()  # pragma: allowlist secret
+            )
+        if self.private_key_passphrase is not None:
+            kwargs["adbc.snowflake.sql.client_option.jwt_private_key_pkcs8_password"] = (
+                self.private_key_passphrase.get_secret_value()  # pragma: allowlist secret
+            )
+        if self.jwt_expire_timeout is not None:
+            kwargs["adbc.snowflake.sql.client_option.jwt_expire_timeout"] = self.jwt_expire_timeout
+
+        # --- OAuth / Okta / WIF (include only if not None) ---
+        if self.oauth_token is not None:
+            kwargs["adbc.snowflake.sql.client_option.auth_token"] = (
+                self.oauth_token.get_secret_value()  # pragma: allowlist secret
+            )
+        if self.okta_url is not None:
+            kwargs["adbc.snowflake.sql.client_option.okta_url"] = self.okta_url
+        if self.identity_provider is not None:
+            kwargs["adbc.snowflake.sql.client_option.identity_provider"] = self.identity_provider
+
+        # --- Session / scope (include only if not None) ---
+        if self.database is not None:
+            kwargs["adbc.snowflake.sql.db"] = self.database
+        if self.schema_ is not None:
+            kwargs["adbc.snowflake.sql.schema"] = self.schema_
+        if self.warehouse is not None:
+            kwargs["adbc.snowflake.sql.warehouse"] = self.warehouse
+        if self.role is not None:
+            kwargs["adbc.snowflake.sql.role"] = self.role
+        if self.region is not None:
+            kwargs["adbc.snowflake.sql.region"] = self.region
+
+        # --- Connection (include only if not None) ---
+        if self.host is not None:
+            kwargs["adbc.snowflake.sql.uri.host"] = self.host
+        if self.port is not None:
+            kwargs["adbc.snowflake.sql.uri.port"] = str(self.port)
+        if self.protocol is not None:
+            kwargs["adbc.snowflake.sql.uri.protocol"] = self.protocol
+
+        # --- Timeouts (include only if not None) ---
+        if self.login_timeout is not None:
+            kwargs["adbc.snowflake.sql.client_option.login_timeout"] = self.login_timeout
+        if self.request_timeout is not None:
+            kwargs["adbc.snowflake.sql.client_option.request_timeout"] = self.request_timeout
+        if self.client_timeout is not None:
+            kwargs["adbc.snowflake.sql.client_option.client_timeout"] = self.client_timeout
+
+        # --- Boolean flags (always include) ---
+        kwargs["adbc.snowflake.sql.client_option.tls_skip_verify"] = str(
+            self.tls_skip_verify
+        ).lower()
+        kwargs["adbc.snowflake.sql.client_option.ocsp_fail_open_mode"] = str(
+            self.ocsp_fail_open_mode
+        ).lower()
+        kwargs["adbc.snowflake.sql.client_option.keep_session_alive"] = str(
+            self.keep_session_alive
+        ).lower()
+        kwargs["adbc.snowflake.sql.client_option.disable_telemetry"] = str(
+            self.disable_telemetry
+        ).lower()
+        kwargs["adbc.snowflake.sql.client_option.cache_mfa_token"] = str(
+            self.cache_mfa_token
+        ).lower()
+        kwargs["adbc.snowflake.sql.client_option.store_temp_creds"] = str(
+            self.store_temp_creds
+        ).lower()
+
+        # --- Misc (include only if not None) ---
+        if self.app_name is not None:
+            kwargs["adbc.snowflake.sql.client_option.app_name"] = self.app_name
+
+        return kwargs
