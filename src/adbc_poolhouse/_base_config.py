@@ -30,6 +30,10 @@ class WarehouseConfig(Protocol):
 
     def _adbc_entrypoint(self) -> str | None: ...
 
+    def to_adbc_kwargs(self) -> dict[str, str]:
+        """Convert config to ADBC driver connection kwargs."""
+        ...
+
 
 class BaseWarehouseConfig(BaseSettings):
     """
@@ -65,3 +69,12 @@ class BaseWarehouseConfig(BaseSettings):
         Internal only — not part of the public API.
         """
         return None
+
+    def to_adbc_kwargs(self) -> dict[str, str]:
+        """
+        Convert config to ADBC driver connection kwargs.
+
+        Subclasses must override this method to provide backend-specific
+        serialization. The default implementation raises NotImplementedError.
+        """
+        raise NotImplementedError(f"{self.__class__.__name__} must implement to_adbc_kwargs()")
