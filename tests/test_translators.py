@@ -63,6 +63,41 @@ class TestDuckDBTranslator:
         assert "access_mode" not in result
 
 
+class TestDuckDBToAdbcKwargs:
+    """Unit tests for DuckDBConfig.to_adbc_kwargs() method."""
+
+    def test_memory_database(self) -> None:
+        """DuckDBConfig().to_adbc_kwargs() uses ':memory:' by default — maps to path key."""
+        result = DuckDBConfig().to_adbc_kwargs()
+        assert result == {"path": ":memory:"}
+
+    def test_file_database(self) -> None:
+        """DuckDBConfig(database=...).to_adbc_kwargs() maps database to 'path' key."""
+        result = DuckDBConfig(database="/tmp/test.db").to_adbc_kwargs()
+        assert result == {"path": "/tmp/test.db"}
+
+    def test_read_only(self) -> None:
+        """read_only=True adds 'access_mode' = 'READ_ONLY' via to_adbc_kwargs()."""
+        result = DuckDBConfig(database="/tmp/test.db", read_only=True).to_adbc_kwargs()
+        assert result == {"path": "/tmp/test.db", "access_mode": "READ_ONLY"}
+
+    def test_read_only_false_omitted(self) -> None:
+        """read_only=False (default) does not emit 'access_mode' via to_adbc_kwargs()."""
+        result = DuckDBConfig(database="/tmp/test.db", read_only=False).to_adbc_kwargs()
+        assert "access_mode" not in result
+
+    def test_matches_translate_duckdb(self) -> None:
+        """to_adbc_kwargs() produces identical output to translate_duckdb()."""
+        config = DuckDBConfig(database="/tmp/test.db", read_only=True)
+        assert config.to_adbc_kwargs() == translate_duckdb(config)
+
+    def test_no_pool_fields_in_output(self) -> None:
+        """Pool tuning fields (pool_size, max_overflow, timeout, recycle) excluded."""
+        result = DuckDBConfig().to_adbc_kwargs()
+        for key in ("pool_size", "max_overflow", "timeout", "recycle"):
+            assert key not in result
+
+
 class TestSnowflakeTranslator:
     """Unit tests for translate_snowflake()."""
 

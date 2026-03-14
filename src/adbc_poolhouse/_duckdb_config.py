@@ -80,6 +80,19 @@ class DuckDBConfig(BaseWarehouseConfig):
     def _adbc_entrypoint(self) -> str | None:
         return "duckdb_adbc_init"
 
+    def to_adbc_kwargs(self) -> dict[str, str]:
+        """
+        Convert config to ADBC driver connection kwargs.
+
+        Returns:
+            Dict with ``'path'`` key (always) and ``'access_mode'`` set to
+            ``'READ_ONLY'`` when ``read_only`` is True.
+        """
+        result: dict[str, str] = {"path": self.database}
+        if self.read_only:
+            result["access_mode"] = "READ_ONLY"
+        return result
+
     @model_validator(mode="after")
     def check_memory_pool_size(self) -> Self:
         if self.database == ":memory:" and self.pool_size > 1:
