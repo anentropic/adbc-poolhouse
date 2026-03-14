@@ -681,6 +681,36 @@ class TestSQLiteTranslator:
         assert list(result.keys()) == ["uri"]
 
 
+class TestSQLiteToAdbcKwargs:
+    """Unit tests for SQLiteConfig.to_adbc_kwargs() method."""
+
+    def test_memory_database(self) -> None:
+        """SQLiteConfig().to_adbc_kwargs() uses ':memory:' by default — maps to 'uri' key."""
+        result = SQLiteConfig().to_adbc_kwargs()
+        assert result == {"uri": ":memory:"}
+
+    def test_file_database(self) -> None:
+        """SQLiteConfig(database=...).to_adbc_kwargs() maps database to 'uri' key."""
+        result = SQLiteConfig(database="/data/x.db").to_adbc_kwargs()
+        assert result == {"uri": "/data/x.db"}
+
+    def test_output_has_only_uri_key(self) -> None:
+        """to_adbc_kwargs() returns exactly one key ('uri')."""
+        result = SQLiteConfig().to_adbc_kwargs()
+        assert list(result.keys()) == ["uri"]
+
+    def test_matches_translate_sqlite(self) -> None:
+        """to_adbc_kwargs() produces identical output to translate_sqlite()."""
+        config = SQLiteConfig(database="/data/x.db")
+        assert config.to_adbc_kwargs() == translate_sqlite(config)
+
+    def test_no_pool_fields_in_output(self) -> None:
+        """Pool tuning fields excluded from to_adbc_kwargs() output."""
+        result = SQLiteConfig().to_adbc_kwargs()
+        for key in ("pool_size", "max_overflow", "timeout", "recycle"):
+            assert key not in result
+
+
 class TestClickHouseTranslator:
     """Unit tests for translate_clickhouse()."""
 
