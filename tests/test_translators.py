@@ -581,6 +581,75 @@ class TestTrinoTranslator:
         assert result["catalog"] == "my_catalog"
 
 
+class TestTrinoToAdbcKwargs:
+    """Unit tests for TrinoConfig.to_adbc_kwargs() method."""
+
+    def test_no_uri_uses_decomposed_fields(self) -> None:
+        """TrinoConfig().to_adbc_kwargs() with no uri returns ssl defaults."""
+        result = TrinoConfig().to_adbc_kwargs()
+        assert result["ssl"] == "true"
+        assert result["ssl_verify"] == "true"
+        assert "uri" not in result
+
+    def test_uri_takes_precedence(self) -> None:
+        """Uri set via to_adbc_kwargs() returns only {'uri': ...}."""
+        result = TrinoConfig(uri="trino://user@host:8080/catalog").to_adbc_kwargs()
+        assert result == {"uri": "trino://user@host:8080/catalog"}
+
+    def test_host_and_catalog(self) -> None:
+        """Host and catalog via to_adbc_kwargs()."""
+        result = TrinoConfig(host="trino-host", catalog="my_catalog").to_adbc_kwargs()
+        assert result["host"] == "trino-host"
+        assert result["catalog"] == "my_catalog"
+
+    def test_ssl_false(self) -> None:
+        """ssl=False via to_adbc_kwargs()."""
+        result = TrinoConfig(ssl=False).to_adbc_kwargs()
+        assert result["ssl"] == "false"
+
+    def test_full_decomposed(self) -> None:
+        """All decomposed fields via to_adbc_kwargs()."""
+        config = TrinoConfig.model_validate(
+            {
+                "host": "trino-host",
+                "port": 8443,
+                "user": "alice",
+                "password": "secret",  # pragma: allowlist secret
+                "catalog": "hive",
+                "schema": "default",
+                "ssl": True,
+                "ssl_verify": False,
+                "source": "my-app",
+            }
+        )
+        result = config.to_adbc_kwargs()
+        assert result["host"] == "trino-host"
+        assert result["port"] == "8443"
+        assert result["username"] == "alice"
+        assert result["password"] == "secret"  # pragma: allowlist secret
+        assert result["catalog"] == "hive"
+        assert result["schema"] == "default"
+        assert result["ssl"] == "true"
+        assert result["ssl_verify"] == "false"
+        assert result["source"] == "my-app"
+
+    def test_matches_translate_trino(self) -> None:
+        """to_adbc_kwargs() produces identical output to translate_trino()."""
+        config = TrinoConfig(host="trino-host", catalog="hive", user="alice")
+        assert config.to_adbc_kwargs() == translate_trino(config)
+
+    def test_matches_translate_trino_uri_mode(self) -> None:
+        """to_adbc_kwargs() in URI mode matches translate_trino()."""
+        config = TrinoConfig(uri="trino://user@host:8080/catalog")
+        assert config.to_adbc_kwargs() == translate_trino(config)
+
+    def test_no_pool_fields_in_output(self) -> None:
+        """Pool tuning fields excluded from to_adbc_kwargs() output."""
+        result = TrinoConfig().to_adbc_kwargs()
+        for key in ("pool_size", "max_overflow", "timeout", "recycle"):
+            assert key not in result
+
+
 class TestMSSQLTranslator:
     """
     Unit tests for translate_mssql().

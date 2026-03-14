@@ -56,3 +56,47 @@ class TrinoConfig(BaseWarehouseConfig):
     source: str | None = None
     """Application identifier sent to Trino coordinator.
     Env: TRINO_SOURCE."""
+
+    def to_adbc_kwargs(self) -> dict[str, str]:
+        """
+        Convert config to ADBC driver connection kwargs.
+
+        Supports two modes:
+
+        - URI mode (``uri`` set): returns ``{uri: ...}``.
+        - Decomposed mode: maps individual fields to their ADBC key
+          equivalents. Boolean defaults (``ssl``, ``ssl_verify``) are
+          always included as ``'true'``/``'false'`` strings.
+
+        Returns:
+            Dict of ADBC driver kwargs for ``adbc_driver_manager.dbapi.connect()``.
+        """
+        kwargs: dict[str, str] = {}
+
+        # URI-first: if uri is set, use it as the primary connection spec
+        if self.uri is not None:
+            kwargs["uri"] = self.uri
+            return kwargs
+
+        # Decomposed fields (include only if not None)
+        if self.host is not None:
+            kwargs["host"] = self.host
+        if self.port is not None:
+            kwargs["port"] = str(self.port)
+        if self.user is not None:
+            kwargs["username"] = self.user
+        if self.password is not None:
+            kwargs["password"] = self.password.get_secret_value()  # pragma: allowlist secret
+        if self.catalog is not None:
+            kwargs["catalog"] = self.catalog
+        if self.schema_ is not None:
+            kwargs["schema"] = self.schema_
+
+        # SSL fields (bool -> 'true'/'false' strings, always included)
+        kwargs["ssl"] = str(self.ssl).lower()
+        kwargs["ssl_verify"] = str(self.ssl_verify).lower()
+
+        if self.source is not None:
+            kwargs["source"] = self.source
+
+        return kwargs
