@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: milestone
 status: in_progress
-stopped_at: Completed 17.5-04-PLAN.md
-last_updated: "2026-03-14T18:42:44.000Z"
-last_activity: "2026-03-14 — Completed Plan 17.5-04 (URI Construction Backend Implementations)"
+stopped_at: Completed 17.5-05-PLAN.md
+last_updated: "2026-03-14T18:50:54.000Z"
+last_activity: "2026-03-14 — Completed Plan 17.5-05 (Registry Cleanup and Driver Updates)"
 progress:
   total_phases: 5
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 5
-  completed_plans: 4
-  percent: 80
+  completed_plans: 5
+  percent: 100
 ---
 
 # Project State
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-03-07)
 ## Current Position
 
 Milestone: v1.2.0 — Plugin/Extensibility API (IN PROGRESS)
-Phase: 17.5-translator-consolidation (Plan 4/5 complete)
-Status: Phase 17.5 Plan 04 complete, 4/5 plans complete
-Last activity: 2026-03-14 — Completed Plan 17.5-04 (URI Construction Backend Implementations)
+Phase: 17.5-translator-consolidation (Plan 5/5 complete)
+Status: Phase 17.5 complete, 5/5 plans complete
+Last activity: 2026-03-14 — Completed Plan 17.5-05 (Registry Cleanup and Driver Updates)
 
-Progress: [████████░░] 80% (4/5 plans complete)
+Progress: [██████████] 100% (5/5 plans complete)
 
 ## Accumulated Context
 
@@ -72,6 +72,10 @@ All decisions from v1.0.0 have been reviewed and marked with outcomes.
 - Direct method implementation for all 4 URI-construction backends -- follows established pattern from plans 01-03
 - Redshift _build_uri() as private method to keep to_adbc_kwargs() readable -- mirrors translator module's helper pattern
 
+**Phase 17.5 Plan 05 decisions:**
+- Removed TranslatorFunc type alias and get_translator() entirely rather than deprecating -- both are internal symbols not exported from __init__.py
+- Removed transitional fallback in translate_config() since all 12 backends have to_adbc_kwargs()
+
 ### Roadmap Evolution
 
 - 15 phases completed across v1.0.0 milestone
@@ -93,6 +97,6 @@ None — execution proceeding normally.
 
 ## Session Continuity
 
-Last session: 2026-03-14T18:42:44Z
-Stopped at: Completed 17.5-04-PLAN.md
-Next step: Execute Plan 17.5-05 with `/gsd:execute-phase 17.5`
+Last session: 2026-03-14T18:50:54Z
+Stopped at: Completed 17.5-05-PLAN.md
+Next step: Phase 17.5 complete. Proceed to Phase 18 (Entry Point Discovery).
