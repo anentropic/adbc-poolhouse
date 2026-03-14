@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from typing import Self
+from urllib.parse import quote
 
 from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import SettingsConfigDict
@@ -80,3 +81,30 @@ class DatabricksConfig(BaseWarehouseConfig):
                 "'host', 'http_path', and 'token'. Got none of these."
             )
         return self
+
+    def to_adbc_kwargs(self) -> dict[str, str]:
+        """
+        Convert Databricks config fields to ADBC driver kwargs.
+
+        Supports two modes:
+
+        - **URI mode** (``uri`` set): extracts ``SecretStr`` value and returns
+          ``{"uri": ...}``.
+        - **Decomposed mode**: builds ``databricks://token:{encoded}@{host}:443{http_path}``
+          from ``host``, ``http_path``, and ``token``. Token is URL-encoded via
+          :func:`urllib.parse.quote` with ``safe=""``.
+
+        Returns:
+            ADBC driver kwargs for ``adbc_driver_manager.dbapi.connect()``.
+        """
+        if self.uri is not None:
+            return {"uri": self.uri.get_secret_value()}
+
+        # Decomposed mode -- model_validator guarantees all three are set.
+        assert self.host is not None
+        assert self.http_path is not None
+        assert self.token is not None
+
+        encoded_token = quote(self.token.get_secret_value(), safe="")
+        uri = f"databricks://token:{encoded_token}@{self.host}:443{self.http_path}"
+        return {"uri": uri}

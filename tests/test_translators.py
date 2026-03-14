@@ -565,6 +565,63 @@ class TestDatabricksTranslator:
             DatabricksConfig()
 
 
+class TestDatabricksToAdbcKwargs:
+    """Unit tests for DatabricksConfig.to_adbc_kwargs() method."""
+
+    def test_uri_mode_secret_extracted(self) -> None:
+        """URI mode extracts SecretStr value via to_adbc_kwargs()."""
+        secret_uri = SecretStr("databricks://host/catalog")  # pragma: allowlist secret
+        result = DatabricksConfig(uri=secret_uri).to_adbc_kwargs()
+        assert result == {"uri": "databricks://host/catalog"}
+
+    def test_decomposed_fields_url_encoded_token(self) -> None:
+        """Decomposed mode: token with special chars percent-encoded via to_adbc_kwargs()."""
+        config = DatabricksConfig(
+            host="host",
+            http_path="/sql/1.0/warehouses/abc",
+            token=SecretStr("dapi+test=value/path"),  # pragma: allowlist secret
+        )
+        result = config.to_adbc_kwargs()
+        expected = "databricks://token:dapi%2Btest%3Dvalue%2Fpath@host:443/sql/1.0/warehouses/abc"  # pragma: allowlist secret  # noqa: E501
+        assert result == {"uri": expected}
+
+    def test_decomposed_fields_plain_token(self) -> None:
+        """Decomposed mode: plain token passes through via to_adbc_kwargs()."""
+        config = DatabricksConfig(
+            host="adb-xxx.azuredatabricks.net",
+            http_path="/sql/1.0/warehouses/abc123",
+            token=SecretStr("dapitoken"),  # pragma: allowlist secret
+        )
+        result = config.to_adbc_kwargs()
+        expected = "databricks://token:dapitoken@adb-xxx.azuredatabricks.net:443/sql/1.0/warehouses/abc123"  # pragma: allowlist secret  # noqa: E501
+        assert result == {"uri": expected}
+
+    def test_matches_translate_databricks(self) -> None:
+        """to_adbc_kwargs() produces identical output to translate_databricks()."""
+        config = DatabricksConfig(
+            host="host",
+            http_path="/sql/1.0/warehouses/abc",
+            token=SecretStr("dapi+test=value/path"),  # pragma: allowlist secret
+        )
+        assert config.to_adbc_kwargs() == translate_databricks(config)
+
+    def test_matches_translate_databricks_uri_mode(self) -> None:
+        """to_adbc_kwargs() in URI mode matches translate_databricks()."""
+        config = DatabricksConfig(
+            uri=SecretStr("databricks://host/catalog")  # pragma: allowlist secret
+        )
+        assert config.to_adbc_kwargs() == translate_databricks(config)
+
+    def test_no_pool_fields_in_output(self) -> None:
+        """Pool tuning fields excluded from to_adbc_kwargs() output."""
+        config = DatabricksConfig(
+            uri=SecretStr("databricks://host/catalog")  # pragma: allowlist secret
+        )
+        result = config.to_adbc_kwargs()
+        for key in ("pool_size", "max_overflow", "timeout", "recycle"):
+            assert key not in result
+
+
 class TestRedshiftTranslator:
     """Unit tests for translate_redshift()."""
 
