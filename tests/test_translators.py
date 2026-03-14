@@ -465,6 +465,11 @@ class TestTranslateConfig:
         config = SnowflakeConfig(account="a")
         assert translate_config(config) == translate_snowflake(config)
 
+    def test_snowflake_dispatch_uses_to_adbc_kwargs(self) -> None:
+        """translate_config() calls config.to_adbc_kwargs() for Snowflake."""
+        config = SnowflakeConfig(account="a")
+        assert translate_config(config) == config.to_adbc_kwargs()
+
     def test_bigquery_dispatch(self) -> None:
         """translate_config() dispatches BigQueryConfig to translate_bigquery()."""
         config = BigQueryConfig()
