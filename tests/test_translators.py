@@ -228,6 +228,49 @@ class TestBigQueryTranslator:
         assert result == {"adbc.bigquery.sql.auth_type": "SERVICE_ACCOUNT"}
 
 
+class TestBigQueryToAdbcKwargs:
+    """Unit tests for BigQueryConfig.to_adbc_kwargs() method."""
+
+    def test_all_optional_empty(self) -> None:
+        """BigQueryConfig().to_adbc_kwargs() with no args returns empty dict."""
+        result = BigQueryConfig().to_adbc_kwargs()
+        assert result == {}
+
+    def test_project_id(self) -> None:
+        """project_id maps to 'adbc.bigquery.sql.project_id' via to_adbc_kwargs()."""
+        result = BigQueryConfig(project_id="my-proj").to_adbc_kwargs()
+        assert result == {"adbc.bigquery.sql.project_id": "my-proj"}
+
+    def test_auth_type(self) -> None:
+        """auth_type maps to 'adbc.bigquery.sql.auth_type' via to_adbc_kwargs()."""
+        result = BigQueryConfig(auth_type="SERVICE_ACCOUNT").to_adbc_kwargs()
+        assert result == {"adbc.bigquery.sql.auth_type": "SERVICE_ACCOUNT"}
+
+    def test_matches_translate_bigquery(self) -> None:
+        """to_adbc_kwargs() produces identical output to translate_bigquery()."""
+        config = BigQueryConfig(
+            auth_type="json_credential_file",
+            auth_credentials=SecretStr("/path/to/creds.json"),
+            project_id="my-proj",
+            dataset_id="my_dataset",
+        )
+        assert config.to_adbc_kwargs() == translate_bigquery(config)
+
+    def test_auth_credentials_secret_extracted(self) -> None:
+        """auth_credentials SecretStr extracted via to_adbc_kwargs()."""
+        config = BigQueryConfig(
+            auth_credentials=SecretStr("/path/to/creds.json"),
+        )
+        result = config.to_adbc_kwargs()
+        assert result["adbc.bigquery.sql.auth_credentials"] == "/path/to/creds.json"
+
+    def test_no_pool_fields_in_output(self) -> None:
+        """Pool tuning fields excluded from to_adbc_kwargs() output."""
+        result = BigQueryConfig().to_adbc_kwargs()
+        for key in ("pool_size", "max_overflow", "timeout", "recycle"):
+            assert key not in result
+
+
 class TestPostgreSQLTranslator:
     """Unit tests for translate_postgresql()."""
 
