@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from typing import Self
+from urllib.parse import quote
 
 from pydantic import SecretStr, model_validator
 from pydantic_settings import SettingsConfigDict
@@ -71,3 +72,34 @@ class MySQLConfig(BaseWarehouseConfig):
                 "and 'database'. Got none of these."
             )
         return self
+
+    def to_adbc_kwargs(self) -> dict[str, str]:
+        """
+        Convert MySQL config fields to ADBC driver kwargs.
+
+        Supports two modes:
+
+        - **URI mode** (``uri`` set): extracts ``SecretStr`` value and returns
+          ``{"uri": ...}``.
+        - **Decomposed mode**: builds a Go DSN from ``user``, ``password``,
+          ``host``, ``port``, and ``database``. Password is URL-encoded via
+          :func:`urllib.parse.quote` with ``safe=""``.
+
+        Returns:
+            ADBC driver kwargs for ``adbc_driver_manager.dbapi.connect()``.
+        """
+        if self.uri is not None:
+            return {"uri": self.uri.get_secret_value()}
+
+        # Decomposed mode -- model_validator guarantees host, user, database.
+        assert self.host is not None
+        assert self.user is not None
+        assert self.database is not None
+
+        if self.password is not None:
+            encoded_pass = quote(self.password.get_secret_value(), safe="")
+            uri = f"{self.user}:{encoded_pass}@tcp({self.host}:{self.port})/{self.database}"
+        else:
+            uri = f"{self.user}@tcp({self.host}:{self.port})/{self.database}"
+
+        return {"uri": uri}

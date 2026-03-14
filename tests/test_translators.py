@@ -953,6 +953,83 @@ class TestMySQLTranslator:
         assert list(result.keys()) == ["uri"]
 
 
+class TestMySQLToAdbcKwargs:
+    """Unit tests for MySQLConfig.to_adbc_kwargs() method."""
+
+    def test_uri_mode_secret_extracted(self) -> None:
+        """URI mode extracts SecretStr value via to_adbc_kwargs()."""
+        config = MySQLConfig(
+            uri=SecretStr("mysql://user:pass@host/db")  # pragma: allowlist secret
+        )
+        result = config.to_adbc_kwargs()
+        assert result == {"uri": "mysql://user:pass@host/db"}  # pragma: allowlist secret
+
+    def test_decomposed_with_password(self) -> None:
+        """Decomposed mode produces Go DSN via to_adbc_kwargs()."""
+        config = MySQLConfig(
+            host="localhost",
+            user="root",
+            password=SecretStr("my-secret-pw"),  # pragma: allowlist secret
+            database="demo",
+        )
+        result = config.to_adbc_kwargs()
+        expected = "root:my-secret-pw@tcp(localhost:3306)/demo"  # pragma: allowlist secret
+        assert result == {"uri": expected}
+
+    def test_decomposed_without_password(self) -> None:
+        """Decomposed mode without password omits :pass via to_adbc_kwargs()."""
+        config = MySQLConfig(host="localhost", user="root", database="demo")
+        result = config.to_adbc_kwargs()
+        assert result == {"uri": "root@tcp(localhost:3306)/demo"}
+
+    def test_special_chars_in_password_are_percent_encoded(self) -> None:
+        """Special chars in password are percent-encoded via to_adbc_kwargs()."""
+        config = MySQLConfig(
+            host="h",
+            user="u",
+            password=SecretStr("p+a=b/c"),  # pragma: allowlist secret
+            database="db",
+        )
+        result = config.to_adbc_kwargs()
+        assert "p%2Ba%3Db%2Fc" in result["uri"]
+
+    def test_custom_port_appears_in_uri(self) -> None:
+        """Non-default port appears in tcp(host:port) via to_adbc_kwargs()."""
+        config = MySQLConfig(host="host", user="user", database="db", port=5306)
+        result = config.to_adbc_kwargs()
+        assert "tcp(host:5306)" in result["uri"]
+
+    def test_output_has_only_uri_key(self) -> None:
+        """to_adbc_kwargs() always returns exactly one key ('uri')."""
+        config = MySQLConfig(host="h", user="u", database="db")
+        result = config.to_adbc_kwargs()
+        assert list(result.keys()) == ["uri"]
+
+    def test_matches_translate_mysql(self) -> None:
+        """to_adbc_kwargs() produces identical output to translate_mysql()."""
+        config = MySQLConfig(
+            host="localhost",
+            user="root",
+            password=SecretStr("my-secret-pw"),  # pragma: allowlist secret
+            database="demo",
+        )
+        assert config.to_adbc_kwargs() == translate_mysql(config)
+
+    def test_matches_translate_mysql_uri_mode(self) -> None:
+        """to_adbc_kwargs() in URI mode matches translate_mysql()."""
+        config = MySQLConfig(
+            uri=SecretStr("mysql://user:pass@host/db")  # pragma: allowlist secret
+        )
+        assert config.to_adbc_kwargs() == translate_mysql(config)
+
+    def test_no_pool_fields_in_output(self) -> None:
+        """Pool tuning fields excluded from to_adbc_kwargs() output."""
+        config = MySQLConfig(host="h", user="u", database="db")
+        result = config.to_adbc_kwargs()
+        for key in ("pool_size", "max_overflow", "timeout", "recycle"):
+            assert key not in result
+
+
 class TestSQLiteTranslator:
     """Unit tests for translate_sqlite()."""
 
