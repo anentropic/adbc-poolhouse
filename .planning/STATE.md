@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: milestone
 status: in_progress
-stopped_at: Completed 17.5-03-PLAN.md
-last_updated: "2026-03-14T18:33:12.000Z"
-last_activity: "2026-03-14 — Completed Plan 17.5-03 (Boolean-default Backend Implementations)"
+stopped_at: Completed 17.5-04-PLAN.md
+last_updated: "2026-03-14T18:42:44.000Z"
+last_activity: "2026-03-14 — Completed Plan 17.5-04 (URI Construction Backend Implementations)"
 progress:
   total_phases: 5
   completed_phases: 2
   total_plans: 5
-  completed_plans: 3
-  percent: 60
+  completed_plans: 4
+  percent: 80
 ---
 
 # Project State
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-03-07)
 ## Current Position
 
 Milestone: v1.2.0 — Plugin/Extensibility API (IN PROGRESS)
-Phase: 17.5-translator-consolidation (Plan 3/5 complete)
-Status: Phase 17.5 Plan 03 complete, 3/5 plans complete
-Last activity: 2026-03-14 — Completed Plan 17.5-03 (Boolean-default Backend Implementations)
+Phase: 17.5-translator-consolidation (Plan 4/5 complete)
+Status: Phase 17.5 Plan 04 complete, 4/5 plans complete
+Last activity: 2026-03-14 — Completed Plan 17.5-04 (URI Construction Backend Implementations)
 
-Progress: [██████░░░░] 60% (3/5 plans complete)
+Progress: [████████░░] 80% (4/5 plans complete)
 
 ## Accumulated Context
 
@@ -68,6 +68,10 @@ All decisions from v1.0.0 have been reviewed and marked with outcomes.
 **Phase 17.5 Plan 03 decisions:**
 - Direct method implementation for all 3 boolean-default backends (FlightSQL, MSSQL, Trino) -- follows established pattern from plans 01/02
 
+**Phase 17.5 Plan 04 decisions:**
+- Direct method implementation for all 4 URI-construction backends -- follows established pattern from plans 01-03
+- Redshift _build_uri() as private method to keep to_adbc_kwargs() readable -- mirrors translator module's helper pattern
+
 ### Roadmap Evolution
 
 - 15 phases completed across v1.0.0 milestone
@@ -89,6 +93,6 @@ None — execution proceeding normally.
 
 ## Session Continuity
 
-Last session: 2026-03-14T18:33:12Z
-Stopped at: Completed 17.5-03-PLAN.md
-Next step: Execute Plan 17.5-04 with `/gsd:execute-phase 17.5`
+Last session: 2026-03-14T18:42:44Z
+Stopped at: Completed 17.5-04-PLAN.md
+Next step: Execute Plan 17.5-05 with `/gsd:execute-phase 17.5`

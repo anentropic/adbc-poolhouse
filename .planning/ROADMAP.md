@@ -30,17 +30,17 @@
   - [x] 17-01-PLAN.md — Create registry core + exceptions + test infrastructure
   - [x] 17-02-PLAN.md — Integrate registry with translators/drivers + export APIs
 
-- [ ] Phase 17.5: Translator Consolidation (0/5 plans)
+- [ ] Phase 17.5: Translator Consolidation (4/5 plans)
 
   **Goal:** All 12 config classes have to_adbc_kwargs() method using Pydantic aliases and serializers. Registry stores driver_path only. All existing tests pass.
 
   **Requirements:** Refactor for plugin interface consistency
 
   Plans:
-  - [ ] 17.5-01-PLAN.md — Protocol + Snowflake reference implementation
-  - [ ] 17.5-02-PLAN.md — DuckDB, BigQuery, SQLite, ClickHouse implementations
-  - [ ] 17.5-03-PLAN.md — FlightSQL, MSSQL, Trino implementations
-  - [ ] 17.5-04-PLAN.md — PostgreSQL, MySQL, Databricks, Redshift implementations
+  - [x] 17.5-01-PLAN.md — Protocol + Snowflake reference implementation
+  - [x] 17.5-02-PLAN.md — DuckDB, BigQuery, SQLite, ClickHouse implementations
+  - [x] 17.5-03-PLAN.md — FlightSQL, MSSQL, Trino implementations
+  - [x] 17.5-04-PLAN.md — PostgreSQL, MySQL, Databricks, Redshift implementations
   - [ ] 17.5-05-PLAN.md — Registry cleanup and driver updates
 
 - [ ] Phase 18: Entry Point Discovery (0/2 plans)
@@ -75,7 +75,7 @@
 |-------|-----------|----------------|--------|-----------|
 | 16. Driver Import Semi-Integration Tests | v1.2.0 | 2/2 | Complete | 2026-03-12 |
 | 17. Registry Infrastructure | v1.2.0 | 2/2 | Complete | 2026-03-12 |
-| 17.5. Translator Consolidation | 3/5 | In Progress|  | - |
+| 17.5. Translator Consolidation | v1.2.0 | 4/5 | In Progress | - |
 | 18. Entry Point Discovery | v1.2.0 | 0/2 | Not started | - |
 | 19. Plugin Author Documentation | v1.2.0 | 0/2 | Not started | - |
 |-------|-----------|----------------|--------|-----------|
