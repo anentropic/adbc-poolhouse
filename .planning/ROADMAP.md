@@ -75,7 +75,7 @@
 |-------|-----------|----------------|--------|-----------|
 | 16. Driver Import Semi-Integration Tests | v1.2.0 | 2/2 | Complete | 2026-03-12 |
 | 17. Registry Infrastructure | v1.2.0 | 2/2 | Complete | 2026-03-12 |
-| 17.5. Translator Consolidation | 2/5 | In Progress|  | - |
+| 17.5. Translator Consolidation | 3/5 | In Progress|  | - |
 | 18. Entry Point Discovery | v1.2.0 | 0/2 | Not started | - |
 | 19. Plugin Author Documentation | v1.2.0 | 0/2 | Not started | - |
 |-------|-----------|----------------|--------|-----------|
