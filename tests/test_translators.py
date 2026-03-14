@@ -692,6 +692,92 @@ class TestRedshiftTranslator:
         assert result["aws_secret_access_key"] == "mysecretkey"  # pragma: allowlist secret
 
 
+class TestRedshiftToAdbcKwargs:
+    """Unit tests for RedshiftConfig.to_adbc_kwargs() method."""
+
+    def test_no_uri_empty(self) -> None:
+        """RedshiftConfig().to_adbc_kwargs() with no fields returns empty dict."""
+        result = RedshiftConfig().to_adbc_kwargs()
+        assert result == {}
+
+    def test_uri_passthrough(self) -> None:
+        """Uri set via to_adbc_kwargs() maps to 'uri' key."""
+        result = RedshiftConfig(uri="redshift://host:5439/mydb").to_adbc_kwargs()
+        assert result == {"uri": "redshift://host:5439/mydb"}
+
+    def test_individual_fields_builds_redshift_uri(self) -> None:
+        """Individual fields via to_adbc_kwargs() builds a redshift:// URI."""
+        result = RedshiftConfig(
+            host="rs.example.com", user="admin", database="analytics"
+        ).to_adbc_kwargs()
+        assert result == {"uri": "redshift://admin@rs.example.com/analytics"}
+
+    def test_password_url_encoded(self) -> None:
+        """Password with special chars URL-encoded via to_adbc_kwargs()."""
+        result = RedshiftConfig(
+            host="rs.example.com",
+            user="admin",
+            password=SecretStr("p+a=b/c"),  # pragma: allowlist secret
+            database="analytics",
+        ).to_adbc_kwargs()
+        assert result["uri"] == (
+            "redshift://admin:p%2Ba%3Db%2Fc@rs.example.com/analytics"  # pragma: allowlist secret
+        )
+
+    def test_iam_fields_included_as_separate_kwargs(self) -> None:
+        """IAM/cluster fields as separate kwargs via to_adbc_kwargs()."""
+        result = RedshiftConfig(
+            uri="redshift://host:5439/mydb",
+            cluster_type="redshift-iam",
+            cluster_identifier="my-cluster",
+            aws_region="us-east-1",
+        ).to_adbc_kwargs()
+        assert result["uri"] == "redshift://host:5439/mydb"
+        assert result["redshift.cluster_type"] == "redshift-iam"
+        assert result["redshift.cluster_identifier"] == "my-cluster"
+        assert result["aws_region"] == "us-east-1"
+
+    def test_uri_takes_precedence_over_individual_fields(self) -> None:
+        """When uri is set, individual fields ignored via to_adbc_kwargs()."""
+        result = RedshiftConfig(
+            uri="redshift://override@host/db",
+            host="ignored",
+            user="ignored",
+        ).to_adbc_kwargs()
+        assert result["uri"] == "redshift://override@host/db"
+
+    def test_aws_secret_access_key_extracted(self) -> None:
+        """aws_secret_access_key SecretStr extracted via to_adbc_kwargs()."""
+        result = RedshiftConfig(
+            aws_secret_access_key=SecretStr("mysecretkey"),  # pragma: allowlist secret
+        ).to_adbc_kwargs()
+        assert result["aws_secret_access_key"] == "mysecretkey"  # pragma: allowlist secret
+
+    def test_matches_translate_redshift(self) -> None:
+        """to_adbc_kwargs() produces identical output to translate_redshift()."""
+        config = RedshiftConfig(
+            host="rs.example.com",
+            user="admin",
+            password=SecretStr("p+a=b/c"),  # pragma: allowlist secret
+            database="analytics",
+            cluster_type="redshift-iam",
+            cluster_identifier="my-cluster",
+            aws_region="us-east-1",
+        )
+        assert config.to_adbc_kwargs() == translate_redshift(config)
+
+    def test_matches_translate_redshift_uri_mode(self) -> None:
+        """to_adbc_kwargs() in URI mode matches translate_redshift()."""
+        config = RedshiftConfig(uri="redshift://host:5439/mydb")
+        assert config.to_adbc_kwargs() == translate_redshift(config)
+
+    def test_no_pool_fields_in_output(self) -> None:
+        """Pool tuning fields excluded from to_adbc_kwargs() output."""
+        result = RedshiftConfig().to_adbc_kwargs()
+        for key in ("pool_size", "max_overflow", "timeout", "recycle"):
+            assert key not in result
+
+
 class TestTrinoTranslator:
     """
     Unit tests for translate_trino().

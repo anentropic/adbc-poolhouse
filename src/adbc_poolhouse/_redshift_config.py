@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from urllib.parse import quote
+
 from pydantic import SecretStr  # noqa: TC002
 from pydantic_settings import SettingsConfigDict
 
@@ -66,3 +68,71 @@ class RedshiftConfig(BaseWarehouseConfig):
 
     sslmode: str | None = None
     """SSL mode (e.g. 'require', 'verify-full'). Env: REDSHIFT_SSLMODE."""
+
+    def to_adbc_kwargs(self) -> dict[str, str]:
+        """
+        Convert Redshift config fields to ADBC driver kwargs.
+
+        Supports two connection modes:
+
+        - **URI mode** (``uri`` set): passed directly as ``{"uri": ...}``.
+        - **Decomposed mode**: builds a ``redshift://`` URI from ``host``,
+          ``port``, ``user``, ``password``, ``database``, and ``sslmode``.
+          Password is URL-encoded via :func:`urllib.parse.quote` with
+          ``safe=""``.
+
+        IAM and cluster fields (``cluster_type``, ``cluster_identifier``,
+        ``workgroup_name``, ``aws_region``, ``aws_access_key_id``,
+        ``aws_secret_access_key``) are always translated as separate driver
+        kwargs when set, regardless of connection mode.
+
+        Returns:
+            ADBC driver kwargs for ``adbc_driver_manager.dbapi.connect()``.
+        """
+        kwargs: dict[str, str] = {}
+
+        # URI: explicit passthrough or build from individual fields
+        if self.uri is not None:
+            kwargs["uri"] = self.uri
+        elif any([self.host, self.user, self.password, self.database, self.sslmode]):
+            kwargs["uri"] = self._build_uri()
+
+        # IAM/cluster params
+        if self.cluster_type is not None:
+            kwargs["redshift.cluster_type"] = self.cluster_type
+        if self.cluster_identifier is not None:
+            kwargs["redshift.cluster_identifier"] = self.cluster_identifier
+        if self.workgroup_name is not None:
+            kwargs["redshift.workgroup_name"] = self.workgroup_name
+        if self.aws_region is not None:
+            kwargs["aws_region"] = self.aws_region
+        if self.aws_access_key_id is not None:
+            kwargs["aws_access_key_id"] = self.aws_access_key_id
+        if self.aws_secret_access_key is not None:
+            kwargs["aws_secret_access_key"] = self.aws_secret_access_key.get_secret_value()
+
+        return kwargs
+
+    def _build_uri(self) -> str:
+        """Build a redshift:// URI from individual fields."""
+        uri = "redshift://"
+
+        if self.user is not None:
+            uri += quote(self.user, safe="")
+            if self.password is not None:
+                uri += ":" + quote(self.password.get_secret_value(), safe="")
+            uri += "@"
+
+        if self.host is not None:
+            uri += self.host
+
+        if self.port is not None:
+            uri += f":{self.port}"
+
+        if self.database is not None:
+            uri += f"/{self.database}"
+
+        if self.sslmode is not None:
+            uri += f"?sslmode={self.sslmode}"
+
+        return uri
