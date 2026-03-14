@@ -2,49 +2,49 @@
 
 ## Milestones
 
-- v1.2.0 **Plugin/Extensibility API** — Phases 1-4 (planned)
+- v1.2.0 **Plugin/Extensibility API** — Phases 16-19 (planned)
 - v1.0.0 **MVP + Backend Expansion** — Phases 1-15 (shipped 2026-03-07)
 
 ## Phases
 
 <details>
-<summary>v1.2.0 Plugin/Extensibility API (Phases 1-4) — PLANNED</summary>
+<summary>v1.2.0 Plugin/Extensibility API (Phases 16-19) — PLANNED</summary>
 
-- [x] Phase 1: Driver Import Semi-Integration Tests (2/2 plans) — completed 2026-03-12
+- [x] Phase 16: Driver Import Semi-Integration Tests (2/2 plans) — completed 2026-03-12
 
   **Goal:** All 12 backend semi-integration tests pass with real driver imports and mocked connections.
 
   **Requirements:** TEST-01, TEST-02, TEST-03, TEST-04
 
   Plans:
-  - [x] 01-01-PLAN.md — Create tests/imports/ with 12 backend test classes
-  - [x] 01-02-PLAN.md — Add install-all-drivers justfile recipe
+  - [x] 16-01-PLAN.md — Create tests/imports/ with 12 backend test classes
+  - [x] 16-02-PLAN.md — Add install-all-drivers justfile recipe
 
-- [x] Phase 2: Registry Infrastructure (2/2 plans) — completed 2026-03-12
+- [x] Phase 17: Registry Infrastructure (2/2 plans) — completed 2026-03-12
 
   **Goal:** Backend registry replaces hardcoded isinstance dispatch, enabling runtime registration of new backends.
 
   **Requirements:** REG-01, REG-02, REG-03, TEST-INFRA-01 (REG-04 deferred)
 
   Plans:
-  - [x] 02-01-PLAN.md — Create registry core + exceptions + test infrastructure
-  - [x] 02-02-PLAN.md — Integrate registry with translators/drivers + export APIs
+  - [x] 17-01-PLAN.md — Create registry core + exceptions + test infrastructure
+  - [x] 17-02-PLAN.md — Integrate registry with translators/drivers + export APIs
 
-- [ ] Phase 2.5: Translator Consolidation (0/5 plans)
+- [ ] Phase 17.5: Translator Consolidation (0/5 plans)
 
   **Goal:** All 12 config classes have to_adbc_kwargs() method using Pydantic aliases and serializers. Registry stores driver_path only. All existing tests pass.
 
   **Requirements:** Refactor for plugin interface consistency
 
   Plans:
-  - [ ] 02.5-01-PLAN.md — Protocol + Snowflake reference implementation
-  - [ ]02.5-02-PLAN.md — DuckDB, BigQuery, SQLite, ClickHouse implementations
-  - [ ] 02.5-03-PLAN.md — FlightSQL, MSSQL, Trino implementations
-  - [ ] 02.5-04-PLAN.md — PostgreSQL, MySQL, Databricks, Redshift implementations
-  - [ ] 02.5-05-PLAN.md — Registry cleanup and driver updates
+  - [ ] 17.5-01-PLAN.md — Protocol + Snowflake reference implementation
+  - [ ] 17.5-02-PLAN.md — DuckDB, BigQuery, SQLite, ClickHouse implementations
+  - [ ] 17.5-03-PLAN.md — FlightSQL, MSSQL, Trino implementations
+  - [ ] 17.5-04-PLAN.md — PostgreSQL, MySQL, Databricks, Redshift implementations
+  - [ ] 17.5-05-PLAN.md — Registry cleanup and driver updates
 
-- [ ] Phase 3: Entry Point Discovery (0/2 plans)
-- [ ] Phase 4: Plugin Author Documentation (0/2 plans)
+- [ ] Phase 18: Entry Point Discovery (0/2 plans)
+- [ ] Phase 19: Plugin Author Documentation (0/2 plans)
 
 </details>
 
@@ -73,11 +73,11 @@
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
-| 1. Driver Import Semi-Integration Tests | v1.2.0 | 2/2 | Complete | 2026-03-12 |
-| 2. Registry Infrastructure | v1.2.0 | 2/2 | Complete | 2026-03-12 |
-| 2.5. Translator Consolidation | v1.2.0 | 0/5 | Not started | - |
-| 3. Entry Point Discovery | v1.2.0 | 0/2 | Not started | - |
-| 4. Plugin Author Documentation | v1.2.0 | 0/2 | Not started | - |
+| 16. Driver Import Semi-Integration Tests | v1.2.0 | 2/2 | Complete | 2026-03-12 |
+| 17. Registry Infrastructure | v1.2.0 | 2/2 | Complete | 2026-03-12 |
+| 17.5. Translator Consolidation | 1/5 | In Progress|  | - |
+| 18. Entry Point Discovery | v1.2.0 | 0/2 | Not started | - |
+| 19. Plugin Author Documentation | v1.2.0 | 0/2 | Not started | - |
 |-------|-----------|----------------|--------|-----------|
 |-------|-----------|----------------|--------|-----------|
 | 1. Pre-flight Fixes | v1.0.0 | 1/1 | Complete | 2026-02-23 |
