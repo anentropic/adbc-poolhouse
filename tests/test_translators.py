@@ -602,6 +602,73 @@ class TestMSSQLTranslator:
         assert result == {"uri": "mssql://host/db"}
 
 
+class TestMSSQLToAdbcKwargs:
+    """Unit tests for MSSQLConfig.to_adbc_kwargs() method."""
+
+    def test_no_uri_uses_decomposed_fields(self) -> None:
+        """MSSQLConfig().to_adbc_kwargs() with no uri returns trust_server_certificate."""
+        result = MSSQLConfig().to_adbc_kwargs()
+        assert result["trustServerCertificate"] == "false"
+        assert "uri" not in result
+
+    def test_uri_takes_precedence(self) -> None:
+        """Uri set via to_adbc_kwargs() returns only {'uri': ...}."""
+        result = MSSQLConfig(uri="mssql://host/db").to_adbc_kwargs()
+        assert result == {"uri": "mssql://host/db"}
+
+    def test_trust_server_certificate_true(self) -> None:
+        """trust_server_certificate=True via to_adbc_kwargs()."""
+        result = MSSQLConfig(trust_server_certificate=True).to_adbc_kwargs()
+        assert result["trustServerCertificate"] == "true"
+
+    def test_decomposed_with_all_fields(self) -> None:
+        """All decomposed fields included via to_adbc_kwargs()."""
+        config = MSSQLConfig(
+            host="sql-server",
+            port=1433,
+            instance="SQLExpress",
+            user="sa",
+            password=SecretStr("pw"),  # pragma: allowlist secret
+            database="mydb",
+            trust_server_certificate=True,
+            connection_timeout=30,
+            fedauth="ActiveDirectoryMsi",
+        )
+        result = config.to_adbc_kwargs()
+        assert result["host"] == "sql-server"
+        assert result["port"] == "1433"
+        assert result["instance"] == "SQLExpress"
+        assert result["username"] == "sa"
+        assert result["password"] == "pw"  # pragma: allowlist secret
+        assert result["database"] == "mydb"
+        assert result["trustServerCertificate"] == "true"
+        assert result["connectionTimeout"] == "30"
+        assert result["fedauth"] == "ActiveDirectoryMsi"
+
+    def test_matches_translate_mssql(self) -> None:
+        """to_adbc_kwargs() produces identical output to translate_mssql()."""
+        config = MSSQLConfig(
+            host="sql-server",
+            port=1433,
+            user="sa",
+            password=SecretStr("pw"),  # pragma: allowlist secret
+            database="mydb",
+            trust_server_certificate=True,
+        )
+        assert config.to_adbc_kwargs() == translate_mssql(config)
+
+    def test_matches_translate_mssql_uri_mode(self) -> None:
+        """to_adbc_kwargs() in URI mode matches translate_mssql()."""
+        config = MSSQLConfig(uri="mssql://host/db")
+        assert config.to_adbc_kwargs() == translate_mssql(config)
+
+    def test_no_pool_fields_in_output(self) -> None:
+        """Pool tuning fields excluded from to_adbc_kwargs() output."""
+        result = MSSQLConfig().to_adbc_kwargs()
+        for key in ("pool_size", "max_overflow", "timeout", "recycle"):
+            assert key not in result
+
+
 class TestTranslateConfig:
     """Unit tests for translate_config() dispatch coordinator."""
 

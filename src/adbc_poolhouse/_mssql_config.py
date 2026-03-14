@@ -63,3 +63,48 @@ class MSSQLConfig(BaseWarehouseConfig):
     Values: 'ActiveDirectoryPassword', 'ActiveDirectoryMsi',
     'ActiveDirectoryServicePrincipal', 'ActiveDirectoryInteractive'.
     Env: MSSQL_FEDAUTH."""
+
+    def to_adbc_kwargs(self) -> dict[str, str]:
+        """
+        Convert config to ADBC driver connection kwargs.
+
+        Supports two modes:
+
+        - URI mode (``uri`` set): returns ``{uri: ...}``.
+        - Decomposed mode: maps individual fields to their ADBC key
+          equivalents. ``trust_server_certificate`` is always included
+          as a ``'true'``/``'false'`` string.
+
+        Returns:
+            Dict of ADBC driver kwargs for ``adbc_driver_manager.dbapi.connect()``.
+        """
+        kwargs: dict[str, str] = {}
+
+        # URI-first: if uri is set, use it as the primary connection spec
+        if self.uri is not None:
+            kwargs["uri"] = self.uri
+            return kwargs
+
+        # Decomposed fields (include only if not None)
+        if self.host is not None:
+            kwargs["host"] = self.host
+        if self.port is not None:
+            kwargs["port"] = str(self.port)
+        if self.instance is not None:
+            kwargs["instance"] = self.instance
+        if self.user is not None:
+            kwargs["username"] = self.user
+        if self.password is not None:
+            kwargs["password"] = self.password.get_secret_value()  # pragma: allowlist secret
+        if self.database is not None:
+            kwargs["database"] = self.database
+
+        # Boolean flag (always include)
+        kwargs["trustServerCertificate"] = str(self.trust_server_certificate).lower()
+
+        if self.connection_timeout is not None:
+            kwargs["connectionTimeout"] = str(self.connection_timeout)
+        if self.fedauth is not None:
+            kwargs["fedauth"] = self.fedauth
+
+        return kwargs
