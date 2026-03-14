@@ -30,6 +30,14 @@
   - [x] 02-01-PLAN.md — Create registry core + exceptions + test infrastructure
   - [x] 02-02-PLAN.md — Integrate registry with translators/drivers + export APIs
 
+- [ ] Phase 2.5: Translator Consolidation (0/? plans) — (INSERTED)
+
+  **Goal:** Consolidate translator functions into config class methods using Pydantic v2 features.
+
+  **Requirements:** Refactor for plugin interface consistency
+
+  Plans: TBD
+
 - [ ] Phase 3: Entry Point Discovery (0/2 plans)
 - [ ] Phase 4: Plugin Author Documentation (0/2 plans)
 
@@ -62,6 +70,7 @@
 |-------|-----------|----------------|--------|-----------|
 | 1. Driver Import Semi-Integration Tests | v1.2.0 | 2/2 | Complete | 2026-03-12 |
 | 2. Registry Infrastructure | v1.2.0 | 2/2 | Complete | 2026-03-12 |
+| 2.5. Translator Consolidation | v1.2.0 | 0/? | Not started | - |
 | 3. Entry Point Discovery | v1.2.0 | 0/2 | Not started | - |
 | 4. Plugin Author Documentation | v1.2.0 | 0/2 | Not started | - |
 |-------|-----------|----------------|--------|-----------|
