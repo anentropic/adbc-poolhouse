@@ -76,3 +76,69 @@ class FlightSQLConfig(BaseWarehouseConfig):
     with_cookie_middleware: bool = False
     """Enable gRPC cookie middleware (required by some servers for session
     management). Env: FLIGHTSQL_WITH_COOKIE_MIDDLEWARE."""
+
+    def to_adbc_kwargs(self) -> dict[str, str]:
+        """
+        Convert config to ADBC driver connection kwargs.
+
+        Maps FlightSQL config fields to their ``adbc.flight.sql.*`` key
+        equivalents. Boolean defaults (``tls_skip_verify``,
+        ``with_cookie_middleware``) are always included as ``'true'``/
+        ``'false'`` strings. Optional fields are omitted when ``None``.
+
+        Returns:
+            Dict of ADBC driver kwargs for ``adbc_driver_manager.dbapi.connect()``.
+        """
+        kwargs: dict[str, str] = {}
+
+        # Connection endpoint
+        if self.uri is not None:
+            kwargs["uri"] = self.uri
+
+        # Authentication
+        if self.username is not None:
+            kwargs["username"] = self.username
+        if self.password is not None:
+            kwargs["password"] = self.password.get_secret_value()  # pragma: allowlist secret
+        if self.authorization_header is not None:
+            kwargs["adbc.flight.sql.authorization_header"] = (
+                self.authorization_header.get_secret_value()
+            )
+
+        # mTLS
+        if self.mtls_cert_chain is not None:
+            kwargs["adbc.flight.sql.client_option.mtls_cert_chain"] = self.mtls_cert_chain
+        if self.mtls_private_key is not None:
+            kwargs["adbc.flight.sql.client_option.mtls_private_key"] = (
+                self.mtls_private_key.get_secret_value()
+            )
+
+        # TLS
+        if self.tls_root_certs is not None:
+            kwargs["adbc.flight.sql.client_option.tls_root_certs"] = self.tls_root_certs
+        kwargs["adbc.flight.sql.client_option.tls_skip_verify"] = str(self.tls_skip_verify).lower()
+        if self.tls_override_hostname is not None:
+            kwargs["adbc.flight.sql.client_option.tls_override_hostname"] = (
+                self.tls_override_hostname
+            )
+
+        # Timeouts
+        if self.connect_timeout is not None:
+            kwargs["adbc.flight.sql.rpc.timeout_seconds.connect"] = str(self.connect_timeout)
+        if self.query_timeout is not None:
+            kwargs["adbc.flight.sql.rpc.timeout_seconds.query"] = str(self.query_timeout)
+        if self.fetch_timeout is not None:
+            kwargs["adbc.flight.sql.rpc.timeout_seconds.fetch"] = str(self.fetch_timeout)
+        if self.update_timeout is not None:
+            kwargs["adbc.flight.sql.rpc.timeout_seconds.update"] = str(self.update_timeout)
+
+        # gRPC options
+        if self.authority is not None:
+            kwargs["adbc.flight.sql.client_option.authority"] = self.authority
+        if self.max_msg_size is not None:
+            kwargs["adbc.flight.sql.client_option.with_max_msg_size"] = str(self.max_msg_size)
+        kwargs["adbc.flight.sql.rpc.with_cookie_middleware"] = str(
+            self.with_cookie_middleware
+        ).lower()
+
+        return kwargs

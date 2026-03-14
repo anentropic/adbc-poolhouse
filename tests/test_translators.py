@@ -371,6 +371,78 @@ class TestFlightSQLTranslator:
         assert result["adbc.flight.sql.client_option.tls_skip_verify"] == "true"
 
 
+class TestFlightSQLToAdbcKwargs:
+    """Unit tests for FlightSQLConfig.to_adbc_kwargs() method."""
+
+    def test_no_uri_returns_bool_defaults(self) -> None:
+        """FlightSQLConfig().to_adbc_kwargs() with no args returns only boolean defaults."""
+        result = FlightSQLConfig().to_adbc_kwargs()
+        assert result == {
+            "adbc.flight.sql.client_option.tls_skip_verify": "false",
+            "adbc.flight.sql.rpc.with_cookie_middleware": "false",
+        }
+
+    def test_uri_included(self) -> None:
+        """Uri set via to_adbc_kwargs() maps to 'uri' key in output."""
+        result = FlightSQLConfig(uri="grpc://localhost:32010").to_adbc_kwargs()
+        assert result["uri"] == "grpc://localhost:32010"
+
+    def test_tls_skip_verify_true(self) -> None:
+        """tls_skip_verify=True via to_adbc_kwargs()."""
+        result = FlightSQLConfig(tls_skip_verify=True).to_adbc_kwargs()
+        assert result["adbc.flight.sql.client_option.tls_skip_verify"] == "true"
+
+    def test_username_and_password(self) -> None:
+        """Username and password are included via to_adbc_kwargs()."""
+        result = FlightSQLConfig(
+            username="user",
+            password=SecretStr("pass"),  # pragma: allowlist secret
+        ).to_adbc_kwargs()
+        assert result["username"] == "user"
+        assert result["password"] == "pass"  # pragma: allowlist secret
+
+    def test_matches_translate_flightsql(self) -> None:
+        """to_adbc_kwargs() produces identical output to translate_flightsql()."""
+        config = FlightSQLConfig(
+            uri="grpc+tls://host:443",
+            username="user",
+            password=SecretStr("pw"),  # pragma: allowlist secret
+            tls_skip_verify=True,
+            with_cookie_middleware=True,
+        )
+        assert config.to_adbc_kwargs() == translate_flightsql(config)
+
+    def test_no_pool_fields_in_output(self) -> None:
+        """Pool tuning fields excluded from to_adbc_kwargs() output."""
+        result = FlightSQLConfig().to_adbc_kwargs()
+        for key in ("pool_size", "max_overflow", "timeout", "recycle"):
+            assert key not in result
+
+    def test_all_optional_fields(self) -> None:
+        """All optional fields are included when set via to_adbc_kwargs()."""
+        config = FlightSQLConfig(
+            uri="grpc://host:443",
+            username="user",
+            password=SecretStr("pw"),  # pragma: allowlist secret
+            authorization_header=SecretStr("Bearer tok"),  # pragma: allowlist secret
+            mtls_cert_chain="cert-pem",
+            mtls_private_key=SecretStr("key-pem"),  # pragma: allowlist secret
+            tls_root_certs="root-ca",
+            tls_skip_verify=True,
+            tls_override_hostname="override-host",
+            connect_timeout=10.0,
+            query_timeout=30.0,
+            fetch_timeout=60.0,
+            update_timeout=120.0,
+            authority="authority-value",
+            max_msg_size=1024,
+            with_cookie_middleware=True,
+        )
+        result = config.to_adbc_kwargs()
+        expected = translate_flightsql(config)
+        assert result == expected
+
+
 class TestDatabricksTranslator:
     """Unit tests for translate_databricks()."""
 
