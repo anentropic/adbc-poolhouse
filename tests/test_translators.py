@@ -344,6 +344,89 @@ class TestPostgreSQLTranslator:
         assert result == {"uri": "postgresql://override@host/db"}
 
 
+class TestPostgreSQLToAdbcKwargs:
+    """Unit tests for PostgreSQLConfig.to_adbc_kwargs() method."""
+
+    def test_no_fields_empty(self) -> None:
+        """PostgreSQLConfig().to_adbc_kwargs() with no fields returns empty dict."""
+        result = PostgreSQLConfig().to_adbc_kwargs()
+        assert result == {}
+
+    def test_uri_passthrough(self) -> None:
+        """Uri set via to_adbc_kwargs() maps to 'uri' key."""
+        result = PostgreSQLConfig(uri="postgresql://localhost/mydb").to_adbc_kwargs()
+        assert result == {"uri": "postgresql://localhost/mydb"}
+
+    def test_use_copy_not_in_output(self) -> None:
+        """use_copy is a StatementOptions key, not a connect kwarg."""
+        result = PostgreSQLConfig(uri="postgresql://localhost/mydb").to_adbc_kwargs()
+        assert "adbc.postgresql.use_copy" not in result
+        assert "use_copy" not in result
+
+    def test_individual_fields_builds_uri(self) -> None:
+        """Individual fields via to_adbc_kwargs() builds a libpq URI."""
+        result = PostgreSQLConfig(
+            host="db.example.com", user="me", database="mydb"
+        ).to_adbc_kwargs()
+        assert result == {"uri": "postgresql://me@db.example.com/mydb"}
+
+    def test_individual_fields_with_password(self) -> None:
+        """Password is URL-encoded and embedded in the URI via to_adbc_kwargs()."""
+        result = PostgreSQLConfig(
+            host="db.example.com",
+            user="me",
+            password=SecretStr("s3cr+t"),  # pragma: allowlist secret
+            database="mydb",
+        ).to_adbc_kwargs()
+        assert (
+            result["uri"]
+            == "postgresql://me:s3cr%2Bt@db.example.com/mydb"  # pragma: allowlist secret
+        )
+
+    def test_individual_fields_with_port_and_sslmode(self) -> None:
+        """Port and sslmode appended correctly via to_adbc_kwargs()."""
+        result = PostgreSQLConfig(
+            host="db.example.com",
+            user="me",
+            port=5433,
+            database="mydb",
+            sslmode="require",
+        ).to_adbc_kwargs()
+        assert result == {"uri": "postgresql://me@db.example.com:5433/mydb?sslmode=require"}
+
+    def test_uri_takes_precedence_over_individual_fields(self) -> None:
+        """When uri is set, individual fields are ignored via to_adbc_kwargs()."""
+        result = PostgreSQLConfig(
+            uri="postgresql://override@host/db",
+            host="ignored",
+            user="ignored",
+        ).to_adbc_kwargs()
+        assert result == {"uri": "postgresql://override@host/db"}
+
+    def test_matches_translate_postgresql(self) -> None:
+        """to_adbc_kwargs() produces identical output to translate_postgresql()."""
+        config = PostgreSQLConfig(
+            host="db.example.com",
+            user="me",
+            password=SecretStr("s3cr+t"),  # pragma: allowlist secret
+            port=5433,
+            database="mydb",
+            sslmode="require",
+        )
+        assert config.to_adbc_kwargs() == translate_postgresql(config)
+
+    def test_matches_translate_postgresql_uri_mode(self) -> None:
+        """to_adbc_kwargs() in URI mode matches translate_postgresql()."""
+        config = PostgreSQLConfig(uri="postgresql://localhost/mydb")
+        assert config.to_adbc_kwargs() == translate_postgresql(config)
+
+    def test_no_pool_fields_in_output(self) -> None:
+        """Pool tuning fields excluded from to_adbc_kwargs() output."""
+        result = PostgreSQLConfig().to_adbc_kwargs()
+        for key in ("pool_size", "max_overflow", "timeout", "recycle"):
+            assert key not in result
+
+
 class TestFlightSQLTranslator:
     """Unit tests for translate_flightsql()."""
 

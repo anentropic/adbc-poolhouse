@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from urllib.parse import quote
+
 from pydantic import SecretStr  # noqa: TC002
 from pydantic_settings import SettingsConfigDict
 
@@ -57,3 +59,48 @@ class PostgreSQLConfig(BaseWarehouseConfig):
     use_copy: bool = True
     """Use PostgreSQL COPY protocol for bulk query execution (driver default:
     True). Disable if COPY triggers permission errors. Env: POSTGRESQL_USE_COPY."""
+
+    def to_adbc_kwargs(self) -> dict[str, str]:
+        """
+        Convert PostgreSQL config fields to ADBC driver kwargs.
+
+        Supports three modes:
+
+        - **URI mode** (``uri`` set): passed directly as ``{"uri": ...}``.
+        - **Decomposed mode**: builds a libpq URI from ``host``, ``port``,
+          ``user``, ``password``, ``database``, and ``sslmode``. Password is
+          URL-encoded via :func:`urllib.parse.quote` with ``safe=""``.
+        - **Empty mode**: returns ``{}`` so libpq resolves from env vars.
+
+        Returns:
+            ADBC driver kwargs for ``adbc_driver_manager.dbapi.connect()``.
+        """
+        if self.uri is not None:
+            return {"uri": self.uri}
+
+        # Decomposed mode -- build URI only if at least one field is set.
+        has_fields = any([self.host, self.user, self.password, self.database, self.sslmode])
+        if not has_fields:
+            return {}
+
+        uri = "postgresql://"
+
+        if self.user is not None:
+            uri += quote(self.user, safe="")
+            if self.password is not None:
+                uri += ":" + quote(self.password.get_secret_value(), safe="")
+            uri += "@"
+
+        if self.host is not None:
+            uri += self.host
+
+        if self.port is not None:
+            uri += f":{self.port}"
+
+        if self.database is not None:
+            uri += f"/{self.database}"
+
+        if self.sslmode is not None:
+            uri += f"?sslmode={self.sslmode}"
+
+        return {"uri": uri}
