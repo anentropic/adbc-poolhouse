@@ -15,9 +15,6 @@ from __future__ import annotations
 import os
 
 import pytest
-from pydantic_settings import SettingsConfigDict
-
-from adbc_poolhouse._base_config import BaseWarehouseConfig
 
 _WAREHOUSE_ENV_PREFIXES: tuple[str, ...] = (
     "BIGQUERY_",
@@ -34,27 +31,6 @@ _WAREHOUSE_ENV_PREFIXES: tuple[str, ...] = (
     "TERADATA_",
     "TRINO_",
 )
-
-
-class DummyConfig(BaseWarehouseConfig):
-    """
-    Minimal config class for testing without real drivers.
-
-    Inherits from BaseWarehouseConfig to satisfy the WarehouseConfig Protocol.
-    Uses SettingsConfigDict(extra="forbid") to catch typos in tests.
-    """
-
-    model_config = SettingsConfigDict(extra="forbid")
-
-    def _adbc_entrypoint(self) -> str | None:
-        """Return None - no entry point required for dummy backend."""
-        return None
-
-    def _driver_path(self) -> str:
-        return "dummy"
-
-    def to_adbc_kwargs(self) -> dict[str, str]:
-        return {"dummy_key": "dummy_value"}
 
 
 @pytest.fixture(autouse=True)
