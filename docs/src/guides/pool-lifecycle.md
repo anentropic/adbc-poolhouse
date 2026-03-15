@@ -77,6 +77,50 @@ Pass any of these to `create_pool`:
 pool = create_pool(config, pool_size=10, recycle=7200)
 ```
 
+## Raw driver arguments
+
+For custom drivers, plugin development, or cases where a config object is not available, `create_pool` and `managed_pool` accept raw ADBC driver arguments directly.
+
+Two raw paths are supported -- use one or the other, not both:
+
+=== "Native ADBC driver"
+
+    Pass a `driver_path` (path to a shared library or a short driver name) and `db_kwargs`:
+
+    ```python
+    from adbc_poolhouse import create_pool, close_pool
+
+    pool = create_pool(
+        driver_path="/path/to/libduckdb.dylib",
+        db_kwargs={"path": "/tmp/my.db"},
+        entrypoint="duckdb_adbc_init",
+    )
+    # ... use pool ...
+    close_pool(pool)
+    ```
+
+    `entrypoint` is optional and only needed for drivers that require an explicit init symbol (DuckDB is the main example).
+
+=== "Python dbapi module"
+
+    Pass a `dbapi_module` (dotted module name implementing the ADBC dbapi interface) and `db_kwargs`:
+
+    ```python
+    from adbc_poolhouse import managed_pool
+
+    with managed_pool(
+        dbapi_module="my_custom_driver.dbapi",
+        db_kwargs={"host": "localhost", "port": "5432"},
+    ) as pool:
+        with pool.connect() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT 1")
+    ```
+
+    The module must expose a `connect(db_kwargs=...)` function following the ADBC dbapi interface.
+
+Pool tuning arguments (`pool_size`, `max_overflow`, `timeout`, `recycle`, `pre_ping`) work with both raw paths, same defaults as the config path.
+
 ## Common mistakes
 
 **Calling `pool.dispose()` without `close_pool()`**
