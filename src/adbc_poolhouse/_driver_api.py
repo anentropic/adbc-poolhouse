@@ -17,6 +17,7 @@ Internal only — not exported from ``__init__.py``.
 from __future__ import annotations
 
 import importlib
+import inspect
 from typing import TYPE_CHECKING
 
 import adbc_driver_manager
@@ -39,11 +40,18 @@ def create_adbc_connection(
     All ``cast()`` and ``# type: ignore`` suppressions for the ADBC driver
     manager are concentrated in this module (DRIV-03).
 
-    When ``dbapi_module`` is provided (PyPI drivers like Snowflake, BigQuery),
-    the connection is created through that driver's own ``.dbapi.connect()``
-    instead of routing through ``adbc_driver_manager.dbapi``. This ensures
-    tools that monkeypatch per-driver DBAPI modules (e.g. pytest-adbc-replay)
-    intercept at the correct module.
+    When ``dbapi_module`` is provided, the connection is created through that
+    driver's own ``.dbapi.connect()`` instead of routing through
+    ``adbc_driver_manager.dbapi``. The function introspects the target
+    module's ``connect()`` signature to handle two distinct families:
+
+    - **Family A** (Snowflake, PostgreSQL, BigQuery, FlightSQL): accepts a
+      ``db_kwargs`` parameter -- called as ``connect(db_kwargs=kwargs)``.
+    - **Family B** (DuckDB, SQLite): no ``db_kwargs`` parameter -- called as
+      ``connect(**kwargs)`` with kwargs unpacked directly.
+
+    This signature detection ensures tools that monkeypatch per-driver DBAPI
+    modules (e.g. pytest-adbc-replay) intercept at the correct module.
 
     For Foundry drivers (Databricks, Redshift, Trino, MSSQL, MySQL):
     if the driver manifest is not found, ``adbc_driver_manager`` raises an
@@ -77,7 +85,11 @@ def create_adbc_connection(
     """
     if dbapi_module is not None:
         mod = importlib.import_module(dbapi_module)
-        conn = mod.connect(db_kwargs=kwargs)  # type: ignore[no-any-return]
+        sig = inspect.signature(mod.connect)  # type: ignore[reportUnknownMemberType]
+        if "db_kwargs" in sig.parameters:
+            conn = mod.connect(db_kwargs=kwargs)  # type: ignore[no-any-return]
+        else:
+            conn = mod.connect(**kwargs)  # type: ignore[no-any-return]
         return conn  # type: ignore[return-value]
 
     try:

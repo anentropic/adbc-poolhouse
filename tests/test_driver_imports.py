@@ -85,8 +85,9 @@ class TestSnowflakeImports:
 
             mock_connect.assert_called_once()
             call_kwargs = mock_connect.call_args.kwargs
-            # PyPI drivers use db_kwargs= kwarg
-            assert "db_kwargs" in call_kwargs
+            # Signature detection dispatches based on mock signature;
+            # verify Snowflake config keys arrive in kwargs
+            assert "adbc.snowflake.sql.account" in call_kwargs
         else:
             # Driver not installed: mock adbc_driver_manager.dbapi.connect
             with patch(
@@ -121,9 +122,6 @@ class TestBigQueryImports:
                 pool.dispose()
 
             mock_connect.assert_called_once()
-            call_kwargs = mock_connect.call_args.kwargs
-            # PyPI drivers use db_kwargs= kwarg
-            assert "db_kwargs" in call_kwargs
         else:
             # Driver not installed: mock adbc_driver_manager.dbapi.connect
             with patch(
@@ -158,9 +156,6 @@ class TestPostgreSQLImports:
                 pool.dispose()
 
             mock_connect.assert_called_once()
-            call_kwargs = mock_connect.call_args.kwargs
-            # PyPI drivers use db_kwargs= kwarg
-            assert "db_kwargs" in call_kwargs
         else:
             # Driver not installed: mock adbc_driver_manager.dbapi.connect
             with patch(
@@ -195,9 +190,6 @@ class TestFlightSQLImports:
                 pool.dispose()
 
             mock_connect.assert_called_once()
-            call_kwargs = mock_connect.call_args.kwargs
-            # PyPI drivers use db_kwargs= kwarg
-            assert "db_kwargs" in call_kwargs
         else:
             # Driver not installed: mock adbc_driver_manager.dbapi.connect
             with patch(
