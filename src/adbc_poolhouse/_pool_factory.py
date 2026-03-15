@@ -1,8 +1,11 @@
 """
 Pool factory: public create_pool() entry point.
 
-This module wires together config translation, driver resolution, and
-the ADBC source+clone pattern to create a SQLAlchemy QueuePool.
+This module wires together config methods and the ADBC source+clone
+pattern to create a SQLAlchemy QueuePool.  Each config instance is
+self-describing -- it carries its own driver path, kwargs translation,
+entrypoint, and optional DBAPI module -- so no registry or dispatch
+layer is needed.
 
 No module-level pool or connection objects exist here (POOL-05).
 
@@ -18,7 +21,6 @@ import sqlalchemy.pool
 from sqlalchemy import event
 
 from adbc_poolhouse._driver_api import create_adbc_connection
-from adbc_poolhouse._drivers import resolve_dbapi_module, resolve_driver
 
 if TYPE_CHECKING:
     import collections.abc
@@ -68,13 +70,11 @@ def create_pool(
 
     Raises:
         ImportError: If the required ADBC driver is not installed.
-        TypeError: If ``config`` is not a recognised warehouse config type.
     """
-    driver_path = resolve_driver(config)
+    driver_path = config._driver_path()
     kwargs = config.to_adbc_kwargs()
     entrypoint = config._adbc_entrypoint()
-
-    dbapi_module = resolve_dbapi_module(config)
+    dbapi_module = config._dbapi_module()
 
     source = create_adbc_connection(
         driver_path,
