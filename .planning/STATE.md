@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: milestone
-status: completed
-stopped_at: Phase 19 context gathered
-last_updated: "2026-03-15T11:49:07.730Z"
-last_activity: 2026-03-15 — Completed Plan 18-03 (Test Suite Cleanup)
+status: executing
+stopped_at: Completed 19-01-PLAN.md
+last_updated: "2026-03-15T12:16:21.035Z"
+last_activity: 2026-03-15 — Completed Plan 19-01 (Raw create_pool Overload)
 progress:
   total_phases: 0
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
-  percent: 100
+  percent: 50
 ---
 
 # Project State
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-03-07)
 ## Current Position
 
 Milestone: v1.2.0 — Plugin/Extensibility API (IN PROGRESS)
-Phase: 18-registration-removal (Plan 3/3 complete)
-Status: Phase 18 complete
-Last activity: 2026-03-15 — Completed Plan 18-03 (Test Suite Cleanup)
+Phase: 19-raw-create-pool (Plan 1/2 complete)
+Status: Phase 19 in progress
+Last activity: 2026-03-15 — Completed Plan 19-01 (Raw create_pool Overload)
 
-Progress: [██████████] 100% (3/3 plans complete)
+Progress: [█████-----] 50% (1/2 plans complete)
 
 ## Accumulated Context
 
@@ -91,6 +91,13 @@ All decisions from v1.0.0 have been reviewed and marked with outcomes.
 - Tasks 1 and 2 committed atomically since ABC enforcement requires implementations to coexist for type checking
 - [Phase 18]: BaseWarehouseConfig uses formal ABC for _driver_path() and to_adbc_kwargs()
 
+**Phase 19 Plan 01 decisions:**
+- _create_pool_impl() shared helper avoids overload forwarding issues between managed_pool() and create_pool()
+- Mutual exclusivity check (driver_path vs dbapi_module) placed first in _create_pool_impl for early fail
+- Empty string passed as driver_path for dbapi_module path (unused by create_adbc_connection when dbapi_module is set)
+- TDD RED+GREEN combined in single commit due to basedpyright pre-commit hook blocking type-invalid test code
+- [Phase 19-raw-create-pool]: _create_pool_impl() shared helper avoids overload forwarding issues between managed_pool() and create_pool()
+
 ### Roadmap Evolution
 
 - 15 phases completed across v1.0.0 milestone
@@ -112,6 +119,6 @@ None — execution proceeding normally.
 
 ## Session Continuity
 
-Last session: 2026-03-15T11:49:07.728Z
-Stopped at: Phase 19 context gathered
-Next step: Phase 18 complete. Begin Phase 19 (raw-create-pool) or Phase 20 (plugin-documentation).
+Last session: 2026-03-15T12:16:16.254Z
+Stopped at: Completed 19-01-PLAN.md
+Next step: Execute Plan 19-02 (documentation/integration tests) to complete Phase 19.
