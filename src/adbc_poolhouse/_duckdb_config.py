@@ -20,8 +20,10 @@ class DuckDBConfig(BaseWarehouseConfig):
     BaseWarehouseConfig and loaded from DUCKDB_* environment variables.
 
     Example:
-        DuckDBConfig(database='/data/warehouse.db', pool_size=5)
-        DuckDBConfig()  # in-memory, pool_size=1 enforced by validator
+        ```python
+        DuckDBConfig(database="/data/warehouse.db", pool_size=5)
+        DuckDBConfig()  # in-memory, pool_size=1 enforced
+        ```
     """
 
     model_config = SettingsConfigDict(env_prefix="DUCKDB_")

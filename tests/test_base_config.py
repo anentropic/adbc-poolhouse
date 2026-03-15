@@ -55,7 +55,5 @@ class TestBaseWarehouseConfig:
             BaseWarehouseConfig()  # type: ignore[abstract]
 
     def test_abstract_methods(self) -> None:
-        """BaseWarehouseConfig declares _driver_path and to_adbc_kwargs as abstract."""
-        assert BaseWarehouseConfig.__abstractmethods__ == frozenset(
-            {"_driver_path", "to_adbc_kwargs"}
-        )
+        """BaseWarehouseConfig declares to_adbc_kwargs as abstract."""
+        assert BaseWarehouseConfig.__abstractmethods__ == frozenset({"to_adbc_kwargs"})

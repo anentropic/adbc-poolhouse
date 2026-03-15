@@ -15,12 +15,12 @@ class WarehouseConfig(Protocol):
     Structural type for warehouse config objects.
 
     Any class with these attributes and methods can be passed to
-    :func:`create_pool` or :func:`managed_pool`. The built-in config
+    `create_pool` or `managed_pool`. The built-in config
     classes all satisfy this protocol through
-    :class:`BaseWarehouseConfig`.
+    `BaseWarehouseConfig`.
 
-    Third-party authors: inherit from :class:`BaseWarehouseConfig`
-    for pool-tuning defaults and :meth:`_resolve_driver_path`, or
+    Third-party authors: inherit from `BaseWarehouseConfig`
+    for pool-tuning defaults and `_resolve_driver_path`, or
     implement the full protocol from scratch.
     """
 
@@ -47,9 +47,9 @@ class WarehouseConfig(Protocol):
         """
         ...
 
-    def _driver_path(self) -> str:
+    def _driver_path(self) -> str | None:
         """
-        Return the ADBC driver path or short name.
+        Return the ADBC driver path or short name, or ``None``.
 
         Called by ``create_pool`` to locate the native driver library.
         Two return styles are supported:
@@ -59,8 +59,13 @@ class WarehouseConfig(Protocol):
         - A short package name (e.g. ``"adbc_driver_snowflake"``)
           that ``adbc_driver_manager`` resolves via its manifest.
 
+        Return ``None`` when the driver uses a Python dbapi module
+        instead (see `_dbapi_module`). At least one of
+        ``_driver_path`` or ``_dbapi_module`` must return a non-None
+        value.
+
         Most implementations delegate to
-        :meth:`BaseWarehouseConfig._resolve_driver_path`.
+        `BaseWarehouseConfig._resolve_driver_path`.
         """
         ...
 
@@ -117,15 +122,18 @@ class BaseWarehouseConfig(BaseSettings, ABC):
         """
         return None
 
-    @abstractmethod
-    def _driver_path(self) -> str:
+    def _driver_path(self) -> str | None:
         """
-        Return the ADBC driver path or short name.
+        Return the ADBC driver path or short name, or ``None``.
 
-        Subclasses must override. Most implementations call
-        ``self._resolve_driver_path("adbc_driver_<name>")``.
+        Override to provide a native ADBC driver. Most implementations
+        call ``self._resolve_driver_path("adbc_driver_<name>")``.
+
+        The base implementation returns ``None``. At least one of
+        ``_driver_path`` or ``_dbapi_module`` must be overridden to
+        return a non-None value.
         """
-        ...
+        return None
 
     def _dbapi_module(self) -> str | None:
         """

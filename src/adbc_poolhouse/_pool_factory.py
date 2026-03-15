@@ -52,10 +52,17 @@ def _create_pool_impl(
 
     if config is not None:
         # Config path -- extract driver info from config methods
-        resolved_driver_path = config._driver_path()
+        cfg_driver_path = config._driver_path()
+        cfg_dbapi_module = config._dbapi_module()
+        if cfg_driver_path is None and cfg_dbapi_module is None:
+            raise TypeError(
+                f"{type(config).__name__} must provide _driver_path() or "
+                "_dbapi_module() (both returned None)"
+            )
+        resolved_driver_path = cfg_driver_path if cfg_driver_path is not None else ""
         resolved_kwargs = config.to_adbc_kwargs()
         resolved_entrypoint = config._adbc_entrypoint()
-        resolved_dbapi_module = config._dbapi_module()
+        resolved_dbapi_module = cfg_dbapi_module
     elif driver_path is not None:
         # Native ADBC driver path
         if db_kwargs is None:
@@ -199,20 +206,26 @@ def create_pool(
         ImportError: If the required ADBC driver is not installed.
 
     Example:
+        Config path:
+
+        ```python
         from adbc_poolhouse import create_pool, close_pool
-
-        # Config path
         from adbc_poolhouse import DuckDBConfig
-        pool = create_pool(DuckDBConfig(database="/tmp/my.db"))
 
-        # Raw native driver path
+        pool = create_pool(DuckDBConfig(database="/tmp/my.db"))
+        close_pool(pool)
+        ```
+
+        Raw native driver path:
+
+        ```python
         pool = create_pool(
             driver_path="/path/to/libduckdb.dylib",
             db_kwargs={"path": "/tmp/my.db"},
             entrypoint="duckdb_adbc_init",
         )
-
         close_pool(pool)
+        ```
     """
     return _create_pool_impl(
         config,
@@ -237,14 +250,15 @@ def close_pool(pool: sqlalchemy.pool.QueuePool) -> None:
     ``pool.dispose()`` directly to avoid leaving the ADBC source connection open.
 
     Args:
-        pool: A pool returned by :func:`create_pool`.
+        pool: A pool returned by `create_pool`.
 
     Example:
+        ```python
         from adbc_poolhouse import DuckDBConfig, create_pool, close_pool
 
-        pool = create_pool(DuckDBConfig(database='/tmp/wh.db'))
-        # ... use pool ...
+        pool = create_pool(DuckDBConfig(database="/tmp/wh.db"))
         close_pool(pool)
+        ```
     """
     pool.dispose()
     pool._adbc_source.close()  # type: ignore[attr-defined]
@@ -307,7 +321,7 @@ def managed_pool(
     Context manager that creates a pool and closes it on exit.
 
     The pool is created when the ``with`` block is entered and disposed
-    (via :func:`close_pool`) when the block exits, whether normally or by
+    (via `close_pool`) when the block exits, whether normally or by
     exception.
 
     Three call patterns are supported:
@@ -348,14 +362,20 @@ def managed_pool(
         ImportError: If the required ADBC driver is not installed.
 
     Example:
+        Config path:
+
+        ```python
         from adbc_poolhouse import DuckDBConfig, managed_pool
 
         with managed_pool(DuckDBConfig(database="/tmp/wh.db")) as pool:
             with pool.connect() as conn:
                 cursor = conn.cursor()
                 cursor.execute("SELECT 1")
+        ```
 
-        # Raw native driver path
+        Raw native driver path:
+
+        ```python
         with managed_pool(
             driver_path="/path/to/libduckdb.dylib",
             db_kwargs={"path": "/tmp/my.db"},
@@ -364,6 +384,7 @@ def managed_pool(
             with pool.connect() as conn:
                 cursor = conn.cursor()
                 cursor.execute("SELECT 42")
+        ```
     """
     pool = _create_pool_impl(
         config,

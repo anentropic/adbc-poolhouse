@@ -25,8 +25,10 @@ class SQLiteConfig(BaseWarehouseConfig):
     races across a single shared DB), so it is rejected by a validator.
 
     Example:
-        SQLiteConfig(database='/data/warehouse.db', pool_size=5)
-        SQLiteConfig()  # in-memory, pool_size=1 enforced by validator
+        ```python
+        SQLiteConfig(database="/data/warehouse.db", pool_size=5)
+        SQLiteConfig()  # in-memory, pool_size=1 enforced
+        ```
     """
 
     model_config = SettingsConfigDict(env_prefix="SQLITE_")

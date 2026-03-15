@@ -19,9 +19,9 @@ class ConfigurationError(PoolhouseError, ValueError):
     @model_validator, pydantic wraps it in ValidationError --- which itself
     inherits from ValueError --- satisfying 'raises ValueError' test expectations.
 
-    Example::
-
+    Example:
+        ```python
         DuckDBConfig(database=":memory:", pool_size=2)
-        # raises pydantic.ValidationError (which wraps ConfigurationError,
-        # and ValidationError itself inherits from ValueError)
+        # raises pydantic.ValidationError (wraps ConfigurationError)
+        ```
     """

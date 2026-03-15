@@ -86,7 +86,7 @@ class MySQLConfig(BaseWarehouseConfig):
           ``{"uri": ...}``.
         - **Decomposed mode**: builds a Go DSN from ``user``, ``password``,
           ``host``, ``port``, and ``database``. Password is URL-encoded via
-          :func:`urllib.parse.quote` with ``safe=""``.
+          `urllib.parse.quote` with ``safe=""``.
 
         Returns:
             ADBC driver kwargs for ``adbc_driver_manager.dbapi.connect()``.

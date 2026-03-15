@@ -1,5 +1,5 @@
 ---
-phase: 02
+phase: 17
 slug: registry-infrastructure
 status: draft
 nyquist_compliant: false

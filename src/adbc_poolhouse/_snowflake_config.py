@@ -24,8 +24,10 @@ class SnowflakeConfig(BaseWarehouseConfig):
     inherited and loaded from SNOWFLAKE_* environment variables.
 
     Example:
-        SnowflakeConfig(account='myorg-myaccount', user='me', password='...')
-        SnowflakeConfig(account='myorg', user='me', private_key_path=Path('/keys/rsa.p8'))
+        ```python
+        SnowflakeConfig(account="myorg-myaccount", user="me", password="...")
+        SnowflakeConfig(account="myorg", user="me", private_key_path=Path("/keys/rsa.p8"))
+        ```
     """
 
     model_config = SettingsConfigDict(env_prefix="SNOWFLAKE_")

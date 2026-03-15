@@ -26,6 +26,12 @@ One config in, one pool out — `create_pool(SnowflakeConfig(...))` returns a re
 - ✓ Foundry tooling: justfile recipes for `dbc` CLI + driver management — v1.0.0
 - ✓ SQLite, MySQL, ClickHouse backends — v1.0.0
 - ✓ VCR-style integration tests via pytest-adbc-replay cassettes — v1.0.0
+- ✓ Self-describing config classes with `to_adbc_kwargs()`, `_driver_path()`, `_dbapi_module()` — v1.2.0
+- ✓ Registry-free architecture — `create_pool()` calls config methods directly — v1.2.0
+- ✓ Raw `create_pool(driver_path=...)` and `create_pool(dbapi_module=...)` overloads — v1.2.0
+- ✓ WarehouseConfig Protocol as third-party contract — v1.2.0
+- ✓ Custom backends guide with Protocol reference — v1.2.0
+- ✓ Semi-integration tests for all 12 backends — v1.2.0
 
 ### Active
 
@@ -44,12 +50,16 @@ One config in, one pool out — `create_pool(SnowflakeConfig(...))` returns a re
 - Teradata — private Foundry registry (requires paid Columnar access)
 - Oracle — private Foundry registry
 - ClickHouse via Apache ADBC — github.com/ClickHouse/adbc_clickhouse is WIP with many NotImplemented stubs
+- Plugin registry / entry point discovery — architectural pivot chose Protocol-based contract over registry system
+- Backend enumeration (list_backends) — no registry; consumers know which configs they use
 
 ## Context
 
-Shipped v1.0.0 with 2,373 LOC Python across 12 warehouse backends.
+Shipped v1.2.0 with 2,326 LOC Python across 12 warehouse backends.
 Tech stack: Pydantic BaseSettings, SQLAlchemy QueuePool, ADBC Driver Manager, mkdocs-material.
 Published to PyPI: `pip install adbc-poolhouse`.
+
+v1.2.0 pivoted from a registry-based plugin system to a simpler Protocol-based contract. Config classes are self-describing — each carries its driver path, kwargs translation, and dbapi module. Third-party backends implement the WarehouseConfig Protocol and pass directly to `create_pool()`.
 
 Two concrete consumers:
 1. **dbt-open-sl** — provides a `translate_to_poolhouse_config()` shim from `profiles.yml` to this lib's config models
@@ -57,7 +67,7 @@ Two concrete consumers:
 
 Integration tests use pytest-adbc-replay cassettes (VCR-style record/replay) for Snowflake and Databricks — CI runs without credentials.
 
-192 tests (188 unit + 4 integration) passing.
+241 tests passing.
 
 ## Constraints
 
@@ -80,6 +90,12 @@ Integration tests use pytest-adbc-replay cassettes (VCR-style record/replay) for
 | URI-first with decomposed-field fallback | Databricks, MySQL, ClickHouse need both modes | ✓ Good — consistent pattern across all backends |
 | Open lower bounds only (no upper caps) | Tight bounds cause unnecessary consumer dep conflicts | ✓ Good — no reports of dep conflicts |
 | `pre_ping=False` default | pre_ping silently no-ops on standalone QueuePool without a dialect; `recycle=3600` is the health mechanism | ✓ Good — correct for standalone pool |
+| Registry built then removed | Self-describing configs are simpler than registry dispatch | ✓ Good — no global state, no lazy registration, no dispatch layer |
+| Protocol over plugin system | WarehouseConfig Protocol lets third parties implement backends without registration | ✓ Good — zero ceremony for custom backends |
+| ABC for BaseWarehouseConfig | Catches missing `_driver_path()` / `to_adbc_kwargs()` at instantiation time | ✓ Good — fail fast on incomplete implementations |
+| EAFP in create_pool() | AttributeError is natural error for configs missing methods; no TypeError raise | ✓ Good — simpler, Pythonic |
+| `_create_pool_impl()` shared helper | Avoids overload forwarding issues between `managed_pool()` and `create_pool()` | ✓ Good — single implementation, three call patterns |
+| Direct `to_adbc_kwargs()` over aliases | Field-to-key mappings too divergent for Pydantic alias approach | ✓ Good — explicit, readable, correct |
 
 ---
-*Last updated: 2026-03-07 after v1.0.0 milestone*
+*Last updated: 2026-03-15 after v1.2.0 milestone*

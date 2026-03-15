@@ -27,7 +27,7 @@ adbc-poolhouse ships config classes for 12 backends:
 and [`TrinoConfig`][adbc_poolhouse.TrinoConfig].
 Each config class validates credentials, builds the ADBC connection kwargs, and resolves the driver automatically.
 
-For custom ADBC drivers or cases where a built-in config class does not exist, `create_pool` also accepts raw driver arguments directly. See [Raw driver arguments](#raw-driver-arguments) below.
+For custom ADBC drivers or cases where a built-in config class does not exist, `create_pool` also accepts [raw driver arguments](configuration.md#raw-driver-arguments) directly.
 
 For env var loading and field details, see the [configuration guide](configuration.md).
 
@@ -105,58 +105,6 @@ Pass any of these to `create_pool`:
 ```python
 pool = create_pool(config, pool_size=10, recycle=7200)
 ```
-
-## Raw driver arguments
-
-For custom ADBC drivers or cases where a built-in config class does not exist, `create_pool` and `managed_pool` accept raw ADBC driver arguments directly.
-
-Two raw paths are supported. Use one or the other, not both:
-
-=== "Native ADBC driver"
-
-    `driver_path` accepts two forms:
-
-    - An absolute path to a shared library (`.so`, `.dylib`, `.dll`)
-    - A short driver name like `"adbc_driver_duckdb"` that `adbc_driver_manager` resolves through its manifest-based lookup
-
-    For a list of available drivers and installation instructions, see the
-    [ADBC driver installation docs](https://arrow.apache.org/adbc/current/driver/installation.html).
-
-    ```python
-    from adbc_poolhouse import create_pool, close_pool
-
-    pool = create_pool(
-        driver_path="adbc_driver_duckdb",
-        db_kwargs={"path": "/tmp/my.db"},
-        # entrypoint is only needed when the driver uses a non-default
-        # init symbol. DuckDB requires "duckdb_adbc_init".
-        entrypoint="duckdb_adbc_init",
-    )
-    # ... use pool ...
-    close_pool(pool)
-    ```
-
-    `entrypoint` is optional. Most drivers use a default init symbol and do not need it. DuckDB is the main driver that requires an explicit entrypoint (`"duckdb_adbc_init"`).
-
-=== "Python dbapi module"
-
-    `dbapi_module` is a dotted Python module path (e.g. `"adbc_driver_snowflake.dbapi"`). The module must expose a `connect()` function. adbc-poolhouse detects the function's signature and passes connection arguments accordingly.
-
-    This path imports the Python package and calls its `connect()` directly. By contrast, `driver_path` loads a native shared library through `adbc_driver_manager`.
-
-    ```python
-    from adbc_poolhouse import managed_pool
-
-    with managed_pool(
-        dbapi_module="adbc_driver_snowflake.dbapi",
-        db_kwargs={"adbc.snowflake.sql.account": "myorg-myaccount"},
-    ) as pool:
-        with pool.connect() as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT 1")
-    ```
-
-Pool tuning arguments (`pool_size`, `max_overflow`, `timeout`, `recycle`, `pre_ping`) work with both raw paths, same defaults as the config path.
 
 ## Common mistakes
 

@@ -81,7 +81,7 @@ class RedshiftConfig(BaseWarehouseConfig):
         - **URI mode** (``uri`` set): passed directly as ``{"uri": ...}``.
         - **Decomposed mode**: builds a ``redshift://`` URI from ``host``,
           ``port``, ``user``, ``password``, ``database``, and ``sslmode``.
-          Password is URL-encoded via :func:`urllib.parse.quote` with
+          Password is URL-encoded via `urllib.parse.quote` with
           ``safe=""``.
 
         IAM and cluster fields (``cluster_type``, ``cluster_identifier``,

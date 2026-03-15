@@ -1,7 +1,9 @@
 # Custom backends
 
 adbc-poolhouse ships config classes for 12 ADBC backends. If your driver is not
-on that list, write your own config class and pass it to `create_pool()`.
+on that list you have two options: pass
+[raw driver arguments](configuration.md#raw-driver-arguments) to `create_pool()`
+directly, or write a config class as described below.
 
 ## The short version
 
@@ -37,22 +39,35 @@ fields (`pool_size`, `max_overflow`, `timeout`, `recycle`) with sensible
 defaults, and the `_adbc_entrypoint()` and `_dbapi_module()` methods return
 `None` -- the right default for most drivers.
 
+Library authors who prefer not to add a dependency on adbc-poolhouse (or
+pydantic) can implement the
+[`WarehouseConfig`][adbc_poolhouse.WarehouseConfig] protocol directly instead.
+See [Without BaseWarehouseConfig](#without-basewarehouseconfig) below.
+
 ## What each method does
 
 ### `_driver_path()`
 
-Called by `create_pool()` to locate the native ADBC driver.
+Called by `create_pool()` to locate the native ADBC driver. Return `None` if
+the driver uses a Python dbapi module instead (see
+[`_dbapi_module()`](#_dbapi_module) below). At least one of `_driver_path` or
+`_dbapi_module` must return a non-None value.
 
 Return one of:
 
 - An absolute path to a shared library (`.so` / `.dylib` / `.dll`)
 - A short package name like `"adbc_driver_mydriver"` that `adbc_driver_manager`
   resolves through its manifest
+- `None` — when using `_dbapi_module()` instead
 
-For PyPI drivers, call `self._resolve_driver_path("adbc_driver_mydriver")`. This
-static method tries `importlib.util.find_spec` -> import -> call the package's
-own `_driver_path()`, and falls back to returning the package name if the package
-is not installed.
+See the [ADBC driver manifests docs](https://arrow.apache.org/adbc/current/format/driver_manifests.html)
+for details about driver path resolution.
+
+The PyPI package for many drivers has a method like `_driver_path()` that
+returns this value. A `_resolve_driver_path("adbc_driver_mydriver")` helper is
+provided on `BaseWarehouseConfig` — it tries `importlib.util.find_spec` ->
+import -> call the package's own `_driver_path()`, and falls back to returning
+the package name if the package is not installed.
 
 ### `to_adbc_kwargs()`
 
@@ -82,9 +97,10 @@ def _adbc_entrypoint(self) -> str | None:
 
 ### `_dbapi_module()`
 
-Return a dotted Python module path (e.g. `"adbc_driver_mydb.dbapi"`) if the
-driver ships a Python package with a `connect()` function. Return `None`
-otherwise.
+Some Python ADBC packages are not full ADBC drivers, but do expose the Python dbapi2-compatible ADBC interface.
+In that case you can implement this method.
+
+Return a dotted Python module path (e.g. `"adbc_driver_mydb.dbapi"`) to the module containing a `connect()` function. Return `None` otherwise.
 
 When set, `create_pool()` imports the module and calls `connect()` directly
 instead of loading a native shared library through `adbc_driver_manager`.
@@ -131,7 +147,7 @@ class StandaloneConfig:
         self.timeout = 30
         self.recycle = 3600
 
-    def _driver_path(self) -> str:
+    def _driver_path(self) -> str | None:
         return "adbc_driver_mydriver"
 
     def _adbc_entrypoint(self) -> str | None:
@@ -145,8 +161,8 @@ class StandaloneConfig:
 ```
 
 This is more boilerplate than inheriting `BaseWarehouseConfig`. The standalone
-approach is useful when you cannot depend on `pydantic-settings` or need full
-control over initialization.
+approach is useful for library authors who do not want to pull in adbc-poolhouse
+or pydantic as a transitive dependency.
 
 ## Protocol reference
 
@@ -164,4 +180,4 @@ API reference:
 
 - [Pool lifecycle](pool-lifecycle.md) -- creating, using, and disposing pools
 - [Configuration reference](configuration.md) -- env var loading and pool tuning
-- [Pool lifecycle: raw driver arguments](pool-lifecycle.md#raw-driver-arguments) -- using `create_pool()` without a config class
+- [Raw driver arguments](configuration.md#raw-driver-arguments) -- using `create_pool()` without a config class

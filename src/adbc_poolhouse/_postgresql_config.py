@@ -21,14 +21,11 @@ class PostgreSQLConfig(BaseWarehouseConfig):
 
     Pool tuning fields are inherited and loaded from POSTGRESQL_* env vars.
 
-    Examples:
-        URI mode::
-
-            PostgreSQLConfig(uri="postgresql://me:s3cret@host/mydb")  # pragma: allowlist secret
-
-        Individual fields::
-
-            PostgreSQLConfig(host="db.example.com", user="me", database="mydb")
+    Example:
+        ```python
+        PostgreSQLConfig(uri="postgresql://me:s3cret@host/mydb")  # pragma: allowlist secret
+        PostgreSQLConfig(host="db.example.com", user="me", database="mydb")
+        ```
     """
 
     model_config = SettingsConfigDict(env_prefix="POSTGRESQL_")
@@ -78,7 +75,7 @@ class PostgreSQLConfig(BaseWarehouseConfig):
         - **URI mode** (``uri`` set): passed directly as ``{"uri": ...}``.
         - **Decomposed mode**: builds a libpq URI from ``host``, ``port``,
           ``user``, ``password``, ``database``, and ``sslmode``. Password is
-          URL-encoded via :func:`urllib.parse.quote` with ``safe=""``.
+          URL-encoded via `urllib.parse.quote` with ``safe=""``.
         - **Empty mode**: returns ``{}`` so libpq resolves from env vars.
 
         Returns:

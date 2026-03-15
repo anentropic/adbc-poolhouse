@@ -95,7 +95,7 @@ class DatabricksConfig(BaseWarehouseConfig):
           ``{"uri": ...}``.
         - **Decomposed mode**: builds ``databricks://token:{encoded}@{host}:443{http_path}``
           from ``host``, ``http_path``, and ``token``. Token is URL-encoded via
-          :func:`urllib.parse.quote` with ``safe=""``.
+          `urllib.parse.quote` with ``safe=""``.
 
         Returns:
             ADBC driver kwargs for ``adbc_driver_manager.dbapi.connect()``.

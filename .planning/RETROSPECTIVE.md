@@ -48,6 +48,50 @@
 
 ---
 
+## Milestone: v1.2.0 — Plugin/Extensibility API
+
+**Shipped:** 2026-03-15
+**Phases:** 6 | **Plans:** 17
+
+### What Was Built
+- Self-describing config classes with `to_adbc_kwargs()`, `_driver_path()`, `_dbapi_module()` on all 12 backends
+- Registry-free architecture — `create_pool()` calls config methods directly
+- Overloaded `create_pool(driver_path=...)` and `create_pool(dbapi_module=...)` for raw driver usage
+- WarehouseConfig Protocol as the third-party integration contract
+- Custom backends guide with Protocol reference documentation
+- Semi-integration tests for all 12 backends with conditional mock targets
+
+### What Worked
+- Architectural pivot (registry → self-describing configs) mid-milestone produced a simpler, better design than the original plan
+- Phase 17.5 insertion for translator consolidation before registry removal meant each subsequent phase built on clean foundations
+- Direct method implementation pattern for `to_adbc_kwargs()` scaled cleanly across all 12 backends once Snowflake reference was established
+- Milestone audit caught the DOC-03 gap, which was then closed by Phase 20 gap closure
+- ABC enforcement on BaseWarehouseConfig catches missing implementations at instantiation rather than at pool creation time
+
+### What Was Inefficient
+- Registry was built in Phase 17, then entirely deleted in Phase 18 — the pivot was correct but the registry work was throwaway
+- Original requirements (REG-*, EP-*, DOC-01/02) were largely invalidated — 12 of 13 requirements superseded by the architectural change
+- Phase numbering required correction mid-milestone (originally 01-04, renumbered to 16-20 for monotonic sequencing across milestones)
+
+### Patterns Established
+- Protocol-based contract over registry/plugin systems — simpler for both library and third-party authors
+- `_create_pool_impl()` shared helper pattern for multi-overload functions
+- ABC with `_driver_path()` and `to_adbc_kwargs()` as abstract methods on BaseWarehouseConfig
+- Gap closure phases from milestone audit as standard practice
+
+### Key Lessons
+1. Build the simple thing first (self-describing configs) rather than the complex thing (plugin registry) — the registry was unnecessary complexity
+2. When requirements become stale mid-milestone due to an architectural pivot, supersede them explicitly rather than forcing completion
+3. Monotonic phase numbering across milestones (don't restart at 01) prevents confusion in commit messages and planning documents
+4. `to_adbc_kwargs()` as a method on each config class is better than external translator functions — keeps translation logic with the data it operates on
+
+### Cost Observations
+- Model mix: primarily opus for planning/execution, sonnet for research, haiku for quick tasks
+- 107 commits over 4 days
+- Notable: 4-day milestone vs 13-day v1.0.0 — patterns from v1.0.0 made v1.2.0 execution highly efficient
+
+---
+
 ## Cross-Milestone Trends
 
 ### Process Evolution
@@ -55,14 +99,17 @@
 | Milestone | Phases | Plans | Key Change |
 |-----------|--------|-------|------------|
 | v1.0.0 | 15 | 51 | Full GSD workflow: research → plan → execute → verify → audit |
+| v1.2.0 | 6 | 17 | Architectural pivot mid-milestone; gap closure from audit |
 
 ### Cumulative Quality
 
 | Milestone | Tests | Backends | Requirements |
 |-----------|-------|----------|-------------|
 | v1.0.0 | 192 | 12 | 66/66 |
+| v1.2.0 | 241 | 12 | 1/13 satisfied, 12/13 superseded |
 
 ### Top Lessons (Verified Across Milestones)
 
-1. Audit before archiving — catches gaps that phase-level verification misses
-2. Establish patterns early, then replicate mechanically for each new backend
+1. Audit before archiving — catches gaps that phase-level verification misses (confirmed v1.0.0 + v1.2.0)
+2. Establish patterns early, then replicate mechanically — translator consolidation scaled to all 12 backends (confirmed v1.0.0 + v1.2.0)
+3. Build the simplest solution that works — registry was unnecessary complexity, self-describing configs are better (v1.2.0)

@@ -1,24 +1,26 @@
 # Milestones
 
-## v1.2.0 Plugin/Extensibility API (Planned)
+## v1.2.0 Plugin/Extensibility API (Shipped: 2026-03-15)
 
-**Status:** In progress (1 phase remaining)
-**Phases:** 5 completed (16-19), 1 pending (20)
+**Phases completed:** 6 phases (16-20), 17 plans
 
-**Goals:**
-- Self-describing config classes (no registry indirection)
-- Raw create_pool overload for advanced/custom use
-- Documentation for custom backend authors
+**Delivered:** Self-describing config architecture with Protocol-based third-party contract and raw driver path overloads. Registry built and deliberately removed in favor of simpler design.
 
-**Completed phases:**
-16. Driver Import Semi-Integration Tests — semi-integration tests for all 12 backends
-17. Registry Infrastructure — backend registry (later removed in Phase 18)
-17.5. Translator Consolidation — consolidate translator interface for plugin consistency
-18. Registration Removal — configs self-describe driver path, delete registry machinery
-19. Raw create_pool Overload — `create_pool()` accepts raw `(driver_path, db_kwargs)` directly
+**Key accomplishments:**
+- Semi-integration tests for all 12 ADBC backends with conditional mock targets
+- Self-describing config classes with `_driver_path()`, `_dbapi_module()`, and `to_adbc_kwargs()` methods
+- Registry-free architecture — `create_pool()` calls config methods directly, no dispatch layer
+- Overloaded `create_pool(driver_path=...)` and `create_pool(dbapi_module=...)` for raw driver usage
+- WarehouseConfig Protocol as the sole third-party contract
+- Custom backends guide with Protocol reference documentation
 
-**Pending phases:**
-20. Protocol Documentation — WarehouseConfig Protocol reference + custom backends guide (DOC-03)
+**Stats:**
+- Lines of code: 2,326 Python (src/)
+- Files modified: 123
+- Commits: 107
+- Timeline: 4 days (2026-03-12 → 2026-03-15)
+- Tests: 241 passing
+- Git range: 6bc6908 → 1564805
 
 ---
 

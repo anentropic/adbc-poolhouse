@@ -1,5 +1,5 @@
 ---
-phase: 02-registry-infrastructure
+phase: 17-registry-infrastructure
 plan: 01
 subsystem: registry
 tags: [registry, plugin, extensibility, exceptions, testing]
