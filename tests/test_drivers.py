@@ -1,11 +1,5 @@
 """
-Driver detection unit tests (TEST-06).
-
-Tests cover all three detection paths using unittest.mock.patch to simulate
-driver presence/absence -- no real ADBC driver connection is made.  Tests
-also verify Foundry backends return static strings and that
-create_adbc_connection() re-raises adbc_driver_manager NOT_FOUND as
-ImportError with https://docs.adbc-drivers.org/ (DRIV-03).
+Unit tests for config _driver_path() and _dbapi_module() methods.
 
 After Phase 18 (registration removal), driver resolution is handled by each
 config's ``_driver_path()`` method, which calls the shared
@@ -23,7 +17,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from adbc_poolhouse import ClickHouseConfig
+from adbc_poolhouse import ClickHouseConfig, WarehouseConfig
 from adbc_poolhouse._bigquery_config import BigQueryConfig
 from adbc_poolhouse._databricks_config import DatabricksConfig
 from adbc_poolhouse._duckdb_config import DuckDBConfig
@@ -40,11 +34,12 @@ from adbc_poolhouse._trino_config import TrinoConfig
 class TestDuckDBDriverPath:
     """Tests for DuckDB driver path resolution via config._driver_path()."""
 
-    def test_path1_duckdb_found_via_find_spec(self) -> None:
-        """Path 1: find_spec('adbc_driver_duckdb') returns spec -> calls driver_path()."""
+    def test_duckdb_calls_resolve_with_driver_path_method_name(self) -> None:
+        """DuckDB uses method_name='driver_path' (no underscore prefix)."""
         config = DuckDBConfig()
         mock_spec = MagicMock()
         mock_pkg = MagicMock()
+        # DuckDB's package exposes driver_path() (not _driver_path())
         mock_pkg.__dict__ = {"driver_path": lambda: "/path/to/_duckdb.cpython-314-darwin.so"}
         with (
             patch("importlib.util.find_spec", return_value=mock_spec),
@@ -53,24 +48,22 @@ class TestDuckDBDriverPath:
             path = config._driver_path()
         assert path == "/path/to/_duckdb.cpython-314-darwin.so"
 
-    def test_path2_duckdb_missing_returns_package_name(self) -> None:
-        """Path 2: find_spec returns None -> returns 'adbc_driver_duckdb' for manifest fallback."""
+    def test_duckdb_fallback_when_package_missing(self) -> None:
+        """find_spec returns None -> returns 'adbc_driver_duckdb' for manifest fallback."""
         with patch("importlib.util.find_spec", return_value=None):
             path = DuckDBConfig()._driver_path()
         assert path == "adbc_driver_duckdb"
+
+    def test_duckdb_dbapi_module_returns_none(self) -> None:
+        """DuckDB always returns None (routes through adbc_driver_manager)."""
+        assert DuckDBConfig()._dbapi_module() is None
 
 
 class TestPyPIDriverPath:
     """Tests for PyPI-installed warehouse driver detection via config._driver_path()."""
 
-    def test_path2_snowflake_missing_returns_package_name(self) -> None:
-        """Path 2: find_spec None -> returns package name for manifest fallback."""
-        with patch("importlib.util.find_spec", return_value=None):
-            result = SnowflakeConfig(account="a")._driver_path()
-        assert result == "adbc_driver_snowflake"
-
-    def test_path1_snowflake_found_returns_driver_path(self) -> None:
-        """Path 1: find_spec returns a spec -> import pkg and call _driver_path()."""
+    def test_snowflake_found_returns_driver_path(self) -> None:
+        """find_spec returns a spec -> import pkg and call _driver_path()."""
         config = SnowflakeConfig(account="a")
         mock_spec = MagicMock()
         mock_pkg = MagicMock()
@@ -82,29 +75,77 @@ class TestPyPIDriverPath:
             result = config._driver_path()
         assert result == "/path/to/adbc_driver_snowflake.so"
 
-    def test_path2_bigquery_missing_returns_package_name(self) -> None:
-        """Path 2: find_spec None -> returns 'adbc_driver_bigquery'."""
+    def test_snowflake_missing_returns_package_name(self) -> None:
+        """find_spec None -> returns package name for manifest fallback."""
+        with patch("importlib.util.find_spec", return_value=None):
+            result = SnowflakeConfig(account="a")._driver_path()
+        assert result == "adbc_driver_snowflake"
+
+    def test_bigquery_missing_returns_package_name(self) -> None:
+        """find_spec None -> returns 'adbc_driver_bigquery'."""
         with patch("importlib.util.find_spec", return_value=None):
             result = BigQueryConfig()._driver_path()
         assert result == "adbc_driver_bigquery"
 
-    def test_path2_postgresql_missing_returns_package_name(self) -> None:
-        """Path 2: find_spec None -> returns 'adbc_driver_postgresql'."""
+    def test_postgresql_missing_returns_package_name(self) -> None:
+        """find_spec None -> returns 'adbc_driver_postgresql'."""
         with patch("importlib.util.find_spec", return_value=None):
             result = PostgreSQLConfig()._driver_path()
         assert result == "adbc_driver_postgresql"
 
-    def test_path2_flightsql_missing_returns_package_name(self) -> None:
-        """Path 2: find_spec None -> returns 'adbc_driver_flightsql'."""
+    def test_flightsql_missing_returns_package_name(self) -> None:
+        """find_spec None -> returns 'adbc_driver_flightsql'."""
         with patch("importlib.util.find_spec", return_value=None):
             result = FlightSQLConfig()._driver_path()
         assert result == "adbc_driver_flightsql"
 
-    def test_path2_sqlite_missing_returns_package_name(self) -> None:
-        """Path 2: find_spec None -> returns 'adbc_driver_sqlite'."""
+    def test_sqlite_missing_returns_package_name(self) -> None:
+        """find_spec None -> returns 'adbc_driver_sqlite'."""
         with patch("importlib.util.find_spec", return_value=None):
             result = SQLiteConfig()._driver_path()
         assert result == "adbc_driver_sqlite"
+
+
+class TestPyPIDbApiModule:
+    """Tests for config._dbapi_module() on PyPI-installed drivers."""
+
+    def test_snowflake_installed_returns_dbapi_module(self) -> None:
+        """Snowflake returns dbapi module name when driver package is installed."""
+        mock_spec = MagicMock()
+        with patch("importlib.util.find_spec", return_value=mock_spec):
+            result = SnowflakeConfig(account="a")._dbapi_module()
+        assert result == "adbc_driver_snowflake.dbapi"
+
+    def test_snowflake_not_installed_returns_none(self) -> None:
+        """Snowflake returns None when driver package is not installed."""
+        with patch("importlib.util.find_spec", return_value=None):
+            result = SnowflakeConfig(account="a")._dbapi_module()
+        assert result is None
+
+    def test_bigquery_installed_returns_dbapi_module(self) -> None:
+        """BigQuery returns dbapi module name when driver package is installed."""
+        mock_spec = MagicMock()
+        with patch("importlib.util.find_spec", return_value=mock_spec):
+            result = BigQueryConfig()._dbapi_module()
+        assert result == "adbc_driver_bigquery.dbapi"
+
+    def test_postgresql_installed_returns_dbapi_module(self) -> None:
+        """PostgreSQL returns dbapi module name when driver package is installed."""
+        mock_spec = MagicMock()
+        with patch("importlib.util.find_spec", return_value=mock_spec):
+            result = PostgreSQLConfig()._dbapi_module()
+        assert result == "adbc_driver_postgresql.dbapi"
+
+    def test_flightsql_installed_returns_dbapi_module(self) -> None:
+        """FlightSQL returns dbapi module name when driver package is installed."""
+        mock_spec = MagicMock()
+        with patch("importlib.util.find_spec", return_value=mock_spec):
+            result = FlightSQLConfig()._dbapi_module()
+        assert result == "adbc_driver_flightsql.dbapi"
+
+    def test_sqlite_dbapi_module_always_none(self) -> None:
+        """SQLite returns None -- incompatible dbapi signature."""
+        assert SQLiteConfig()._dbapi_module() is None
 
 
 class TestFoundryDriverPath:
@@ -138,42 +179,61 @@ class TestFoundryDriverPath:
         """Foundry: MSSQL returns 'mssql'."""
         assert MSSQLConfig()._driver_path() == "mssql"
 
+    @pytest.mark.parametrize(
+        "config",
+        [
+            pytest.param(
+                DatabricksConfig(
+                    host="h",
+                    http_path="/sql/1.0/warehouses/abc",
+                    token=__import__("pydantic").SecretStr("tok"),  # pragma: allowlist secret
+                ),
+                id="databricks",
+            ),
+            pytest.param(RedshiftConfig(), id="redshift"),
+            pytest.param(MySQLConfig(host="h", user="u", database="db"), id="mysql"),
+            pytest.param(ClickHouseConfig(host="h", username="u"), id="clickhouse"),
+            pytest.param(TrinoConfig(), id="trino"),
+            pytest.param(MSSQLConfig(), id="mssql"),
+        ],
+    )
+    def test_foundry_dbapi_module_all_none(self, config: object) -> None:
+        """All Foundry configs return None for _dbapi_module()."""
+        assert config._dbapi_module() is None  # type: ignore[union-attr]
 
-class TestDbApiModule:
-    """Tests for config._dbapi_module() return values."""
 
-    def test_snowflake_dbapi_when_installed(self) -> None:
-        """Snowflake returns dbapi module name when driver package is installed."""
-        mock_spec = MagicMock()
-        with patch("importlib.util.find_spec", return_value=mock_spec):
-            result = SnowflakeConfig(account="a")._dbapi_module()
-        assert result == "adbc_driver_snowflake.dbapi"
+class TestCustomConfigContract:
+    """3P-CONTRACT: verify Protocol-only custom config works with create_pool()."""
 
-    def test_snowflake_dbapi_when_missing(self) -> None:
-        """Snowflake returns None when driver package is not installed."""
-        with patch("importlib.util.find_spec", return_value=None):
-            result = SnowflakeConfig(account="a")._dbapi_module()
-        assert result is None
+    def test_custom_protocol_config_has_required_methods(self) -> None:
+        """Protocol-only class (no BaseWarehouseConfig) satisfies WarehouseConfig."""
 
-    def test_duckdb_dbapi_returns_none(self) -> None:
-        """DuckDB always returns None (routes through adbc_driver_manager)."""
-        assert DuckDBConfig()._dbapi_module() is None
+        class MyCustomConfig:
+            """Third-party config not subclassing BaseWarehouseConfig."""
 
-    def test_sqlite_dbapi_returns_none(self) -> None:
-        """SQLite returns None (incompatible dbapi signature)."""
-        assert SQLiteConfig()._dbapi_module() is None
+            pool_size: int = 5
+            max_overflow: int = 3
+            timeout: int = 30
+            recycle: int = 3600
 
-    def test_foundry_dbapi_returns_none(self) -> None:
-        """Foundry configs return None (route through adbc_driver_manager)."""
-        from pydantic import SecretStr
+            def _adbc_entrypoint(self) -> str | None:
+                return None
 
-        _dbx_uri = "databricks://token:dapi@host:443/wh/abc"  # pragma: allowlist secret
-        assert DatabricksConfig(uri=SecretStr(_dbx_uri))._dbapi_module() is None
-        assert RedshiftConfig()._dbapi_module() is None
-        assert TrinoConfig()._dbapi_module() is None
-        assert MSSQLConfig()._dbapi_module() is None
-        assert MySQLConfig(host="h", user="u", database="db")._dbapi_module() is None
-        assert ClickHouseConfig(host="h", username="u")._dbapi_module() is None
+            def _driver_path(self) -> str:
+                return "my_custom_driver"
+
+            def _dbapi_module(self) -> str | None:
+                return None
+
+            def to_adbc_kwargs(self) -> dict[str, str]:
+                return {"key": "value"}
+
+        config = MyCustomConfig()
+        assert isinstance(config, WarehouseConfig)
+        assert config._driver_path() == "my_custom_driver"
+        assert config.to_adbc_kwargs() == {"key": "value"}
+        assert config._dbapi_module() is None
+        assert config._adbc_entrypoint() is None
 
 
 class TestCreateAdbcConnectionFoundryNotFound:
