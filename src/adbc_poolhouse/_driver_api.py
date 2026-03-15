@@ -72,25 +72,13 @@ def create_adbc_connection(
         An open ADBC DBAPI connection.
 
     Raises:
-        ImportError: When a Foundry driver manifest is absent (NOT_FOUND).
+        ImportError: When the ADBC driver is not found (NOT_FOUND status).
             Message contains ``https://docs.adbc-drivers.org/``.
     """
     if dbapi_module is not None:
         mod = importlib.import_module(dbapi_module)
         conn = mod.connect(db_kwargs=kwargs)  # type: ignore[no-any-return]
         return conn  # type: ignore[return-value]
-
-    # Build a reverse lookup: short driver name → dbc install name.
-    # Used to construct the ImportError message when a Foundry driver manifest
-    # is missing (adbc_driver_manager raises NOT_FOUND in that case).
-    _foundry_name_to_install: dict[str, str] = {
-        "clickhouse": "clickhouse",
-        "databricks": "databricks",
-        "mssql": "mssql",
-        "mysql": "mysql",
-        "redshift": "redshift",
-        "trino": "trino",
-    }
 
     try:
         # All ADBC type suppressions are concentrated here (DRIV-03).
@@ -113,11 +101,8 @@ def create_adbc_connection(
         if (
             getattr(exc, "status_code", None) == adbc_driver_manager.AdbcStatusCode.NOT_FOUND  # type: ignore[attr-defined]
         ) or "NOT_FOUND" in str(exc):
-            install_name = _foundry_name_to_install.get(driver_path, driver_path)
             raise ImportError(
-                f"ADBC driver '{driver_path}' not found. "
-                f"Install it with: dbc install {install_name}\n"
-                f"See: https://docs.adbc-drivers.org/"
+                f"ADBC driver '{driver_path}' not found. See: https://docs.adbc-drivers.org/"
             ) from exc
         raise  # re-raise other ADBC status errors raw
 

@@ -256,8 +256,8 @@ class TestCreateAdbcConnectionFoundryNotFound:
         ):
             create_adbc_connection("databricks", {})
 
-    def test_foundry_not_found_message_contains_install_command(self) -> None:
-        """DRIV-03: ImportError message includes dbc install command."""
+    def test_not_found_message_contains_driver_name(self) -> None:
+        """DRIV-03: ImportError message includes the driver name."""
         import adbc_driver_manager
 
         from adbc_poolhouse._driver_api import create_adbc_connection
@@ -269,6 +269,6 @@ class TestCreateAdbcConnectionFoundryNotFound:
 
         with (
             patch("adbc_driver_manager.dbapi.connect", side_effect=not_found_exc),
-            pytest.raises(ImportError, match=r"dbc install databricks"),
+            pytest.raises(ImportError, match=r"ADBC driver 'databricks' not found"),
         ):
             create_adbc_connection("databricks", {})
