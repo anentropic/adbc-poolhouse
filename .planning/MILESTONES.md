@@ -2,19 +2,23 @@
 
 ## v1.2.0 Plugin/Extensibility API (Planned)
 
-**Status:** Planned  
-**Phases:** 3 planned  
-**Roadmap:** `.planning/roadmap/v1.2.0-ROADMAP.md`  
+**Status:** In progress (1 phase remaining)
+**Phases:** 5 completed (16-19), 1 pending (20)
 
 **Goals:**
-- Manual registration API for in-project custom backends
-- Entry point auto-discovery for 3rd party plugin packages
-- Documentation for plugin authors
+- Self-describing config classes (no registry indirection)
+- Raw create_pool overload for advanced/custom use
+- Documentation for custom backend authors
 
-**Planned phases:**
-1. Registry Infrastructure — backend registry + manual `register_backend()` API
-2. Entry Point Discovery — auto-discover via `adbc_poolhouse.backends` entry points
-3. Plugin Author Documentation — guide for implementing and publishing custom backends
+**Completed phases:**
+16. Driver Import Semi-Integration Tests — semi-integration tests for all 12 backends
+17. Registry Infrastructure — backend registry (later removed in Phase 18)
+17.5. Translator Consolidation — consolidate translator interface for plugin consistency
+18. Registration Removal — configs self-describe driver path, delete registry machinery
+19. Raw create_pool Overload — `create_pool()` accepts raw `(driver_path, db_kwargs)` directly
+
+**Pending phases:**
+20. Protocol Documentation — WarehouseConfig Protocol reference + custom backends guide (DOC-03)
 
 ---
 

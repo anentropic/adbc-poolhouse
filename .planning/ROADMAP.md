@@ -2,13 +2,13 @@
 
 ## Milestones
 
-- v1.2.0 **Plugin/Extensibility API** — Phases 16-19 (planned)
+- v1.2.0 **Plugin/Extensibility API** — Phases 16-20 (in progress)
 - v1.0.0 **MVP + Backend Expansion** — Phases 1-15 (shipped 2026-03-07)
 
 ## Phases
 
 <details>
-<summary>v1.2.0 Plugin/Extensibility API (Phases 16-19) — PLANNED</summary>
+<summary>v1.2.0 Plugin/Extensibility API (Phases 16-20) — IN PROGRESS</summary>
 
 - [x] Phase 16: Driver Import Semi-Integration Tests (2/2 plans) — completed 2026-03-12
 
@@ -54,19 +54,27 @@
   - [x] 18-02-PLAN.md — Rewrite create_pool() + delete registry/drivers + clean exports
   - [x] 18-03-PLAN.md — Rewrite tests for registry-free architecture
 
-- [ ] Phase 19: Raw create_pool Overload (2/4 plans) (gap closure in progress)
+- [x] Phase 19: Raw create_pool Overload (4/4 plans) — completed 2026-03-15
 
   **Goal:** Add overloaded create_pool() and managed_pool() signatures that accept raw driver args directly (driver_path or dbapi_module), bypassing config objects. Clean up hardcoded driver lists in _driver_api.py.
 
   **Requirements:** RAW-01, RAW-02, RAW-03, RAW-04, RAW-05, RAW-06, RAW-07, RAW-08, RAW-09, RAW-10
 
-  **Plans:** 4 plans
-
   Plans:
   - [x] 19-01-PLAN.md — Core implementation: driver cleanup + overloads + unit tests
   - [x] 19-02-PLAN.md — Integration test + documentation
-  - [ ] 19-03-PLAN.md — Gap closure: fix dbapi_module connect() signature dispatch
-  - [ ] 19-04-PLAN.md — Gap closure: rewrite pool lifecycle guide
+  - [x] 19-03-PLAN.md — Gap closure: fix dbapi_module connect() signature dispatch
+  - [x] 19-04-PLAN.md — Gap closure: rewrite pool lifecycle guide
+
+- [ ] Phase 20: Protocol Documentation for Custom Backend Authors (0/0 plans)
+
+  **Goal:** Document the WarehouseConfig Protocol contract so third-party library authors can implement custom ADBC backends for adbc-poolhouse. After registration removal, the story is simple: define a config class with the required methods, pass it to `create_pool()`.
+
+  **Requirements:** DOC-03
+  **Gap Closure:** Closes DOC-03 from v1.2.0 milestone audit
+
+  Plans:
+  (none yet — run `/gsd:plan-phase 20`)
 
 </details>
 
@@ -99,7 +107,8 @@
 | 17. Registry Infrastructure | v1.2.0 | 2/2 | Complete | 2026-03-12 |
 | 17.5. Translator Consolidation | v1.2.0 | 5/5 | Complete | 2026-03-14 |
 | 18. Registration Removal | v1.2.0 | 3/3 | Complete | 2026-03-15 |
-| 19. Raw create_pool Overload | 4/4 | Complete    | 2026-03-15 | - |
+| 19. Raw create_pool Overload | v1.2.0 | 4/4 | Complete | 2026-03-15 |
+| 20. Protocol Documentation | v1.2.0 | 0/0 | Pending | — |
 |-------|-----------|----------------|--------|-----------|
 | 1. Pre-flight Fixes | v1.0.0 | 1/1 | Complete | 2026-02-23 |
 | 2. Dependency Declarations | v1.0.0 | 2/2 | Complete | 2026-02-23 |
