@@ -1,5 +1,5 @@
 ---
-status: diagnosed
+status: resolved
 phase: 19-raw-create-pool
 source: [19-01-SUMMARY.md, 19-02-SUMMARY.md]
 started: 2026-03-15T12:30:00Z
@@ -55,7 +55,7 @@ skipped: 0
 ## Gaps
 
 - truth: "managed_pool(dbapi_module=...) works as a context manager"
-  status: failed
+  status: resolved
   reason: "User reported: mod.connect(db_kwargs=kwargs) crashes — TypeError: Connection.__init__() got an unexpected keyword argument 'db_kwargs'"
   severity: blocker
   test: 4
@@ -71,7 +71,7 @@ skipped: 0
   debug_session: ".planning/debug/dbapi-module-connect-kwargs.md"
 
 - truth: "Pool lifecycle guide has correct content with raw driver section"
-  status: failed
+  status: resolved
   reason: "User reported: References 'plugin development' which no longer exists. Missing 'Create a pool' section. Raw driver arguments section lacks detail."
   severity: major
   test: 7
