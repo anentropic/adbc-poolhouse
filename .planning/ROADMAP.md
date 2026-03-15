@@ -54,17 +54,19 @@
   - [x] 18-02-PLAN.md — Rewrite create_pool() + delete registry/drivers + clean exports
   - [x] 18-03-PLAN.md — Rewrite tests for registry-free architecture
 
-- [x] Phase 19: Raw create_pool Overload (0/2 plans) (completed 2026-03-15)
+- [ ] Phase 19: Raw create_pool Overload (2/4 plans) (gap closure in progress)
 
   **Goal:** Add overloaded create_pool() and managed_pool() signatures that accept raw driver args directly (driver_path or dbapi_module), bypassing config objects. Clean up hardcoded driver lists in _driver_api.py.
 
   **Requirements:** RAW-01, RAW-02, RAW-03, RAW-04, RAW-05, RAW-06, RAW-07, RAW-08, RAW-09, RAW-10
 
-  **Plans:** 2 plans
+  **Plans:** 4 plans
 
   Plans:
-  - [ ] 19-01-PLAN.md — Core implementation: driver cleanup + overloads + unit tests
-  - [ ] 19-02-PLAN.md — Integration test + documentation
+  - [x] 19-01-PLAN.md — Core implementation: driver cleanup + overloads + unit tests
+  - [x] 19-02-PLAN.md — Integration test + documentation
+  - [ ] 19-03-PLAN.md — Gap closure: fix dbapi_module connect() signature dispatch
+  - [ ] 19-04-PLAN.md — Gap closure: rewrite pool lifecycle guide
 
 </details>
 
@@ -97,8 +99,7 @@
 | 17. Registry Infrastructure | v1.2.0 | 2/2 | Complete | 2026-03-12 |
 | 17.5. Translator Consolidation | v1.2.0 | 5/5 | Complete | 2026-03-14 |
 | 18. Registration Removal | v1.2.0 | 3/3 | Complete | 2026-03-15 |
-| 19. Raw create_pool Overload | 2/2 | Complete    | 2026-03-15 | - |
-|-------|-----------|----------------|--------|-----------|
+| 19. Raw create_pool Overload | v1.2.0 | 2/4 | Gap Closure | - |
 |-------|-----------|----------------|--------|-----------|
 | 1. Pre-flight Fixes | v1.0.0 | 1/1 | Complete | 2026-02-23 |
 | 2. Dependency Declarations | v1.0.0 | 2/2 | Complete | 2026-02-23 |
