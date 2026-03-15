@@ -59,7 +59,7 @@ def create_adbc_connection(
             driver name for manifest-based resolution (Foundry drivers and
             PyPI Path 2 fallback).
         kwargs: ADBC ``db_kwargs`` as ``dict[str, str]`` from
-            ``translate_config()``.
+            ``config.to_adbc_kwargs()``.
         entrypoint: Optional ADBC entry-point symbol. Required for DuckDB
             (``entrypoint='duckdb_adbc_init'``).
         dbapi_module: Dotted module name for a PyPI driver's own DBAPI module

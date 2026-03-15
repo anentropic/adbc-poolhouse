@@ -19,7 +19,6 @@ from sqlalchemy import event
 
 from adbc_poolhouse._driver_api import create_adbc_connection
 from adbc_poolhouse._drivers import resolve_dbapi_module, resolve_driver
-from adbc_poolhouse._translators import translate_config
 
 if TYPE_CHECKING:
     import collections.abc
@@ -72,7 +71,7 @@ def create_pool(
         TypeError: If ``config`` is not a recognised warehouse config type.
     """
     driver_path = resolve_driver(config)
-    kwargs = translate_config(config)
+    kwargs = config.to_adbc_kwargs()
     entrypoint = config._adbc_entrypoint()
 
     dbapi_module = resolve_dbapi_module(config)

@@ -2,7 +2,7 @@
 Resolve the ADBC driver path or short name for a given warehouse config.
 
 Queries the backend registry for the appropriate driver_path, All
-12 built-in backends are registered lazily on avoid importing all translator
+12 built-in backends are registered lazily to avoid importing all config
 modules at startup.
 
 Internal only -- not exported from ``__init__.py``.

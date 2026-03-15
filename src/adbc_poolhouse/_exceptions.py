@@ -45,8 +45,8 @@ class BackendAlreadyRegisteredError(RegistryError):
 
     Example::
 
-        register_backend("my_backend", MyConfig, my_translator, "driver_path")
-        register_backend("my_backend", OtherConfig, other_translator, "path")
+        register_backend("my_backend", MyConfig, "driver_path")
+        register_backend("my_backend", OtherConfig, "path")
         # raises BackendAlreadyRegisteredError("my_backend")
     """
 
