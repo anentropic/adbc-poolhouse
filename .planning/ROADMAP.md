@@ -108,7 +108,7 @@
 | 17.5. Translator Consolidation | v1.2.0 | 5/5 | Complete | 2026-03-14 |
 | 18. Registration Removal | v1.2.0 | 3/3 | Complete | 2026-03-15 |
 | 19. Raw create_pool Overload | v1.2.0 | 4/4 | Complete | 2026-03-15 |
-| 20. Protocol Documentation | v1.2.0 | 0/1 | Planned | — |
+| 20. Protocol Documentation | 1/1 | Complete   | 2026-03-15 | — |
 |-------|-----------|----------------|--------|-----------|
 | 1. Pre-flight Fixes | v1.0.0 | 1/1 | Complete | 2026-02-23 |
 | 2. Dependency Declarations | v1.0.0 | 2/2 | Complete | 2026-02-23 |
