@@ -54,7 +54,7 @@
   - [x] 18-02-PLAN.md — Rewrite create_pool() + delete registry/drivers + clean exports
   - [x] 18-03-PLAN.md — Rewrite tests for registry-free architecture
 
-- [ ] Phase 19: Raw create_pool Overload (0/2 plans)
+- [x] Phase 19: Raw create_pool Overload (0/2 plans) (completed 2026-03-15)
 
   **Goal:** Add overloaded create_pool() and managed_pool() signatures that accept raw driver args directly (driver_path or dbapi_module), bypassing config objects. Clean up hardcoded driver lists in _driver_api.py.
 
@@ -97,7 +97,7 @@
 | 17. Registry Infrastructure | v1.2.0 | 2/2 | Complete | 2026-03-12 |
 | 17.5. Translator Consolidation | v1.2.0 | 5/5 | Complete | 2026-03-14 |
 | 18. Registration Removal | v1.2.0 | 3/3 | Complete | 2026-03-15 |
-| 19. Raw create_pool Overload | 1/2 | In Progress|  | - |
+| 19. Raw create_pool Overload | 2/2 | Complete   | 2026-03-15 | - |
 |-------|-----------|----------------|--------|-----------|
 |-------|-----------|----------------|--------|-----------|
 | 1. Pre-flight Fixes | v1.0.0 | 1/1 | Complete | 2026-02-23 |
