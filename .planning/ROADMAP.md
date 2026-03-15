@@ -66,7 +66,7 @@
   - [x] 19-03-PLAN.md — Gap closure: fix dbapi_module connect() signature dispatch
   - [x] 19-04-PLAN.md — Gap closure: rewrite pool lifecycle guide
 
-- [ ] Phase 20: Protocol Documentation for Custom Backend Authors (0/0 plans)
+- [ ] Phase 20: Protocol Documentation for Custom Backend Authors (1 plan)
 
   **Goal:** Document the WarehouseConfig Protocol contract so third-party library authors can implement custom ADBC backends for adbc-poolhouse. After registration removal, the story is simple: define a config class with the required methods, pass it to `create_pool()`.
 
@@ -74,7 +74,7 @@
   **Gap Closure:** Closes DOC-03 from v1.2.0 milestone audit
 
   Plans:
-  (none yet — run `/gsd:plan-phase 20`)
+  - [ ] 20-01-PLAN.md — Protocol docstrings + custom backends guide + nav entry
 
 </details>
 
@@ -108,7 +108,7 @@
 | 17.5. Translator Consolidation | v1.2.0 | 5/5 | Complete | 2026-03-14 |
 | 18. Registration Removal | v1.2.0 | 3/3 | Complete | 2026-03-15 |
 | 19. Raw create_pool Overload | v1.2.0 | 4/4 | Complete | 2026-03-15 |
-| 20. Protocol Documentation | v1.2.0 | 0/0 | Pending | — |
+| 20. Protocol Documentation | v1.2.0 | 0/1 | Planned | — |
 |-------|-----------|----------------|--------|-----------|
 | 1. Pre-flight Fixes | v1.0.0 | 1/1 | Complete | 2026-02-23 |
 | 2. Dependency Declarations | v1.0.0 | 2/2 | Complete | 2026-02-23 |
