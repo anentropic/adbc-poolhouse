@@ -535,3 +535,29 @@ class TestSQLitePoolFactory:
         finally:
             pool.dispose()
             pool._adbc_source.close()  # type: ignore[attr-defined]
+
+
+class TestRawDuckDBIntegration:
+    """RAW-09: End-to-end test using raw driver_path with real DuckDB driver."""
+
+    def test_raw_duckdb_driver_path_query(self, tmp_path: Path) -> None:
+        """create_pool(driver_path=...) creates a working pool with real DuckDB."""
+        import adbc_driver_duckdb  # type: ignore[reportMissingTypeStubs]
+
+        pool = create_pool(
+            driver_path=adbc_driver_duckdb.driver_path(),
+            db_kwargs={"path": str(tmp_path / "raw_test.db")},
+            entrypoint="duckdb_adbc_init",
+            pool_size=1,
+        )
+        try:
+            conn = pool.connect()
+            cur = conn.cursor()
+            cur.execute("SELECT 42 AS answer")
+            row = cur.fetchone()
+            assert row == (42,)
+            cur.close()
+            conn.close()
+        finally:
+            pool.dispose()
+            pool._adbc_source.close()  # type: ignore[attr-defined]
