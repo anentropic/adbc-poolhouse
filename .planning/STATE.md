@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: milestone
-status: completed
-stopped_at: Phase 18 context gathered
-last_updated: "2026-03-15T08:23:14.150Z"
-last_activity: 2026-03-14 — Completed Plan 17.5-05 (Registry Cleanup and Driver Updates)
+status: executing
+stopped_at: Completed 18-01-PLAN.md
+last_updated: "2026-03-15T08:48:50.532Z"
+last_activity: 2026-03-15 — Completed Plan 18-01 (Self-Describing Configs)
 progress:
   total_phases: 0
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
-  percent: 100
+  percent: 33
 ---
 
 # Project State
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-03-07)
 ## Current Position
 
 Milestone: v1.2.0 — Plugin/Extensibility API (IN PROGRESS)
-Phase: 17.5-translator-consolidation (Plan 5/5 complete)
-Status: Phase 17.5 complete, 5/5 plans complete
-Last activity: 2026-03-14 — Completed Plan 17.5-05 (Registry Cleanup and Driver Updates)
+Phase: 18-registration-removal (Plan 1/3 complete)
+Status: Plan 18-01 complete, executing phase 18
+Last activity: 2026-03-15 — Completed Plan 18-01 (Self-Describing Configs)
 
-Progress: [██████████] 100% (5/5 plans complete)
+Progress: [███░░░░░░░] 33% (1/3 plans complete)
 
 ## Accumulated Context
 
@@ -76,6 +76,12 @@ All decisions from v1.0.0 have been reviewed and marked with outcomes.
 - Removed TranslatorFunc type alias and get_translator() entirely rather than deprecating -- both are internal symbols not exported from __init__.py
 - Removed transitional fallback in translate_config() since all 12 backends have to_adbc_kwargs()
 
+**Phase 18 Plan 01 decisions:**
+- BaseWarehouseConfig uses formal ABC (not NotImplementedError defaults) for _driver_path() and to_adbc_kwargs() -- catches missing implementations at instantiation time
+- _resolve_driver_path() uses pkg.__dict__[method_name]() to avoid false matches from inherited attrs
+- Tasks 1 and 2 committed atomically since ABC enforcement requires implementations to coexist for type checking
+- [Phase 18]: BaseWarehouseConfig uses formal ABC for _driver_path() and to_adbc_kwargs()
+
 ### Roadmap Evolution
 
 - 15 phases completed across v1.0.0 milestone
@@ -97,6 +103,6 @@ None — execution proceeding normally.
 
 ## Session Continuity
 
-Last session: 2026-03-15T08:23:14.146Z
-Stopped at: Phase 18 context gathered
-Next step: Phase 17.5 complete. Proceed to Phase 18 (Entry Point Discovery).
+Last session: 2026-03-15T08:48:44.678Z
+Stopped at: Completed 18-01-PLAN.md
+Next step: Execute Plan 18-02 (inline create_pool, delete registry/drivers).
