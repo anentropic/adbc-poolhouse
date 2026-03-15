@@ -156,7 +156,7 @@ def create_pool(
     """
     Create a SQLAlchemy QueuePool backed by an ADBC driver.
 
-    Three call patterns are supported::
+    Three call patterns are supported:
 
         pool = create_pool(DuckDBConfig(...))           # from a config object
         pool = create_pool(driver_path="...", ...)       # native ADBC driver
@@ -198,8 +198,7 @@ def create_pool(
             provided.
         ImportError: If the required ADBC driver is not installed.
 
-    Example::
-
+    Example:
         from adbc_poolhouse import create_pool, close_pool
 
         # Config path
@@ -311,7 +310,7 @@ def managed_pool(
     (via :func:`close_pool`) when the block exits, whether normally or by
     exception.
 
-    Three call patterns are supported::
+    Three call patterns are supported:
 
         with managed_pool(DuckDBConfig(...)) as pool: ...          # config
         with managed_pool(driver_path="...", ...) as pool: ...     # native
@@ -348,8 +347,7 @@ def managed_pool(
             provided.
         ImportError: If the required ADBC driver is not installed.
 
-    Example::
-
+    Example:
         from adbc_poolhouse import DuckDBConfig, managed_pool
 
         with managed_pool(DuckDBConfig(database="/tmp/wh.db")) as pool:

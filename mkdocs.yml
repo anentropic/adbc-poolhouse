@@ -63,6 +63,7 @@ plugins:
             merge_init_into_class: true
             show_signature_annotations: true
             separate_signature: true
+            overloads_only: true
 
 markdown_extensions:
   - admonition
