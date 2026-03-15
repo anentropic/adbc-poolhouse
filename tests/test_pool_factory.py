@@ -12,6 +12,7 @@ from adbc_poolhouse import (
     PoolhouseError,
     SQLiteConfig,
     create_pool,
+    managed_pool,
 )
 
 
@@ -320,8 +321,8 @@ class TestExceptionHierarchy:
             DuckDBConfig(database="")
 
 
-class TestRawDriverPathOverload:
-    """RAW-01: create_pool(driver_path=..., db_kwargs=...) creates pool via native ADBC."""
+class TestRawDriverPath:
+    """RAW-01: Tests for the driver_path overload."""
 
     def test_raw_driver_path_creates_pool(self) -> None:
         """create_pool(driver_path=...) calls create_adbc_connection with correct args."""
@@ -346,6 +347,154 @@ class TestRawDriverPathOverload:
             entrypoint=None,
             dbapi_module=None,
         )
+
+    def test_raw_driver_path_with_entrypoint(self) -> None:
+        """create_pool(driver_path=..., entrypoint=...) passes entrypoint through."""
+        from unittest.mock import MagicMock, patch
+
+        mock_conn = MagicMock()
+        mock_conn.adbc_clone = MagicMock(return_value=MagicMock())
+
+        with patch(
+            "adbc_poolhouse._pool_factory.create_adbc_connection",
+            return_value=mock_conn,
+        ) as mock_factory:
+            pool = create_pool(
+                driver_path="test_driver",
+                db_kwargs={},
+                entrypoint="my_init",
+            )
+            pool.dispose()
+
+        mock_factory.assert_called_once_with(
+            "test_driver",
+            {},
+            entrypoint="my_init",
+            dbapi_module=None,
+        )
+
+    def test_raw_driver_path_pool_tuning(self) -> None:
+        """Pool tuning kwargs are applied to the QueuePool."""
+        from unittest.mock import MagicMock, patch
+
+        mock_conn = MagicMock()
+        mock_conn.adbc_clone = MagicMock(return_value=MagicMock())
+
+        with patch(
+            "adbc_poolhouse._pool_factory.create_adbc_connection",
+            return_value=mock_conn,
+        ):
+            pool = create_pool(
+                driver_path="d",
+                db_kwargs={},
+                pool_size=10,
+                max_overflow=5,
+                timeout=60,
+                recycle=1800,
+                pre_ping=True,
+            )
+            try:
+                assert pool.size() == 10
+                assert pool._max_overflow == 5
+                assert pool._timeout == 60
+            finally:
+                pool.dispose()
+
+
+class TestRawDbApiModule:
+    """RAW-02: Tests for the dbapi_module overload."""
+
+    def test_raw_dbapi_module_creates_pool(self) -> None:
+        """create_pool(dbapi_module=...) calls create_adbc_connection with correct args."""
+        from unittest.mock import MagicMock, patch
+
+        mock_conn = MagicMock()
+        mock_conn.adbc_clone = MagicMock(return_value=MagicMock())
+
+        with patch(
+            "adbc_poolhouse._pool_factory.create_adbc_connection",
+            return_value=mock_conn,
+        ) as mock_factory:
+            pool = create_pool(
+                dbapi_module="my.custom.dbapi",
+                db_kwargs={"host": "localhost"},
+            )
+            try:
+                assert isinstance(pool, sqlalchemy.pool.QueuePool)
+            finally:
+                pool.dispose()
+
+        mock_factory.assert_called_once_with(
+            "",
+            {"host": "localhost"},
+            entrypoint=None,
+            dbapi_module="my.custom.dbapi",
+        )
+
+
+class TestManagedPoolRaw:
+    """RAW-03: Tests for managed_pool raw variants."""
+
+    def test_managed_raw_driver_path(self) -> None:
+        """managed_pool(driver_path=...) yields pool and closes on exit."""
+        from unittest.mock import MagicMock, patch
+
+        mock_conn = MagicMock()
+        mock_conn.adbc_clone = MagicMock(return_value=MagicMock())
+
+        with (
+            patch(
+                "adbc_poolhouse._pool_factory.create_adbc_connection",
+                return_value=mock_conn,
+            ),
+            managed_pool(driver_path="d", db_kwargs={}) as pool,
+        ):
+            assert isinstance(pool, sqlalchemy.pool.QueuePool)
+
+    def test_managed_raw_dbapi_module(self) -> None:
+        """managed_pool(dbapi_module=...) yields pool and closes on exit."""
+        from unittest.mock import MagicMock, patch
+
+        mock_conn = MagicMock()
+        mock_conn.adbc_clone = MagicMock(return_value=MagicMock())
+
+        with (
+            patch(
+                "adbc_poolhouse._pool_factory.create_adbc_connection",
+                return_value=mock_conn,
+            ),
+            managed_pool(dbapi_module="m.dbapi", db_kwargs={}) as pool,
+        ):
+            assert isinstance(pool, sqlalchemy.pool.QueuePool)
+
+
+class TestRawCreatePoolErrors:
+    """RAW-04, RAW-05: Tests for error conditions."""
+
+    def test_missing_args_raises_type_error(self) -> None:
+        """create_pool() with no args raises TypeError."""
+        with pytest.raises(TypeError, match="requires one of"):
+            create_pool()  # type: ignore[call-overload]
+
+    def test_pool_tuning_only_raises_type_error(self) -> None:
+        """create_pool(pool_size=10) with only pool tuning raises TypeError."""
+        with pytest.raises(TypeError, match="requires one of"):
+            create_pool(pool_size=10)  # type: ignore[call-overload]
+
+    def test_mutual_exclusive_raises_type_error(self) -> None:
+        """create_pool(driver_path=..., dbapi_module=...) raises TypeError."""
+        with pytest.raises(TypeError, match="driver_path or dbapi_module, not both"):
+            create_pool(driver_path="x", dbapi_module="y", db_kwargs={})  # type: ignore[call-overload]
+
+    def test_driver_path_without_db_kwargs_raises_type_error(self) -> None:
+        """create_pool(driver_path=...) without db_kwargs raises TypeError."""
+        with pytest.raises(TypeError, match="db_kwargs is required"):
+            create_pool(driver_path="x")  # type: ignore[call-overload]
+
+    def test_dbapi_module_without_db_kwargs_raises_type_error(self) -> None:
+        """create_pool(dbapi_module=...) without db_kwargs raises TypeError."""
+        with pytest.raises(TypeError, match="db_kwargs is required"):
+            create_pool(dbapi_module="m")  # type: ignore[call-overload]
 
 
 class TestSQLitePoolFactory:
