@@ -43,7 +43,12 @@
   - [x] 17.5-04-PLAN.md — PostgreSQL, MySQL, Databricks, Redshift implementations
   - [x] 17.5-05-PLAN.md — Registry cleanup and driver updates
 
-- [ ] Phase 18: Entry Point Discovery (0/2 plans)
+- [ ] Phase 18: Registration Removal (0/? plans)
+
+  **Goal:** Make config classes fully self-describing so the backend registry is unnecessary. Each config carries its driver path, kwargs translation, dbapi module, and entrypoint. `create_pool()` calls config methods directly — no registry lookup, no lazy registration, no `_drivers.py` dispatch layer. Delete all registry machinery.
+
+  **Requirements:** Refactor for plugin interface self-description
+
 - [ ] Phase 19: Plugin Author Documentation (0/2 plans)
 
 </details>
@@ -76,7 +81,7 @@
 | 16. Driver Import Semi-Integration Tests | v1.2.0 | 2/2 | Complete | 2026-03-12 |
 | 17. Registry Infrastructure | v1.2.0 | 2/2 | Complete | 2026-03-12 |
 | 17.5. Translator Consolidation | v1.2.0 | Complete    | 2026-03-14 | 2026-03-14 |
-| 18. Entry Point Discovery | v1.2.0 | 0/2 | Not started | - |
+| 18. Registration Removal | v1.2.0 | 0/? | Not started | - |
 | 19. Plugin Author Documentation | v1.2.0 | 0/2 | Not started | - |
 |-------|-----------|----------------|--------|-----------|
 |-------|-----------|----------------|--------|-----------|
