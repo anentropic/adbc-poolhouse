@@ -95,6 +95,7 @@ nav:
     - Pool Lifecycle: guides/pool-lifecycle.md
     - Consumer Patterns: guides/consumer-patterns.md
     - Configuration Reference: guides/configuration.md
+    - Custom Backends: guides/custom-backends.md
     - Warehouse Guides:
       - Snowflake: guides/snowflake.md
       - DuckDB: guides/duckdb.md
