@@ -12,10 +12,16 @@ from pydantic_settings import BaseSettings
 @runtime_checkable
 class WarehouseConfig(Protocol):
     """
-    Structural type for any adbc-poolhouse warehouse config model.
+    Structural type for warehouse config objects.
 
-    Downstream code annotates function parameters as `config: WarehouseConfig`
-    to accept any supported warehouse config without importing concrete classes.
+    Any class with these attributes and methods can be passed to
+    :func:`create_pool` or :func:`managed_pool`. The built-in config
+    classes all satisfy this protocol through
+    :class:`BaseWarehouseConfig`.
+
+    Third-party authors: inherit from :class:`BaseWarehouseConfig`
+    for pool-tuning defaults and :meth:`_resolve_driver_path`, or
+    implement the full protocol from scratch.
     """
 
     pool_size: int
@@ -30,11 +36,47 @@ class WarehouseConfig(Protocol):
     recycle: int
     """Seconds before a connection is closed and replaced."""
 
-    def _adbc_entrypoint(self) -> str | None: ...
+    def _adbc_entrypoint(self) -> str | None:
+        """
+        Return the ADBC driver init symbol, or ``None`` for the default.
 
-    def _driver_path(self) -> str: ...
+        Most ADBC drivers use a default init function and this method
+        should return ``None``. Override only when the driver requires a
+        non-standard symbol -- for example, DuckDB needs
+        ``"duckdb_adbc_init"``.
+        """
+        ...
 
-    def _dbapi_module(self) -> str | None: ...
+    def _driver_path(self) -> str:
+        """
+        Return the ADBC driver path or short name.
+
+        Called by ``create_pool`` to locate the native driver library.
+        Two return styles are supported:
+
+        - An absolute filesystem path to a shared library
+          (e.g. ``/usr/lib/libadbc_driver_snowflake.so``).
+        - A short package name (e.g. ``"adbc_driver_snowflake"``)
+          that ``adbc_driver_manager`` resolves via its manifest.
+
+        Most implementations delegate to
+        :meth:`BaseWarehouseConfig._resolve_driver_path`.
+        """
+        ...
+
+    def _dbapi_module(self) -> str | None:
+        """
+        Return a dotted Python module path exposing ``connect()``, or ``None``.
+
+        When set, ``create_pool`` imports this module and calls its
+        ``connect()`` function instead of loading a native shared library
+        through ``adbc_driver_manager``. Typical value:
+        ``"adbc_driver_snowflake.dbapi"``.
+
+        Return ``None`` (the default) for drivers that do not ship a
+        Python package with a ``dbapi`` sub-module.
+        """
+        ...
 
     def to_adbc_kwargs(self) -> dict[str, str]:
         """Convert config to ADBC driver connection kwargs."""
@@ -67,22 +109,32 @@ class BaseWarehouseConfig(BaseSettings, ABC):
 
     def _adbc_entrypoint(self) -> str | None:
         """
-        Return the ADBC entry-point symbol, or None if not required.
+        Return the ADBC driver init symbol, or ``None`` for the default.
 
-        DuckDB overrides this to return ``'duckdb_adbc_init'``.
-        All other drivers do not need an explicit entry point.
-
-        Internal only — not part of the public API.
+        The base implementation returns ``None``. Override in subclasses
+        where the driver uses a non-standard init symbol (e.g. DuckDB
+        returns ``"duckdb_adbc_init"``).
         """
         return None
 
     @abstractmethod
     def _driver_path(self) -> str:
-        """Return the ADBC driver path or short name."""
+        """
+        Return the ADBC driver path or short name.
+
+        Subclasses must override. Most implementations call
+        ``self._resolve_driver_path("adbc_driver_<name>")``.
+        """
         ...
 
     def _dbapi_module(self) -> str | None:
-        """Return the DBAPI module name, or None if not applicable."""
+        """
+        Return a dotted Python module path exposing ``connect()``, or ``None``.
+
+        The base implementation returns ``None``. Override when the
+        driver ships a Python package with a ``dbapi`` sub-module
+        (e.g. ``"adbc_driver_snowflake.dbapi"``).
+        """
         return None
 
     @abstractmethod
