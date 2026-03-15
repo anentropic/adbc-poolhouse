@@ -320,6 +320,34 @@ class TestExceptionHierarchy:
             DuckDBConfig(database="")
 
 
+class TestRawDriverPathOverload:
+    """RAW-01: create_pool(driver_path=..., db_kwargs=...) creates pool via native ADBC."""
+
+    def test_raw_driver_path_creates_pool(self) -> None:
+        """create_pool(driver_path=...) calls create_adbc_connection with correct args."""
+        from unittest.mock import MagicMock, patch
+
+        mock_conn = MagicMock()
+        mock_conn.adbc_clone = MagicMock(return_value=MagicMock())
+
+        with patch(
+            "adbc_poolhouse._pool_factory.create_adbc_connection",
+            return_value=mock_conn,
+        ) as mock_factory:
+            pool = create_pool(driver_path="test_driver", db_kwargs={"path": "/tmp/db"})
+            try:
+                assert isinstance(pool, sqlalchemy.pool.QueuePool)
+            finally:
+                pool.dispose()
+
+        mock_factory.assert_called_once_with(
+            "test_driver",
+            {"path": "/tmp/db"},
+            entrypoint=None,
+            dbapi_module=None,
+        )
+
+
 class TestSQLitePoolFactory:
     """Mock wiring and integration tests for SQLite via create_pool()."""
 
