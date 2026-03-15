@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: milestone
 status: completed
-stopped_at: Completed 19-04-PLAN.md
-last_updated: "2026-03-15T21:21:34.036Z"
+stopped_at: Completed 19-03-PLAN.md
+last_updated: "2026-03-15T21:25:15.341Z"
 last_activity: 2026-03-15 — Completed Plan 19-04 (Pool Lifecycle Guide Rewrite)
 progress:
   total_phases: 0
@@ -100,6 +100,8 @@ All decisions from v1.0.0 have been reviewed and marked with outcomes.
 
 **Phase 19 Plan 02 decisions:**
 - type: ignore[reportMissingTypeStubs] for adbc_driver_duckdb import in integration test (no type stubs published)
+- [Phase 19]: TDD RED+GREEN combined in single commit due to basedpyright pre-commit hook blocking type-invalid test code
+- [Phase 19]: Semi-integration tests updated to assert config keys instead of db_kwargs presence (mock signature differs from real function)
 
 ### Roadmap Evolution
 
@@ -122,6 +124,6 @@ None — execution proceeding normally.
 
 ## Session Continuity
 
-Last session: 2026-03-15T21:21:34.031Z
-Stopped at: Completed 19-04-PLAN.md
+Last session: 2026-03-15T21:25:09.264Z
+Stopped at: Completed 19-03-PLAN.md
 Next step: Phase 19 gap closure complete. All UAT documentation issues resolved.
