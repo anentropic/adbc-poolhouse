@@ -1,0 +1,379 @@
+# Phase 20: Plugin Documentation - Research
+
+**Researched:** 2026-03-15
+**Domain:** Documentation (MkDocs Material + mkdocstrings) for Python Protocol-based plugin contract
+**Confidence:** HIGH
+
+## Summary
+
+Phase 20 closes the last remaining v1.2.0 requirement (DOC-03) by documenting how third-party authors implement custom ADBC backends for adbc-poolhouse. The architecture is settled: no registry, no entry points. A third-party author defines a config class that satisfies the `WarehouseConfig` Protocol, then passes it to `create_pool()`.
+
+The primary documentation challenge is that the Protocol's three critical methods (`_driver_path()`, `_adbc_entrypoint()`, `_dbapi_module()`) are all underscore-prefixed. The mkdocstrings global filter `"!^_"` in `mkdocs.yml` hides them from the auto-generated API reference. The guide must document these methods manually, and the API reference for `WarehouseConfig` needs a per-object filter override to expose them.
+
+The implementation surface is small: one new guide page (`docs/src/guides/custom-backends.md`), a nav entry in `mkdocs.yml`, improved docstrings on the Protocol and `BaseWarehouseConfig`, and a per-object filter override for the `WarehouseConfig` API reference rendering. No source code changes are needed beyond docstring improvements.
+
+**Primary recommendation:** Write a "Custom backends" how-to guide with a minimal working example config class, document all Protocol methods (including `_`-prefixed ones), and override the mkdocstrings filter for `WarehouseConfig` to show the full contract in the API reference.
+
+<phase_requirements>
+## Phase Requirements
+
+| ID | Description | Research Support |
+|----|-------------|-----------------|
+| DOC-03 | Protocol documented in API reference with all required attributes | Per-object mkdocstrings filter override exposes `_driver_path()`, `_adbc_entrypoint()`, `_dbapi_module()` alongside the already-visible `pool_size`/`max_overflow`/`timeout`/`recycle`/`to_adbc_kwargs()` |
+| DOC-03 | Document `_adbc_entrypoint()` method and when to override | Guide explains that most drivers return `None` (the default); only DuckDB and SQLite override this with custom init symbols |
+| DOC-03 | Document pool-related fields: `pool_size`, `max_overflow`, `timeout`, `recycle` | These are already visible in the API reference; the guide shows that inheriting `BaseWarehouseConfig` provides them for free |
+| DOC-03 | Include type annotations in docs | mkdocstrings `show_signature_annotations: true` is already enabled globally; the filter override preserves this setting |
+</phase_requirements>
+
+## Standard Stack
+
+### Core
+| Library | Version | Purpose | Why Standard |
+|---------|---------|---------|--------------|
+| mkdocs-material | >=9.5.0,<9.7.0 | Documentation theme | Already in use; pinned in pyproject.toml docs group |
+| mkdocstrings[python] | >=0.26.0 | Auto-generated API reference from docstrings | Already in use; handles Protocol rendering |
+| mkdocs-gen-files | >=0.5.0 | Generates reference pages from source tree | Already in use; `gen_ref_pages.py` drives the API reference |
+| mkdocs-literate-nav | >=0.6.0 | Literate navigation from SUMMARY.md | Already in use for reference section |
+
+### Supporting
+| Library | Version | Purpose | When to Use |
+|---------|---------|---------|-------------|
+| pymdownx.tabbed | (bundled) | Tabbed content blocks | Use for showing BaseWarehouseConfig vs standalone Protocol examples side by side |
+| pymdownx.superfences | (bundled) | Fenced code blocks with annotations | Use for code examples in the guide |
+| admonition | (bundled) | Note/warning/tip blocks | Use for "Most drivers return None" type callouts |
+
+### Alternatives Considered
+| Instead of | Could Use | Tradeoff |
+|------------|-----------|----------|
+| Per-object filter override | Changing global filter to include `_` methods | Would expose internal methods on ALL classes, not just the Protocol |
+| Hand-written Protocol reference in guide | Dedicated `::: adbc_poolhouse.WarehouseConfig` with filter override | The override approach keeps the reference in the auto-generated section; hand-writing duplicates and drifts |
+
+## Architecture Patterns
+
+### Recommended Project Structure
+```
+docs/src/
+  guides/
+    custom-backends.md    # NEW: the Custom Backends guide
+  ...existing guides...
+mkdocs.yml                # MODIFIED: add nav entry
+src/adbc_poolhouse/
+  _base_config.py         # MODIFIED: improve Protocol + BaseWarehouseConfig docstrings
+```
+
+### Pattern 1: Per-Object mkdocstrings Filter Override
+**What:** Override the global `"!^_"` filter for `WarehouseConfig` only, so its `_driver_path()`, `_adbc_entrypoint()`, and `_dbapi_module()` methods appear in the API reference.
+**When to use:** When a Protocol defines methods that are underscore-prefixed (private-by-convention) but must be documented for third-party implementors.
+**How:** The API reference page is auto-generated by `gen_ref_pages.py`, which writes `"::: adbc_poolhouse"` for the top-level package. To override filters for a single class within that page, use a dedicated directive block in a hand-written reference page or modify the gen script. However, since `gen_ref_pages.py` generates `"::: adbc_poolhouse"` as a single directive, the simplest approach is to add a dedicated `::: adbc_poolhouse.WarehouseConfig` block with a filter override in the custom-backends guide itself, providing inline API documentation where the reader needs it.
+
+**Example (in guide markdown):**
+```markdown
+::: adbc_poolhouse.WarehouseConfig
+    options:
+      filters: []
+      show_root_heading: true
+      show_source: false
+```
+
+### Pattern 2: Minimal Working Example Config
+**What:** A complete, copy-pasteable config class that satisfies the Protocol.
+**When to use:** As the centerpiece of the "Custom backends" guide.
+**Example:**
+```python
+from adbc_poolhouse import BaseWarehouseConfig, create_pool
+from pydantic_settings import SettingsConfigDict
+
+
+class MyDriverConfig(BaseWarehouseConfig):
+    """Config for a hypothetical ADBC driver."""
+
+    model_config = SettingsConfigDict(env_prefix="MYDRIVER_")
+
+    host: str
+    port: int = 5000
+    database: str = "default"
+
+    def _driver_path(self) -> str:
+        return self._resolve_driver_path("adbc_driver_mydriver")
+
+    def to_adbc_kwargs(self) -> dict[str, str]:
+        return {
+            "uri": f"mydriver://{self.host}:{self.port}/{self.database}",
+        }
+
+
+# Usage
+pool = create_pool(MyDriverConfig(host="db.example.com"))
+```
+
+### Pattern 3: Guide Cross-References with MkDocs Syntax
+**What:** Use `[link text][adbc_poolhouse.ClassName]` syntax for cross-references to API docs.
+**When to use:** Throughout the guide when referencing Protocol, BaseWarehouseConfig, create_pool, etc.
+**Example:**
+```markdown
+Your config class must satisfy the [`WarehouseConfig`][adbc_poolhouse.WarehouseConfig] protocol.
+```
+
+### Anti-Patterns to Avoid
+- **Documenting _methods in prose but not in API reference:** The API reference filter must also be updated; prose alone is insufficient for DOC-03 ("Protocol documented in API reference").
+- **Changing the global mkdocstrings filter:** This would expose `_driver_path()`, `_adbc_entrypoint()`, etc. on every built-in config class, cluttering the reference for consumers who do not need these internal details.
+- **Writing a tutorial-style walkthrough:** The docs-author skill classifies this as a how-to guide (goal-oriented action), not a tutorial. Keep it direct.
+- **Over-explaining ADBC internals:** The audience (per skill definition) is "Python developers familiar with connection pools, DBAPI, and async Python."
+
+## Don't Hand-Roll
+
+| Problem | Don't Build | Use Instead | Why |
+|---------|-------------|-------------|-----|
+| Protocol API rendering | Hand-written method table | mkdocstrings `::: adbc_poolhouse.WarehouseConfig` with `filters: []` | Stays in sync with source; renders type annotations automatically |
+| Navigation | Hand-written nav links | `mkdocs.yml` nav entry + `[text][adbc_poolhouse.Symbol]` cross-refs | MkDocs resolves links at build time; `--strict` catches broken refs |
+| Pool tuning field docs | Repeat field definitions in guide | Reference `BaseWarehouseConfig` and link to configuration guide | Single source of truth; already documented in configuration.md |
+
+## Common Pitfalls
+
+### Pitfall 1: mkdocstrings Filter Hides Protocol Methods
+**What goes wrong:** The global filter `"!^_"` in `mkdocs.yml` hides `_driver_path()`, `_adbc_entrypoint()`, and `_dbapi_module()` from the auto-generated API reference. Without an override, DOC-03 acceptance criterion "Protocol documented in API reference with all required attributes" fails.
+**Why it happens:** These methods are underscore-prefixed because they are internal implementation details for consumers, but they are the public contract for plugin authors.
+**How to avoid:** Use a per-object filter override (`filters: []`) on the `WarehouseConfig` directive in the guide page. This shows all members for that one class without affecting others.
+**Warning signs:** Running `mkdocs build --strict` passes but the rendered WarehouseConfig section only shows `pool_size`, `max_overflow`, `timeout`, `recycle`, and `to_adbc_kwargs`.
+
+### Pitfall 2: Duplicate Rendering of WarehouseConfig
+**What goes wrong:** If both the auto-generated `reference/adbc_poolhouse.md` (via `gen_ref_pages.py`) and the guide page render `WarehouseConfig`, the Protocol appears twice in the docs with different member visibility.
+**Why it happens:** The auto-generated page uses the global filter (hiding `_`-methods), while the guide uses `filters: []` (showing everything).
+**How to avoid:** This is acceptable and arguably desirable: the API reference page shows the consumer view (public-only), while the guide shows the implementor view (full contract). Add a note in the guide explaining that the full Protocol reference is shown here for plugin authors. Alternatively, the auto-generated reference could also get a filter override, but that requires modifying `gen_ref_pages.py` to special-case `WarehouseConfig`.
+**Warning signs:** User confusion about why the two renderings differ.
+
+### Pitfall 3: Forgetting to Add Nav Entry
+**What goes wrong:** The guide exists as a file but is not reachable from the docs navigation. `mkdocs build --strict` may not catch orphan pages.
+**Why it happens:** MkDocs Material requires explicit `nav` entries in `mkdocs.yml`.
+**How to avoid:** Add the nav entry to `mkdocs.yml` under Guides, positioned after "Configuration Reference" and before the Warehouse Guides section.
+
+### Pitfall 4: BaseWarehouseConfig._resolve_driver_path() Not Documented
+**What goes wrong:** The guide shows `self._resolve_driver_path("adbc_driver_mydriver")` in the example but does not explain what this static method does.
+**Why it happens:** `_resolve_driver_path` is a `@staticmethod` on `BaseWarehouseConfig`, also hidden by the global filter.
+**How to avoid:** Document `_resolve_driver_path()` in the guide prose. Explain its behavior: tries `find_spec` -> import -> call `method_name()`, falls back to returning the package name for manifest resolution.
+
+### Pitfall 5: Humanizer Pass Skipped
+**What goes wrong:** The guide reads like AI-generated docs with promotional language and -ing phrases.
+**Why it happens:** Phase >= 7 requires a humanizer pass per CLAUDE.md.
+**How to avoid:** Apply the humanizer checklist from `@/Users/paul/.claude/skills/humanizer/SKILL.md` after drafting the guide. Specific patterns to watch: "by defining X, you can Y", "this allows you to", "seamlessly", "robust", "powerful".
+
+## Code Examples
+
+### The WarehouseConfig Protocol (current source)
+```python
+# Source: src/adbc_poolhouse/_base_config.py lines 13-41
+@runtime_checkable
+class WarehouseConfig(Protocol):
+    pool_size: int
+    max_overflow: int
+    timeout: int
+    recycle: int
+
+    def _adbc_entrypoint(self) -> str | None: ...
+    def _driver_path(self) -> str: ...
+    def _dbapi_module(self) -> str | None: ...
+    def to_adbc_kwargs(self) -> dict[str, str]: ...
+```
+
+### BaseWarehouseConfig Defaults (current source)
+```python
+# Source: src/adbc_poolhouse/_base_config.py lines 44-96
+class BaseWarehouseConfig(BaseSettings, ABC):
+    pool_size: int = 5
+    max_overflow: int = 3
+    timeout: int = 30
+    recycle: int = 3600
+
+    def _adbc_entrypoint(self) -> str | None:
+        return None  # Most drivers don't need this
+
+    @abstractmethod
+    def _driver_path(self) -> str: ...
+
+    def _dbapi_module(self) -> str | None:
+        return None  # Only needed for PyPI drivers with a .dbapi module
+
+    @abstractmethod
+    def to_adbc_kwargs(self) -> dict[str, str]: ...
+
+    @staticmethod
+    def _resolve_driver_path(pkg_name: str, *, method_name: str = "_driver_path") -> str:
+        """Try find_spec -> import -> call method. Fallback: return pkg_name."""
+        ...
+```
+
+### Simplest Possible Custom Config (for guide example)
+```python
+from adbc_poolhouse import BaseWarehouseConfig, create_pool
+from pydantic_settings import SettingsConfigDict
+
+
+class MyDriverConfig(BaseWarehouseConfig):
+    model_config = SettingsConfigDict(env_prefix="MYDRIVER_")
+
+    host: str
+    port: int = 5000
+
+    def _driver_path(self) -> str:
+        return self._resolve_driver_path("adbc_driver_mydriver")
+
+    def to_adbc_kwargs(self) -> dict[str, str]:
+        return {"uri": f"mydriver://{self.host}:{self.port}"}
+```
+
+### Foundry-style Config (no PyPI package)
+```python
+class FoundryDriverConfig(BaseWarehouseConfig):
+    model_config = SettingsConfigDict(env_prefix="FOUNDRY_")
+
+    uri: str
+
+    def _driver_path(self) -> str:
+        # Foundry drivers use short names resolved by adbc_driver_manager
+        return "my_foundry_driver"
+
+    def to_adbc_kwargs(self) -> dict[str, str]:
+        return {"uri": self.uri}
+```
+
+### Config with Custom Entrypoint (rare)
+```python
+class CustomEntrypointConfig(BaseWarehouseConfig):
+    model_config = SettingsConfigDict(env_prefix="CUSTOM_")
+
+    database: str
+
+    def _adbc_entrypoint(self) -> str | None:
+        # Only needed when the driver uses a non-default init symbol
+        return "my_driver_custom_init"
+
+    def _driver_path(self) -> str:
+        return self._resolve_driver_path("adbc_driver_custom")
+
+    def to_adbc_kwargs(self) -> dict[str, str]:
+        return {"path": self.database}
+```
+
+### Config with dbapi Module (PyPI driver with Python package)
+```python
+import importlib.util
+
+
+class PyPIDriverConfig(BaseWarehouseConfig):
+    model_config = SettingsConfigDict(env_prefix="PYPIDRVR_")
+
+    connection_string: str
+
+    def _driver_path(self) -> str:
+        return self._resolve_driver_path("adbc_driver_mydb")
+
+    def _dbapi_module(self) -> str | None:
+        if importlib.util.find_spec("adbc_driver_mydb") is not None:
+            return "adbc_driver_mydb.dbapi"
+        return None
+
+    def to_adbc_kwargs(self) -> dict[str, str]:
+        return {"uri": self.connection_string}
+```
+
+### mkdocstrings Inline Directive with Filter Override
+```markdown
+## Protocol reference
+
+::: adbc_poolhouse.WarehouseConfig
+    options:
+      filters: []
+      show_root_heading: true
+      show_source: true
+```
+
+### mkdocs.yml Nav Entry
+```yaml
+nav:
+  - Getting Started: index.md
+  - Guides:
+    - Pool Lifecycle: guides/pool-lifecycle.md
+    - Consumer Patterns: guides/consumer-patterns.md
+    - Configuration Reference: guides/configuration.md
+    - Custom Backends: guides/custom-backends.md    # NEW
+    - Warehouse Guides:
+      # ...existing...
+```
+
+## State of the Art
+
+| Old Approach | Current Approach | When Changed | Impact |
+|--------------|------------------|--------------|--------|
+| Registry-based plugins with entry points | Self-describing config objects satisfying Protocol | Phase 17-18 (2026-03-14) | No registry, no entry points. Authors just implement the Protocol. |
+| Translator functions separate from configs | `to_adbc_kwargs()` method on config class | Phase 17.5 (2026-03-14) | Each config carries its own serialization logic. |
+| `_registry.py` + `_drivers.py` modules | Deleted entirely | Phase 18 (2026-03-14) | `create_pool()` calls config methods directly. |
+| `driver_path` / `dbapi_module` as raw args only | Also supported as config methods | Phase 19 (2026-03-15) | Three call patterns: config, native driver, dbapi module. |
+
+**Deprecated/outdated:**
+- Registry-based plugin system: Deleted in Phase 18. No backwards compat shim.
+- `TranslatorFunc` type alias: Removed in Phase 17.5 Plan 05.
+- `get_translator()` function: Removed in Phase 17.5 Plan 05.
+
+## Open Questions
+
+1. **Should the guide example use `BaseWarehouseConfig` (ABC) or demonstrate a standalone class satisfying `WarehouseConfig` (Protocol)?**
+   - What we know: `BaseWarehouseConfig` is easier (inherits pool fields, provides `_resolve_driver_path()`). A standalone Protocol implementation requires more boilerplate.
+   - What's unclear: Whether third-party authors would prefer the simpler ABC inheritance or want to see both options.
+   - Recommendation: Show `BaseWarehouseConfig` as the primary example (fewer lines, inherits pool tuning). Add a brief note that any class satisfying the `WarehouseConfig` Protocol works without inheritance.
+
+2. **Should `WarehouseConfig` Protocol methods get expanded docstrings in source?**
+   - What we know: Currently `_driver_path()`, `_adbc_entrypoint()`, and `_dbapi_module()` on the Protocol have no docstrings (only `...` bodies). `BaseWarehouseConfig` has short docstrings on these methods.
+   - What's unclear: Whether adding docstrings to the Protocol definition would be redundant with the guide prose.
+   - Recommendation: Add concise docstrings to the Protocol methods. mkdocstrings will render them in the filter-overridden reference block. This satisfies the DOC-03 acceptance criterion of "Protocol documented in API reference."
+
+## Validation Architecture
+
+### Test Framework
+| Property | Value |
+|----------|-------|
+| Framework | pytest 8.x |
+| Config file | `pyproject.toml` `[tool.pytest.ini_options]` |
+| Quick run command | `uv run mkdocs build --strict` |
+| Full suite command | `uv run mkdocs build --strict && uv run pytest tests/ -x` |
+
+### Phase Requirements to Test Map
+| Req ID | Behavior | Test Type | Automated Command | File Exists? |
+|--------|----------|-----------|-------------------|-------------|
+| DOC-03 | Protocol documented in API reference | smoke | `uv run mkdocs build --strict` (no build warnings) | N/A (build command) |
+| DOC-03 | `_adbc_entrypoint()` documented | manual | Visual check that method appears in rendered output | N/A |
+| DOC-03 | Pool fields documented | manual | Already visible in current API reference | N/A |
+| DOC-03 | Type annotations in docs | smoke | `show_signature_annotations: true` in mkdocs.yml (already set) | N/A |
+
+### Sampling Rate
+- **Per task commit:** `uv run mkdocs build --strict`
+- **Per wave merge:** `uv run mkdocs build --strict && uv run pytest tests/ -x`
+- **Phase gate:** Full suite green before `/gsd:verify-work`
+
+### Wave 0 Gaps
+None -- existing documentation infrastructure covers all phase requirements. The `docs` dependency group is already configured and `mkdocs build --strict` is the established validation command.
+
+## Sources
+
+### Primary (HIGH confidence)
+- Source code: `src/adbc_poolhouse/_base_config.py` -- WarehouseConfig Protocol and BaseWarehouseConfig definitions
+- Source code: `src/adbc_poolhouse/_pool_factory.py` -- create_pool() implementation showing how config methods are called
+- Source code: `src/adbc_poolhouse/__init__.py` -- public API exports including WarehouseConfig and BaseWarehouseConfig
+- `mkdocs.yml` -- current mkdocstrings configuration with `filters: ["!^_"]`
+- Built docs (`site/reference/adbc_poolhouse/index.html`) -- verified that `_driver_path()`, `_adbc_entrypoint()`, `_dbapi_module()` are currently hidden
+
+### Secondary (MEDIUM confidence)
+- [mkdocstrings-python Members documentation](https://mkdocstrings.github.io/python/usage/configuration/members/) -- confirms per-object filter overrides with `options: filters: []`
+
+### Tertiary (LOW confidence)
+- None
+
+## Metadata
+
+**Confidence breakdown:**
+- Standard stack: HIGH -- all tools already in use, versions pinned
+- Architecture: HIGH -- documentation-only phase, source code is stable and well-understood
+- Pitfalls: HIGH -- verified the filter issue by inspecting rendered output; mkdocstrings override syntax confirmed from official docs
+- Guide structure: HIGH -- docs-author skill provides explicit classification and workflow
+
+**Research date:** 2026-03-15
+**Valid until:** 2026-04-15 (stable -- no moving parts)
