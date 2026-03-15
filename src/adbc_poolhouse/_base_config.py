@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from typing import Protocol, runtime_checkable
+import importlib.util
+from abc import ABC, abstractmethod
+from typing import Any, Protocol, runtime_checkable
 
 from pydantic_settings import BaseSettings
 
@@ -30,12 +32,16 @@ class WarehouseConfig(Protocol):
 
     def _adbc_entrypoint(self) -> str | None: ...
 
+    def _driver_path(self) -> str: ...
+
+    def _dbapi_module(self) -> str | None: ...
+
     def to_adbc_kwargs(self) -> dict[str, str]:
         """Convert config to ADBC driver connection kwargs."""
         ...
 
 
-class BaseWarehouseConfig(BaseSettings):
+class BaseWarehouseConfig(BaseSettings, ABC):
     """
     Base class for all warehouse config models.
 
@@ -70,11 +76,47 @@ class BaseWarehouseConfig(BaseSettings):
         """
         return None
 
+    @abstractmethod
+    def _driver_path(self) -> str:
+        """Return the ADBC driver path or short name."""
+        ...
+
+    def _dbapi_module(self) -> str | None:
+        """Return the DBAPI module name, or None if not applicable."""
+        return None
+
+    @abstractmethod
     def to_adbc_kwargs(self) -> dict[str, str]:
         """
         Convert config to ADBC driver connection kwargs.
 
         Subclasses must override this method to provide backend-specific
-        serialization. The default implementation raises NotImplementedError.
+        serialization.
         """
-        raise NotImplementedError(f"{self.__class__.__name__} must implement to_adbc_kwargs()")
+        ...
+
+    @staticmethod
+    def _resolve_driver_path(
+        pkg_name: str,
+        *,
+        method_name: str = "_driver_path",
+    ) -> str:
+        """
+        Resolve driver path from a PyPI ADBC driver package.
+
+        Tries ``find_spec`` -> ``import`` -> call ``method_name()``. Falls back
+        to returning *pkg_name* for ``adbc_driver_manager`` manifest resolution.
+
+        Args:
+            pkg_name: Python package name (e.g. ``"adbc_driver_snowflake"``).
+            method_name: Function name on the package module. Apache drivers
+                use ``"_driver_path"``, DuckDB uses ``"driver_path"``.
+
+        Returns:
+            Absolute path to driver shared library, or *pkg_name* as fallback.
+        """
+        spec = importlib.util.find_spec(pkg_name)
+        if spec is not None:
+            pkg: Any = __import__(pkg_name)
+            return pkg.__dict__[method_name]()
+        return pkg_name

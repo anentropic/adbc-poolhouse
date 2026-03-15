@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import importlib.util
+
 from pydantic import SecretStr  # noqa: TC002
 from pydantic_settings import SettingsConfigDict
 
@@ -76,6 +78,14 @@ class FlightSQLConfig(BaseWarehouseConfig):
     with_cookie_middleware: bool = False
     """Enable gRPC cookie middleware (required by some servers for session
     management). Env: FLIGHTSQL_WITH_COOKIE_MIDDLEWARE."""
+
+    def _driver_path(self) -> str:
+        return self._resolve_driver_path("adbc_driver_flightsql")
+
+    def _dbapi_module(self) -> str | None:
+        if importlib.util.find_spec("adbc_driver_flightsql") is not None:
+            return "adbc_driver_flightsql.dbapi"
+        return None
 
     def to_adbc_kwargs(self) -> dict[str, str]:
         """

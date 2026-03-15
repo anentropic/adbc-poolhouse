@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import importlib.util
+
 from pydantic import SecretStr  # noqa: TC002
 from pydantic_settings import SettingsConfigDict
 
@@ -42,6 +44,14 @@ class BigQueryConfig(BaseWarehouseConfig):
 
     dataset_id: str | None = None
     """Default dataset. Env: BIGQUERY_DATASET_ID."""
+
+    def _driver_path(self) -> str:
+        return self._resolve_driver_path("adbc_driver_bigquery")
+
+    def _dbapi_module(self) -> str | None:
+        if importlib.util.find_spec("adbc_driver_bigquery") is not None:
+            return "adbc_driver_bigquery.dbapi"
+        return None
 
     def to_adbc_kwargs(self) -> dict[str, str]:
         """

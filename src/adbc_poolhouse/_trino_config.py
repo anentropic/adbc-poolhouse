@@ -57,6 +57,9 @@ class TrinoConfig(BaseWarehouseConfig):
     """Application identifier sent to Trino coordinator.
     Env: TRINO_SOURCE."""
 
+    def _driver_path(self) -> str:
+        return "trino"
+
     def to_adbc_kwargs(self) -> dict[str, str]:
         """
         Convert config to ADBC driver connection kwargs.

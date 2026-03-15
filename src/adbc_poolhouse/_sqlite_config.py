@@ -80,16 +80,6 @@ class SQLiteConfig(BaseWarehouseConfig):
             raise ConfigurationError(f"database must be a non-empty string, got {v!r}")
         return v
 
-    def to_adbc_kwargs(self) -> dict[str, str]:
-        """
-        Convert config to ADBC driver connection kwargs.
-
-        Returns:
-            Dict with a single ``'uri'`` key set to the database path
-            (or ``':memory:'``).
-        """
-        return {"uri": self.database}
-
     def _adbc_entrypoint(self) -> str | None:
         """
         Return the ADBC entry-point symbol for the SQLite driver.
@@ -101,6 +91,19 @@ class SQLiteConfig(BaseWarehouseConfig):
         # Confirmed by integration testing: "adbc_driver_sqlite_init" raises
         # dlsym symbol-not-found; "AdbcDriverSqliteInit" resolves correctly.
         return "AdbcDriverSqliteInit"
+
+    def _driver_path(self) -> str:
+        return self._resolve_driver_path("adbc_driver_sqlite")
+
+    def to_adbc_kwargs(self) -> dict[str, str]:
+        """
+        Convert config to ADBC driver connection kwargs.
+
+        Returns:
+            Dict with a single ``'uri'`` key set to the database path
+            (or ``':memory:'``).
+        """
+        return {"uri": self.database}
 
     @model_validator(mode="after")
     def check_memory_pool_size(self) -> Self:

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import importlib.util
 from pathlib import Path  # noqa: TC003
 from typing import Self
 
@@ -129,6 +130,14 @@ class SnowflakeConfig(BaseWarehouseConfig):
                 "private_key_pem for inline PEM content."
             )
         return self
+
+    def _driver_path(self) -> str:
+        return self._resolve_driver_path("adbc_driver_snowflake")
+
+    def _dbapi_module(self) -> str | None:
+        if importlib.util.find_spec("adbc_driver_snowflake") is not None:
+            return "adbc_driver_snowflake.dbapi"
+        return None
 
     def to_adbc_kwargs(self) -> dict[str, str]:
         """

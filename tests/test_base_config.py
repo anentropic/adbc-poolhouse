@@ -8,14 +8,22 @@ from adbc_poolhouse._base_config import BaseWarehouseConfig, WarehouseConfig
 
 
 class TestWarehouseConfigProtocol:
-    """Verify WarehouseConfig Protocol declares to_adbc_kwargs()."""
+    """Verify WarehouseConfig Protocol declares expected methods."""
 
     def test_protocol_has_to_adbc_kwargs(self) -> None:
         """WarehouseConfig Protocol declares to_adbc_kwargs() method."""
         assert hasattr(WarehouseConfig, "to_adbc_kwargs")
 
+    def test_protocol_has_driver_path(self) -> None:
+        """WarehouseConfig Protocol declares _driver_path() method."""
+        assert hasattr(WarehouseConfig, "_driver_path")
+
+    def test_protocol_has_dbapi_module(self) -> None:
+        """WarehouseConfig Protocol declares _dbapi_module() method."""
+        assert hasattr(WarehouseConfig, "_dbapi_module")
+
     def test_concrete_class_satisfies_protocol(self) -> None:
-        """A concrete class with to_adbc_kwargs() satisfies WarehouseConfig Protocol."""
+        """A concrete class with all required methods satisfies WarehouseConfig Protocol."""
 
         class ConcreteConfig:
             pool_size: int = 5
@@ -26,6 +34,12 @@ class TestWarehouseConfigProtocol:
             def _adbc_entrypoint(self) -> str | None:
                 return None
 
+            def _driver_path(self) -> str:
+                return "test"
+
+            def _dbapi_module(self) -> str | None:
+                return None
+
             def to_adbc_kwargs(self) -> dict[str, str]:
                 return {"key": "value"}
 
@@ -33,10 +47,15 @@ class TestWarehouseConfigProtocol:
 
 
 class TestBaseWarehouseConfig:
-    """Verify BaseWarehouseConfig.to_adbc_kwargs() raises NotImplementedError."""
+    """Verify BaseWarehouseConfig is ABC with correct abstract methods."""
 
-    def test_to_adbc_kwargs_raises_not_implemented(self) -> None:
-        """BaseWarehouseConfig.to_adbc_kwargs() raises NotImplementedError."""
-        config = BaseWarehouseConfig()
-        with pytest.raises(NotImplementedError, match="BaseWarehouseConfig must implement"):
-            config.to_adbc_kwargs()
+    def test_cannot_instantiate_abstract(self) -> None:
+        """BaseWarehouseConfig cannot be instantiated directly (ABC enforcement)."""
+        with pytest.raises(TypeError, match="abstract method"):
+            BaseWarehouseConfig()  # type: ignore[abstract]
+
+    def test_abstract_methods(self) -> None:
+        """BaseWarehouseConfig declares _driver_path and to_adbc_kwargs as abstract."""
+        assert BaseWarehouseConfig.__abstractmethods__ == frozenset(
+            {"_driver_path", "to_adbc_kwargs"}
+        )

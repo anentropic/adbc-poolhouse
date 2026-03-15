@@ -69,6 +69,9 @@ class RedshiftConfig(BaseWarehouseConfig):
     sslmode: str | None = None
     """SSL mode (e.g. 'require', 'verify-full'). Env: REDSHIFT_SSLMODE."""
 
+    def _driver_path(self) -> str:
+        return "redshift"
+
     def to_adbc_kwargs(self) -> dict[str, str]:
         """
         Convert Redshift config fields to ADBC driver kwargs.

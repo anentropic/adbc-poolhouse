@@ -73,6 +73,9 @@ class MySQLConfig(BaseWarehouseConfig):
             )
         return self
 
+    def _driver_path(self) -> str:
+        return "mysql"
+
     def to_adbc_kwargs(self) -> dict[str, str]:
         """
         Convert MySQL config fields to ADBC driver kwargs.

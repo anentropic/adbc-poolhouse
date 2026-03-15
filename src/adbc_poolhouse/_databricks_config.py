@@ -82,6 +82,9 @@ class DatabricksConfig(BaseWarehouseConfig):
             )
         return self
 
+    def _driver_path(self) -> str:
+        return "databricks"
+
     def to_adbc_kwargs(self) -> dict[str, str]:
         """
         Convert Databricks config fields to ADBC driver kwargs.

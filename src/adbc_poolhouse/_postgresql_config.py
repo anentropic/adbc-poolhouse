@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import importlib.util
 from urllib.parse import quote
 
 from pydantic import SecretStr  # noqa: TC002
@@ -59,6 +60,14 @@ class PostgreSQLConfig(BaseWarehouseConfig):
     use_copy: bool = True
     """Use PostgreSQL COPY protocol for bulk query execution (driver default:
     True). Disable if COPY triggers permission errors. Env: POSTGRESQL_USE_COPY."""
+
+    def _driver_path(self) -> str:
+        return self._resolve_driver_path("adbc_driver_postgresql")
+
+    def _dbapi_module(self) -> str | None:
+        if importlib.util.find_spec("adbc_driver_postgresql") is not None:
+            return "adbc_driver_postgresql.dbapi"
+        return None
 
     def to_adbc_kwargs(self) -> dict[str, str]:
         """

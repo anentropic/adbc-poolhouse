@@ -66,6 +66,9 @@ class ClickHouseConfig(BaseWarehouseConfig):
     database: str | None = None
     """ClickHouse database name. Optional. Env: CLICKHOUSE_DATABASE."""
 
+    def _driver_path(self) -> str:
+        return "clickhouse"
+
     def to_adbc_kwargs(self) -> dict[str, str]:
         """
         Convert config to ADBC driver connection kwargs.

@@ -56,6 +56,12 @@ class DummyConfig(BaseWarehouseConfig):
         """Return None - no entry point required for dummy backend."""
         return None
 
+    def _driver_path(self) -> str:
+        return "dummy"
+
+    def to_adbc_kwargs(self) -> dict[str, str]:
+        return {"dummy_key": "dummy_value"}
+
 
 def dummy_translator(config: WarehouseConfig) -> dict[str, str]:
     """

@@ -64,6 +64,9 @@ class MSSQLConfig(BaseWarehouseConfig):
     'ActiveDirectoryServicePrincipal', 'ActiveDirectoryInteractive'.
     Env: MSSQL_FEDAUTH."""
 
+    def _driver_path(self) -> str:
+        return "mssql"
+
     def to_adbc_kwargs(self) -> dict[str, str]:
         """
         Convert config to ADBC driver connection kwargs.

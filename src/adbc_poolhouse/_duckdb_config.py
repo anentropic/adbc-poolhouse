@@ -80,6 +80,10 @@ class DuckDBConfig(BaseWarehouseConfig):
     def _adbc_entrypoint(self) -> str | None:
         return "duckdb_adbc_init"
 
+    def _driver_path(self) -> str:
+        # adbc_driver_duckdb uses driver_path() (no underscore prefix)
+        return self._resolve_driver_path("adbc_driver_duckdb", method_name="driver_path")
+
     def to_adbc_kwargs(self) -> dict[str, str]:
         """
         Convert config to ADBC driver connection kwargs.
