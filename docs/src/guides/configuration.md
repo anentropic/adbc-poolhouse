@@ -88,6 +88,10 @@ Two raw paths are supported. Use one or the other, not both:
     For a list of available drivers and installation instructions, see the
     [ADBC driver installation docs](https://arrow.apache.org/adbc/current/driver/installation.html).
 
+    See the [ADBC driver manifests docs](https://arrow.apache.org/adbc/current/format/driver_manifests.html)
+    for details about driver path resolution.
+
+
     ```python
     from adbc_poolhouse import create_pool, close_pool
 
