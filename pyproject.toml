@@ -1,6 +1,6 @@
 [project]
 name = "adbc-poolhouse"
-version = "1.1.0"
+version = "1.2.0"
 description = "Connection pooling for ADBC drivers from typed warehouse configs"
 readme = "README.md"
 authors = [
