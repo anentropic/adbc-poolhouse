@@ -316,7 +316,7 @@ def managed_pool(
     timeout: int = 30,
     recycle: int = 3600,
     pre_ping: bool = False,
-) -> collections.abc.Iterator[sqlalchemy.pool.QueuePool]:
+) -> collections.abc.Generator[sqlalchemy.pool.QueuePool, None, None]:
     """
     Context manager that creates a pool and closes it on exit.
 
