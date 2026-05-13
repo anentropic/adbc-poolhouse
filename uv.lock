@@ -25,19 +25,19 @@ wheels = [
 
 [[package]]
 name = "adbc-driver-flightsql"
-version = "1.10.0"
+version = "1.11.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "adbc-driver-manager" },
     { name = "importlib-resources" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/55/c3/a97fba4960b76b4b3a3055d8c33f6915e7d40a9c67f065fe760d9a17514a/adbc_driver_flightsql-1.10.0.tar.gz", hash = "sha256:aab737ee7c16d0ec89928ef2297c92f815756e91773085d55cc5eabbebcb9338", size = 24516, upload-time = "2026-01-09T07:13:44.793Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/e2/d8/b0bf88456d9acf85812b1d28568f3c3f80019d2b52d2131d28daea259d1e/adbc_driver_flightsql-1.11.0.tar.gz", hash = "sha256:75f703eef1812c3932e5f4643c5e21b5690b23df7e09e88b727f7952aa559f2a", size = 34941, upload-time = "2026-04-07T00:17:26.829Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/94/fb/c0d48ded0e75b61bbaff24ef52c89b97ba9b2fbc5caaeb9a102ab17f8f1d/adbc_driver_flightsql-1.10.0-py3-none-macosx_10_15_x86_64.whl", hash = "sha256:a520579be3194e315f35c749afc9cb2ae9b9b7b852c8c2ac5fb9cafa31cdc0c6", size = 7922165, upload-time = "2026-01-09T07:11:35.077Z" },
-    { url = "https://files.pythonhosted.org/packages/c8/55/c8bc08ea1e0ba3a35f6307528efa23f11745c5acb90981d2632f5d416659/adbc_driver_flightsql-1.10.0-py3-none-macosx_11_0_arm64.whl", hash = "sha256:c6d6f5e93adcc87f41e70adc07a470f865f36f8dd1e6e9ab2b05855bc44274ca", size = 7366098, upload-time = "2026-01-09T07:11:37.799Z" },
-    { url = "https://files.pythonhosted.org/packages/50/ed/2cc8683b1f59d5c9c82aaf8f5992b41d19e5abc90393af6b882eab072773/adbc_driver_flightsql-1.10.0-py3-none-manylinux1_x86_64.manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_5_x86_64.whl", hash = "sha256:9dfee1c767281c9add95fcf29eac84338107a7610b2d9b19d1169e67083a3eaa", size = 14446811, upload-time = "2026-01-09T07:11:41.532Z" },
-    { url = "https://files.pythonhosted.org/packages/b3/5d/1d4c235a04b349d8d5c89e6ca42e11a6b21e6959f48b5847523e87926b4b/adbc_driver_flightsql-1.10.0-py3-none-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:e6212fba5a2a59d7a2a71db1b036730908eb85457df3cc3c90563e4ddadaa923", size = 13257586, upload-time = "2026-01-09T07:11:45.63Z" },
-    { url = "https://files.pythonhosted.org/packages/e7/4d/55b96339f18c3932c61bd503c477fabfb7f6c95d4fc4ceb31a1e4275d4fd/adbc_driver_flightsql-1.10.0-py3-none-win_amd64.whl", hash = "sha256:6750c1def8c782469cc33dd883f5c9598086a875432a257adf0522bb1e3b95ca", size = 14231290, upload-time = "2026-01-09T07:11:49.683Z" },
+    { url = "https://files.pythonhosted.org/packages/88/af/3e40778760257b594df4efc0b12cbfe3c182bdcb69f67a9730cfad5e9cae/adbc_driver_flightsql-1.11.0-py3-none-macosx_10_15_x86_64.whl", hash = "sha256:6cceffd95af5cdf5f3be051629de6bfd65744e591177b0f8176cd6810725e8f0", size = 8014539, upload-time = "2026-04-07T00:14:57.149Z" },
+    { url = "https://files.pythonhosted.org/packages/b2/06/6ae41136909c88fc85c913b008d3d9878683289a851ec78924ab11c9e3bc/adbc_driver_flightsql-1.11.0-py3-none-macosx_11_0_arm64.whl", hash = "sha256:2e716c15bfad65c489d13a49528de5bcce72179fb8024be19353b143af5749fd", size = 7437919, upload-time = "2026-04-07T00:15:04.504Z" },
+    { url = "https://files.pythonhosted.org/packages/9a/37/d8d12630ebbe336517b42aed9d9d4deab91e2bee153a1cba6ea9af9c5026/adbc_driver_flightsql-1.11.0-py3-none-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl", hash = "sha256:cabff560abcf18cebef0bf24bb2886d145bae340e8eef18cf0b6642e09fa349d", size = 14696685, upload-time = "2026-04-07T00:15:07.644Z" },
+    { url = "https://files.pythonhosted.org/packages/bd/d2/18147e9fda30d41644ef75c9b30a19c8bc39734b3308e127b17747079e93/adbc_driver_flightsql-1.11.0-py3-none-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:6252f0a4c8a6240d51b61dcefed88fb3d9fa1e5bcc67cb954c94907f447b744d", size = 13471551, upload-time = "2026-04-07T00:15:10.792Z" },
+    { url = "https://files.pythonhosted.org/packages/97/e4/343f698d0377db4a99009af3cf4ce8dbdc36f1578d9be71e128ee2e3a225/adbc_driver_flightsql-1.11.0-py3-none-win_amd64.whl", hash = "sha256:955865ed9a5746073a7b78c291ebb59aaaeaf0244e394b1e5a037c53cf61900c", size = 14475054, upload-time = "2026-04-07T00:15:14.949Z" },
 ]
 
 [[package]]
