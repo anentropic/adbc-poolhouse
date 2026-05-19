@@ -28,6 +28,7 @@ from adbc_poolhouse import (
     MSSQLConfig,
     MySQLConfig,
     PostgreSQLConfig,
+    QuackConfig,
     RedshiftConfig,
     SnowflakeConfig,
     SQLiteConfig,
@@ -101,6 +102,39 @@ class TestSnowflakeImports:
             call_kwargs = mock_connect.call_args.kwargs
             # Falls back to driver= kwarg
             assert "driver" in call_kwargs
+
+
+class TestQuackImports:
+    """Semi-integration test: real Quack driver import (if available), mocked connection."""
+
+    def test_create_pool_wiring(self) -> None:
+        """Import real Quack driver (if installed), mock connection, assert correct kwargs."""
+        config = QuackConfig(host="h")
+        mock_conn = MagicMock()
+        mock_conn.adbc_clone = MagicMock(return_value=MagicMock())
+
+        if _driver_installed("adbc_driver_quack"):
+            # Driver installed: mock driver's own dbapi.connect
+            with patch(
+                "adbc_driver_quack.dbapi.connect",
+                return_value=mock_conn,
+            ) as mock_connect:
+                pool = create_pool(config)
+                pool.dispose()
+
+            mock_connect.assert_called_once()
+            assert "uri" in mock_connect.call_args.kwargs
+        else:
+            # Driver not installed: mock adbc_driver_manager.dbapi.connect
+            with patch(
+                "adbc_driver_manager.dbapi.connect",
+                return_value=mock_conn,
+            ) as mock_connect:
+                pool = create_pool(config)
+                pool.dispose()
+
+            mock_connect.assert_called_once()
+            assert "driver" in mock_connect.call_args.kwargs
 
 
 class TestBigQueryImports:

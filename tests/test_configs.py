@@ -15,6 +15,7 @@ from adbc_poolhouse import (
     MSSQLConfig,
     MySQLConfig,
     PostgreSQLConfig,
+    QuackConfig,
     RedshiftConfig,
     SnowflakeConfig,
     SQLiteConfig,
@@ -559,3 +560,122 @@ class TestClickHouseConfig:
         monkeypatch.setenv("CLICKHOUSE_POOL_SIZE", "7")
         c = ClickHouseConfig()
         assert c.pool_size == 7
+
+
+class TestQuackConfig:
+    """Unit tests for QuackConfig — connection validation, kwargs shape, env prefix."""
+
+    def test_uri_mode_constructs(self) -> None:
+        """QuackConfig(uri=...) succeeds; host/port remain None."""
+        c = QuackConfig(uri="quack://h:1234")
+        assert c.uri == "quack://h:1234"
+        assert c.host is None
+        assert c.port is None
+        assert isinstance(c, WarehouseConfig)
+
+    def test_host_only_constructs(self) -> None:
+        """QuackConfig(host=...) succeeds; port defaults to None; uri is None."""
+        c = QuackConfig(host="h")
+        assert c.host == "h"
+        assert c.port is None
+        assert c.uri is None
+        assert isinstance(c, WarehouseConfig)
+
+    def test_host_port_constructs(self) -> None:
+        """QuackConfig(host=..., port=...) succeeds with both fields set."""
+        c = QuackConfig(host="h", port=1234)
+        assert c.host == "h"
+        assert c.port == 1234
+
+    def test_uri_and_host_raises(self) -> None:
+        """Setting both uri and host raises ValidationError (mutual exclusion)."""
+        with pytest.raises(ValidationError):
+            QuackConfig(uri="quack://h", host="h")
+
+    def test_neither_uri_nor_host_raises(self) -> None:
+        """QuackConfig() with no connection spec raises ValidationError."""
+        with pytest.raises(ValidationError):
+            QuackConfig()
+
+    def test_port_alone_raises(self) -> None:
+        """port alone (no host, no uri) raises ValidationError."""
+        with pytest.raises(ValidationError):
+            QuackConfig(port=1234)
+
+    def test_uri_is_plain_str_not_secretstr(self) -> None:
+        """uri field is plain str (driver URI cannot embed credentials)."""
+        c = QuackConfig(uri="quack://h")
+        assert type(c.uri) is str
+        assert not isinstance(c.uri, SecretStr)
+
+    def test_token_is_secretstr(self) -> None:
+        """token is SecretStr — repr masking prevents leakage."""
+        c = QuackConfig(host="h", token=SecretStr("tk"))  # pragma: allowlist secret
+        assert isinstance(c.token, SecretStr)
+        assert "tk" not in repr(c)
+
+    def test_to_adbc_kwargs_uri_mode(self) -> None:
+        """URI mode passes uri through verbatim, no token/tls keys."""
+        c = QuackConfig(uri="quack://h:1234")
+        assert c.to_adbc_kwargs() == {"uri": "quack://h:1234"}
+
+    def test_to_adbc_kwargs_decomposed_no_port(self) -> None:
+        """Decomposed mode without port: uri rebuilt as quack://host (no :None suffix)."""
+        c = QuackConfig(host="h")
+        assert c.to_adbc_kwargs() == {"uri": "quack://h"}
+
+    def test_to_adbc_kwargs_decomposed_with_port(self) -> None:
+        """Decomposed mode with port: uri rebuilt as quack://host:port."""
+        c = QuackConfig(host="h", port=1234)
+        assert c.to_adbc_kwargs() == {"uri": "quack://h:1234"}
+
+    def test_to_adbc_kwargs_token_passthrough(self) -> None:
+        """token passes through adbc.quack.token kwarg (never embedded in URI)."""
+        c = QuackConfig(host="h", token=SecretStr("tk"))  # pragma: allowlist secret
+        k = c.to_adbc_kwargs()
+        assert k["adbc.quack.token"] == "tk"  # pragma: allowlist secret
+        # Token must NOT be embedded in the URI
+        assert "tk" not in k["uri"]
+
+    def test_to_adbc_kwargs_tls_true(self) -> None:
+        """tls=True emits adbc.quack.tls = 'true'."""
+        c = QuackConfig(host="h", tls=True)
+        k = c.to_adbc_kwargs()
+        assert k["adbc.quack.tls"] == "true"
+
+    def test_to_adbc_kwargs_tls_false_omitted(self) -> None:
+        """tls=False (default) omits adbc.quack.tls key entirely (driver default)."""
+        c = QuackConfig(host="h", tls=False)
+        k = c.to_adbc_kwargs()
+        assert "adbc.quack.tls" not in k
+
+    def test_to_adbc_kwargs_token_omitted_when_none(self) -> None:
+        """token=None omits adbc.quack.token key entirely."""
+        c = QuackConfig(host="h")
+        k = c.to_adbc_kwargs()
+        assert "adbc.quack.token" not in k
+
+    def test_env_prefix_loads(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """QUACK_* env vars populate fields via env_prefix."""
+        monkeypatch.setenv("QUACK_HOST", "envhost")
+        monkeypatch.setenv("QUACK_PORT", "9999")
+        monkeypatch.setenv("QUACK_TLS", "true")
+        monkeypatch.setenv("QUACK_TOKEN", "envtok")  # pragma: allowlist secret
+        c = QuackConfig()
+        assert c.host == "envhost"
+        assert c.port == 9999
+        assert c.tls is True
+        assert c.token is not None
+        assert c.token.get_secret_value() == "envtok"  # pragma: allowlist secret
+
+    def test_pool_tuning_inherited(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """QUACK_POOL_SIZE env var sets pool_size via inherited env_prefix."""
+        monkeypatch.setenv("QUACK_POOL_SIZE", "7")
+        c = QuackConfig(host="h")
+        assert c.pool_size == 7
+
+    def test_satisfies_warehouse_config_protocol(self) -> None:
+        """QuackConfig satisfies the WarehouseConfig structural Protocol."""
+        from adbc_poolhouse._base_config import WarehouseConfig as _WC
+
+        assert isinstance(QuackConfig(host="h"), _WC)
