@@ -42,15 +42,11 @@ One config in, one pool out — `create_pool(SnowflakeConfig(...))` returns a re
 - ✓ WarehouseConfig Protocol as third-party contract — v1.2.0
 - ✓ Custom backends guide with Protocol reference — v1.2.0
 - ✓ Semi-integration tests for all 12 backends — v1.2.0
+- ✓ `QuackConfig` backend for `adbc-driver-quack` (URI + decomposed host/port + token + tls), plus guide, configuration table, index listing, mkdocs nav — v1.3.0 (Phase 21, 2026-05-19)
 
 ### Active
 
-**Milestone v1.3.0 — Quack Backend:**
-- [ ] **QUACK-01**: User can import `QuackConfig` from `adbc_poolhouse`
-- [ ] **QUACK-02**: User can construct `QuackConfig(uri="quack://host:port")` with optional `token` and `tls` fields
-- [ ] **QUACK-03**: `create_pool(QuackConfig(...))` returns a pooled connection via the `adbc_driver_quack` driver
-- [ ] **QUACK-04**: Semi-integration test verifies pool creation against a mocked driver target
-- [ ] **QUACK-05**: Per-warehouse guide page in docs, plus configuration.md row and index.md listing
+**Milestone v1.3.0 — Quack Backend:** Complete (Phase 21 verified 2026-05-19; QUACK-01 through QUACK-18 satisfied)
 
 **Carried (externally blocked):**
 - [ ] Verify Teradata field names against real Columnar ADBC Teradata driver
@@ -85,7 +81,7 @@ Two concrete consumers:
 
 Integration tests use pytest-adbc-replay cassettes (VCR-style record/replay) for Snowflake and Databricks — CI runs without credentials.
 
-241 tests passing.
+265 tests passing (241 from v1.2.0 baseline + 24 new in Phase 21 for QuackConfig).
 
 ## Constraints
 
