@@ -59,3 +59,29 @@ class TestDbApiModuleSignatureDispatch:
             cursor.close()
         finally:
             conn.close()
+
+    def test_family_a_prime_pops_uri_when_required_positional(self) -> None:
+        """Family A' (Quack/Postgres/FlightSQL): required-positional uri + db_kwargs."""
+        call_record: dict[str, Any] = {}
+
+        # Real function with the affected signature shape: required-positional
+        # `uri` (no default), keyword-only `db_kwargs`.
+        def connect(uri: str, *, db_kwargs: dict[str, str] | None = None) -> MagicMock:
+            call_record["uri_positional"] = uri
+            call_record["db_kwargs"] = db_kwargs
+            return MagicMock()
+
+        mock_mod = MagicMock()
+        mock_mod.connect = connect
+
+        with patch("importlib.import_module", return_value=mock_mod):
+            create_adbc_connection(
+                "",
+                {"uri": "quack://h:1", "adbc.quack.token": "t"},
+                dbapi_module="mock_family_a_prime",
+            )
+
+        # uri was popped and passed positionally; the rest stayed in db_kwargs.
+        assert call_record["uri_positional"] == "quack://h:1"
+        assert call_record["db_kwargs"] == {"adbc.quack.token": "t"}
+        assert "uri" not in (call_record["db_kwargs"] or {})

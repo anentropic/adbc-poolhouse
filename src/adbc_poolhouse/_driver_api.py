@@ -43,10 +43,16 @@ def create_adbc_connection(
     When ``dbapi_module`` is provided, the connection is created through that
     driver's own ``.dbapi.connect()`` instead of routing through
     ``adbc_driver_manager.dbapi``. The function introspects the target
-    module's ``connect()`` signature to handle two distinct families:
+    module's ``connect()`` signature to handle three distinct shapes:
 
-    - **Family A** (Snowflake, PostgreSQL, BigQuery, FlightSQL): accepts a
-      ``db_kwargs`` parameter -- called as ``connect(db_kwargs=kwargs)``.
+    - **Family A** (Snowflake, BigQuery): accepts a ``db_kwargs`` parameter
+      and either has no ``uri`` parameter or ``uri`` has a default --
+      called as ``connect(db_kwargs=kwargs)``.
+    - **Family A'** (PostgreSQL, FlightSQL, Quack): accepts ``db_kwargs``
+      AND declares ``uri`` as a required positional (no default). The
+      dispatcher pops ``"uri"`` from ``kwargs`` and calls
+      ``connect(uri_val, db_kwargs=kwargs)``. ``db_kwargs`` is always passed
+      by name because some of these drivers declare it KEYWORD_ONLY.
     - **Family B** (DuckDB, SQLite): no ``db_kwargs`` parameter -- called as
       ``connect(**kwargs)`` with kwargs unpacked directly.
 
@@ -86,9 +92,22 @@ def create_adbc_connection(
     if dbapi_module is not None:
         mod = importlib.import_module(dbapi_module)
         sig = inspect.signature(mod.connect)  # type: ignore[reportUnknownMemberType]
-        if "db_kwargs" in sig.parameters:
-            conn = mod.connect(db_kwargs=kwargs)  # type: ignore[no-any-return]
+        params = sig.parameters
+        if "db_kwargs" in params:
+            uri_param = params.get("uri")
+            if uri_param is not None and uri_param.default is inspect.Parameter.empty:
+                # Family A' (PostgreSQL / FlightSQL / Quack): uri is required-positional.
+                # Pop "uri" out of kwargs and pass positionally; remaining keys ride as
+                # db_kwargs=. db_kwargs is passed by name because Quack declares it
+                # KEYWORD_ONLY. KeyError from the pop is intentional — fail loud on a
+                # config-shape mismatch rather than silently mis-dispatching.
+                uri_val = kwargs.pop("uri")
+                conn = mod.connect(uri_val, db_kwargs=kwargs)  # type: ignore[no-any-return]
+            else:
+                # Family A (Snowflake / BigQuery): uri optional or absent.
+                conn = mod.connect(db_kwargs=kwargs)  # type: ignore[no-any-return]
         else:
+            # Family B (DuckDB / SQLite): no db_kwargs parameter.
             conn = mod.connect(**kwargs)  # type: ignore[no-any-return]
         return conn  # type: ignore[return-value]
 
