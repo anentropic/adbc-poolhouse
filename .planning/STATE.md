@@ -1,47 +1,50 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.2
-milestone_name: Plugin/Extensibility API
-status: completed
-stopped_at: Milestone v1.2.0 archived
-last_updated: "2026-03-15T23:00:00.000Z"
-last_activity: 2026-03-15 — Milestone v1.2.0 archived
+milestone: v1.3
+milestone_name: Quack Backend
+status: defining_requirements
+stopped_at: ""
+last_updated: "2026-05-19T00:00:00.000Z"
+last_activity: 2026-05-19 — Milestone v1.3.0 started
 progress:
-  total_phases: 6
-  completed_phases: 6
-  total_plans: 17
-  completed_plans: 17
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-03-15)
+See: .planning/PROJECT.md (updated 2026-05-19)
 
 **Core value:** One config in, one pool out — `create_pool(SnowflakeConfig(...))` returns a ready-to-use SQLAlchemy QueuePool in a single call.
-**Current focus:** Planning next milestone
+**Current focus:** Defining requirements for v1.3.0 (Quack Backend)
 
 ## Current Position
 
-Milestone: v1.2.0 — Plugin/Extensibility API (SHIPPED 2026-03-15)
-All phases complete (16-20). Milestone archived.
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-05-19 — Milestone v1.3.0 started
 
 ## Accumulated Context
 
 ### Decisions
 
-All v1.2.0 decisions recorded in PROJECT.md Key Decisions table.
+All v1.0.0–v1.2.0 decisions recorded in PROJECT.md Key Decisions table.
 
 ### Roadmap Evolution
 
 - 20 phases completed across v1.0.0 and v1.2.0 milestones
 - v1.2.0 underwent architectural pivot: registry → self-describing configs
+- v1.3.0 follows established phase-per-backend pattern
 
 ### Blockers/Concerns
 
-None — milestone shipped.
+None — adbc-driver-quack is alpha (v0.1.0-alpha.1); document alpha status and pin lower bound carefully.
 
 ### Quick Tasks Completed
 
@@ -51,6 +54,6 @@ None — milestone shipped.
 
 ## Session Continuity
 
-Last session: 2026-03-15
-Stopped at: Milestone v1.2.0 archived
-Next step: `/gsd:new-milestone` to start next milestone
+Last session: 2026-05-19
+Stopped at: Milestone v1.3.0 started — defining requirements
+Next step: `/gsd-plan-phase [N]` after roadmap created

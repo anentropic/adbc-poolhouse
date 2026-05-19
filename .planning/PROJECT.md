@@ -2,7 +2,17 @@
 
 ## What This Is
 
-A focused Python library that takes a typed warehouse configuration and returns a pooled ADBC connection. Supports 12 warehouse backends (DuckDB, Snowflake, BigQuery, PostgreSQL, FlightSQL, Databricks, Redshift, Trino, MSSQL, SQLite, MySQL, ClickHouse) with both PyPI and Foundry driver detection. Published to PyPI as `adbc-poolhouse`.
+A focused Python library that takes a typed warehouse configuration and returns a pooled ADBC connection. Supports 13 warehouse backends (DuckDB, Snowflake, BigQuery, PostgreSQL, FlightSQL, Databricks, Redshift, Trino, MSSQL, SQLite, MySQL, ClickHouse, Quack) with both PyPI and Foundry driver detection. Published to PyPI as `adbc-poolhouse`.
+
+## Current Milestone: v1.3.0 Quack Backend
+
+**Goal:** Add `QuackConfig` warehouse backend for `adbc-driver-quack` (DuckDB remote/Quack protocol).
+
+**Target features:**
+- `QuackConfig` class implementing the `WarehouseConfig` Protocol (URI + optional token + TLS)
+- Driver detection via PyPI path (`adbc_driver_quack`)
+- Semi-integration test with conditional mock target
+- Documentation: per-warehouse guide, configuration.md row, index.md listing
 
 ## Core Value
 
@@ -35,6 +45,14 @@ One config in, one pool out — `create_pool(SnowflakeConfig(...))` returns a re
 
 ### Active
 
+**Milestone v1.3.0 — Quack Backend:**
+- [ ] **QUACK-01**: User can import `QuackConfig` from `adbc_poolhouse`
+- [ ] **QUACK-02**: User can construct `QuackConfig(uri="quack://host:port")` with optional `token` and `tls` fields
+- [ ] **QUACK-03**: `create_pool(QuackConfig(...))` returns a pooled connection via the `adbc_driver_quack` driver
+- [ ] **QUACK-04**: Semi-integration test verifies pool creation against a mocked driver target
+- [ ] **QUACK-05**: Per-warehouse guide page in docs, plus configuration.md row and index.md listing
+
+**Carried (externally blocked):**
 - [ ] Verify Teradata field names against real Columnar ADBC Teradata driver
 - [ ] Live integration tests for non-DuckDB, non-Snowflake backends (blocked on test account availability)
 - [ ] Async pool support (blocked on ADBC adding async dbapi interface)
@@ -97,5 +115,22 @@ Integration tests use pytest-adbc-replay cassettes (VCR-style record/replay) for
 | `_create_pool_impl()` shared helper | Avoids overload forwarding issues between `managed_pool()` and `create_pool()` | ✓ Good — single implementation, three call patterns |
 | Direct `to_adbc_kwargs()` over aliases | Field-to-key mappings too divergent for Pydantic alias approach | ✓ Good — explicit, readable, correct |
 
+## Evolution
+
+This document evolves at phase transitions and milestone boundaries.
+
+**After each phase transition** (via `/gsd-transition`):
+1. Requirements invalidated? → Move to Out of Scope with reason
+2. Requirements validated? → Move to Validated with phase reference
+3. New requirements emerged? → Add to Active
+4. Decisions to log? → Add to Key Decisions
+5. "What This Is" still accurate? → Update if drifted
+
+**After each milestone** (via `/gsd-complete-milestone`):
+1. Full review of all sections
+2. Core Value check — still the right priority?
+3. Audit Out of Scope — reasons still valid?
+4. Update Context with current state
+
 ---
-*Last updated: 2026-03-15 after v1.2.0 milestone*
+*Last updated: 2026-05-19 after starting v1.3.0 milestone*
