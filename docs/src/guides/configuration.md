@@ -20,6 +20,7 @@ Each config class reads its fields from environment variables with a prefix matc
 | [`MSSQLConfig`][adbc_poolhouse.MSSQLConfig] | `MSSQL_` |
 | [`ClickHouseConfig`][adbc_poolhouse.ClickHouseConfig] | `CLICKHOUSE_` |
 | [`MySQLConfig`][adbc_poolhouse.MySQLConfig] | `MYSQL_` |
+| [`QuackConfig`][adbc_poolhouse.QuackConfig] | `QUACK_` |
 
 For example, setting `SNOWFLAKE_ACCOUNT=myorg-myaccount` in the environment is equivalent to passing `account="myorg-myaccount"` to `SnowflakeConfig(...)`.
 
