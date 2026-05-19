@@ -2,10 +2,15 @@
 
 ## Milestones
 
+- 🚧 **v1.3.0 Quack Backend** — Phase 21 (in progress)
 - ✅ **v1.2.0 Plugin/Extensibility API** — Phases 16-20 (shipped 2026-03-15)
 - ✅ **v1.0.0 MVP + Backend Expansion** — Phases 1-15 (shipped 2026-03-07)
 
 ## Phases
+
+### v1.3.0 Quack Backend
+
+- [ ] **Phase 21: Quack Backend** — Add `QuackConfig` (config + tests + docs) for `adbc-driver-quack`
 
 <details>
 <summary>✅ v1.2.0 Plugin/Extensibility API (Phases 16-20) — SHIPPED 2026-03-15</summary>
@@ -40,10 +45,28 @@
 
 </details>
 
+## Phase Details
+
+### Phase 21: Quack Backend
+**Goal**: Users can configure and pool connections to a Quack server via `QuackConfig`, with documentation matching the established per-backend pattern.
+**Depends on**: Phase 20 (self-describing config architecture and Protocol contract from v1.2.0)
+**Milestone**: v1.3.0
+**Requirements**: QUACK-01, QUACK-02, QUACK-03, QUACK-04, QUACK-05, QUACK-06, QUACK-07, QUACK-08, QUACK-09, QUACK-10, QUACK-11, QUACK-12, QUACK-13, QUACK-14, QUACK-15, QUACK-16, QUACK-17, QUACK-18
+**Success Criteria** (what must be TRUE):
+  1. User can `from adbc_poolhouse import QuackConfig` and construct it with either a `uri="quack://host:port"` OR decomposed `host`/`port` fields, plus optional `token` (SecretStr) and `tls` (bool)
+  2. User who passes both `uri` and `host`, or neither, gets a Pydantic validation error at construction time (mutual exclusion enforced)
+  3. `create_pool(QuackConfig(...))` returns a working `QueuePool` via the existing self-describing dispatch — no changes to `_pool_factory` required — using the `adbc_driver_quack` PyPI driver
+  4. `pip install adbc-poolhouse[quack]` installs `adbc-driver-quack>=0.1.0a1` and the Quack backend is then usable
+  5. User can read a per-warehouse guide at `docs/src/guides/quack.md` (linked in `mkdocs.yml` nav, listed on `index.md`, and shown in the `configuration.md` table) with alpha-status warning and external project link, and `uv run mkdocs build --strict` passes
+  6. Unit tests cover URI/host/port/token/tls validation paths, the semi-integration test verifies pool creation against a conditional mock target, and all 241 existing tests continue to pass
+**Plans**: TBD
+**UI hint**: no
+
 ## Progress
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
+| 21. Quack Backend | v1.3.0 | 0/0 | Not started | - |
 | 16. Driver Import Semi-Integration Tests | v1.2.0 | 2/2 | Complete | 2026-03-12 |
 | 17. Registry Infrastructure | v1.2.0 | 2/2 | Complete | 2026-03-12 |
 | 17.5. Translator Consolidation | v1.2.0 | 5/5 | Complete | 2026-03-14 |

@@ -2,12 +2,13 @@
 gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: Quack Backend
-status: defining_requirements
+status: planning
 stopped_at: ""
 last_updated: "2026-05-19T00:00:00.000Z"
-last_activity: 2026-05-19 — Milestone v1.3.0 started
+last_activity: 2026-05-19 — Roadmap created for v1.3.0 (Phase 21)
+current_phase: 21
 progress:
-  total_phases: 0
+  total_phases: 1
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -21,14 +22,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-19)
 
 **Core value:** One config in, one pool out — `create_pool(SnowflakeConfig(...))` returns a ready-to-use SQLAlchemy QueuePool in a single call.
-**Current focus:** Defining requirements for v1.3.0 (Quack Backend)
+**Current focus:** v1.3.0 — Quack Backend (Phase 21)
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: 21 — Quack Backend (not started)
 Plan: —
-Status: Defining requirements
-Last activity: 2026-05-19 — Milestone v1.3.0 started
+Status: Roadmap complete; awaiting phase planning
+Last activity: 2026-05-19 — Roadmap created for v1.3.0 (Phase 21)
 
 ## Accumulated Context
 
@@ -36,11 +37,16 @@ Last activity: 2026-05-19 — Milestone v1.3.0 started
 
 All v1.0.0–v1.2.0 decisions recorded in PROJECT.md Key Decisions table.
 
+v1.3.0 roadmap decisions:
+- Single combined Phase 21 (config + tests + docs) rather than splitting into separate implementation and documentation phases — follows v1.0.0 retrospective lesson "Every new backend should update all three doc surfaces in the same plan, not as a separate phase"
+- Phase numbering continues from v1.2.0's Phase 20 (monotonic across milestones, per v1.2.0 lesson)
+- Mirrors single-phase backend pattern of Phase 10 (SQLite) and Phase 12 (ClickHouse) from v1.0.0
+
 ### Roadmap Evolution
 
 - 20 phases completed across v1.0.0 and v1.2.0 milestones
 - v1.2.0 underwent architectural pivot: registry → self-describing configs
-- v1.3.0 follows established phase-per-backend pattern
+- v1.3.0 follows established phase-per-backend pattern — single combined phase for the small Quack surface
 
 ### Blockers/Concerns
 
@@ -55,5 +61,5 @@ None — adbc-driver-quack is alpha (v0.1.0-alpha.1); document alpha status and 
 ## Session Continuity
 
 Last session: 2026-05-19
-Stopped at: Milestone v1.3.0 started — defining requirements
-Next step: `/gsd-plan-phase [N]` after roadmap created
+Stopped at: Roadmap created for v1.3.0 — Phase 21 ready for planning
+Next step: `/gsd-plan-phase 21`

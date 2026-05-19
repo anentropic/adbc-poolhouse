@@ -56,33 +56,34 @@ None deferred for this milestone — Quack surface is small and fully addressed.
 
 ## Traceability
 
-To be populated by roadmapper.
+All v1.3 requirements consolidated into Phase 21 (Quack Backend) per v1.0.0 retrospective lesson — single backend addition with config + tests + docs in one phase.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| QUACK-01 | Phase ? | Pending |
-| QUACK-02 | Phase ? | Pending |
-| QUACK-03 | Phase ? | Pending |
-| QUACK-04 | Phase ? | Pending |
-| QUACK-05 | Phase ? | Pending |
-| QUACK-06 | Phase ? | Pending |
-| QUACK-07 | Phase ? | Pending |
-| QUACK-08 | Phase ? | Pending |
-| QUACK-09 | Phase ? | Pending |
-| QUACK-10 | Phase ? | Pending |
-| QUACK-11 | Phase ? | Pending |
-| QUACK-12 | Phase ? | Pending |
-| QUACK-13 | Phase ? | Pending |
-| QUACK-14 | Phase ? | Pending |
-| QUACK-15 | Phase ? | Pending |
-| QUACK-16 | Phase ? | Pending |
-| QUACK-17 | Phase ? | Pending |
-| QUACK-18 | Phase ? | Pending |
+| QUACK-01 | Phase 21 | Pending |
+| QUACK-02 | Phase 21 | Pending |
+| QUACK-03 | Phase 21 | Pending |
+| QUACK-04 | Phase 21 | Pending |
+| QUACK-05 | Phase 21 | Pending |
+| QUACK-06 | Phase 21 | Pending |
+| QUACK-07 | Phase 21 | Pending |
+| QUACK-08 | Phase 21 | Pending |
+| QUACK-09 | Phase 21 | Pending |
+| QUACK-10 | Phase 21 | Pending |
+| QUACK-11 | Phase 21 | Pending |
+| QUACK-12 | Phase 21 | Pending |
+| QUACK-13 | Phase 21 | Pending |
+| QUACK-14 | Phase 21 | Pending |
+| QUACK-15 | Phase 21 | Pending |
+| QUACK-16 | Phase 21 | Pending |
+| QUACK-17 | Phase 21 | Pending |
+| QUACK-18 | Phase 21 | Pending |
 
 **Coverage:**
 - v1.3 requirements: 18 total
-- Mapped to phases: 0
-- Unmapped: 18 ⚠️ (will be mapped by roadmapper)
+- Mapped to phases: 18 ✓
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-05-19*
+*Traceability populated: 2026-05-19*
