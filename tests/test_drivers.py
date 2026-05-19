@@ -25,6 +25,7 @@ from adbc_poolhouse._flightsql_config import FlightSQLConfig
 from adbc_poolhouse._mssql_config import MSSQLConfig
 from adbc_poolhouse._mysql_config import MySQLConfig
 from adbc_poolhouse._postgresql_config import PostgreSQLConfig
+from adbc_poolhouse._quack_config import QuackConfig
 from adbc_poolhouse._redshift_config import RedshiftConfig
 from adbc_poolhouse._snowflake_config import SnowflakeConfig
 from adbc_poolhouse._sqlite_config import SQLiteConfig
@@ -105,6 +106,25 @@ class TestPyPIDriverPath:
             result = SQLiteConfig()._driver_path()
         assert result == "adbc_driver_sqlite"
 
+    def test_quack_found_returns_driver_path(self) -> None:
+        """find_spec returns a spec -> import pkg and call _driver_path()."""
+        config = QuackConfig(host="h")
+        mock_spec = MagicMock()
+        mock_pkg = MagicMock()
+        mock_pkg.__dict__ = {"_driver_path": lambda: "/path/to/adbc_driver_quack.so"}
+        with (
+            patch("importlib.util.find_spec", return_value=mock_spec),
+            patch("builtins.__import__", return_value=mock_pkg),
+        ):
+            result = config._driver_path()
+        assert result == "/path/to/adbc_driver_quack.so"
+
+    def test_quack_missing_returns_package_name(self) -> None:
+        """find_spec None -> returns 'adbc_driver_quack' for manifest fallback."""
+        with patch("importlib.util.find_spec", return_value=None):
+            result = QuackConfig(host="h")._driver_path()
+        assert result == "adbc_driver_quack"
+
 
 class TestPyPIDbApiModule:
     """Tests for config._dbapi_module() on PyPI-installed drivers."""
@@ -146,6 +166,30 @@ class TestPyPIDbApiModule:
     def test_sqlite_dbapi_module_always_none(self) -> None:
         """SQLite returns None -- incompatible dbapi signature."""
         assert SQLiteConfig()._dbapi_module() is None
+
+    def test_quack_installed_returns_dbapi_module(self) -> None:
+        """Quack returns dbapi module name when driver package is installed."""
+        mock_spec = MagicMock()
+        with patch("importlib.util.find_spec", return_value=mock_spec):
+            result = QuackConfig(host="h")._dbapi_module()
+        assert result == "adbc_driver_quack.dbapi"
+
+    def test_quack_not_installed_returns_none(self) -> None:
+        """Quack returns None when driver package is not installed."""
+        with patch("importlib.util.find_spec", return_value=None):
+            result = QuackConfig(host="h")._dbapi_module()
+        assert result is None
+
+
+def test_quack_returns_short_name() -> None:
+    """PyPI: Quack returns 'adbc_driver_quack' when driver package is missing.
+
+    Per 21-VALIDATION.md row 21-02-03 — mirrors test_clickhouse_returns_short_name
+    pattern but for the PyPI-distributed Quack driver. Uses find_spec patching
+    (not a static string) because Quack is a PyPI driver, not a Foundry one.
+    """
+    with patch("importlib.util.find_spec", return_value=None):
+        assert QuackConfig(host="h")._driver_path() == "adbc_driver_quack"
 
 
 class TestFoundryDriverPath:
