@@ -88,3 +88,21 @@
 | 13. Verification and Tracking Fix | v1.0.0 | 2/2 | Complete | 2026-03-02 |
 | 14. Homepage Discovery Fix | v1.0.0 | 1/1 | Complete | 2026-03-02 |
 | 15. Replace Syrupy with pytest-adbc-replay | v1.0.0 | 5/5 | Complete | 2026-03-07 |
+
+### Phase 21.1: ADBC dispatch URI-positional fix (INSERTED)
+
+**Goal**: `create_pool()` returns a working `QueuePool` for every PyPI-driver backend (Quack, Postgres, FlightSQL) when the matching driver is installed — fixing the `TypeError: connect() missing 1 required positional argument: 'uri'` that breaks the documented quickstart.
+**Depends on**: Phase 21 (Quack backend ships the surface that surfaced the bug)
+**Milestone**: v1.3.0 (gap closure)
+**Requirements**: DISP-01, DISP-02, DISP-03, DISP-04, DISP-05, DISP-06, DISP-07, DISP-08, DISP-09, DISP-10, DISP-11
+**Success Criteria** (what must be TRUE):
+  1. `_driver_api.create_adbc_connection` correctly dispatches to PyPI driver `connect()` functions whose signature has a required-positional `uri` AND `db_kwargs` in parameters — by popping `"uri"` from kwargs and passing it positionally
+  2. `create_pool(QuackConfig(uri="quack://..."))` returns a working `QueuePool` when `adbc-driver-quack` is installed (closes Phase 21 QUACK-08 gap)
+  3. `create_pool(PostgreSQLConfig(uri="postgresql://..."))` returns a working `QueuePool` when `adbc-driver-postgresql` is installed (latent v1.0.0 bug)
+  4. `create_pool(FlightSQLConfig(uri="grpc://..."))` returns a working `QueuePool` when `adbc-driver-flightsql` is installed (latent v1.0.0 bug)
+  5. Test mocks for Quack, Postgres, and FlightSQL imports use a signature-preserving stub so this regression class is caught by CI in future
+  6. A dedicated `tests/test_driver_api.py` unit test exercises the new uri-positional dispatch branch against a fake module
+  7. Duplicate `test_quack_returns_short_name` removed (ultrareview bug_005)
+  8. All existing tests continue to pass; `uv run mkdocs build --strict` passes; humanizer pass applied to new prose
+**Plans**: TBD
+**UI hint**: no

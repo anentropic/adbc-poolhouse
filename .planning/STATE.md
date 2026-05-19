@@ -47,6 +47,7 @@ v1.3.0 roadmap decisions:
 - 20 phases completed across v1.0.0 and v1.2.0 milestones
 - v1.2.0 underwent architectural pivot: registry → self-describing configs
 - v1.3.0 follows established phase-per-backend pattern — single combined phase for the small Quack surface
+- Phase 21.1 inserted after Phase 21: ADBC dispatch URI-positional fix (URGENT) — /ultrareview surfaced a `TypeError` in `_driver_api.create_adbc_connection` that breaks `create_pool(QuackConfig(...))` and latently also `create_pool(PostgreSQLConfig(...))` and `create_pool(FlightSQLConfig(...))` when their PyPI drivers are installed; closes the Phase 21 QUACK-08 verification gap and fixes pre-existing bugs from v1.0.0
 
 ### Blockers/Concerns
 

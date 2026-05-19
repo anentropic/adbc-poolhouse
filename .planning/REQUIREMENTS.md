@@ -41,6 +41,33 @@ Add `QuackConfig` warehouse backend for `adbc-driver-quack` (DuckDB Quack remote
 - [ ] **QUACK-17**: `mkdocs.yml` nav adds `guides/quack.md` entry
 - [ ] **QUACK-18**: `uv run mkdocs build --strict` passes; humanizer pass applied to new prose
 
+## v1.3.1 Requirements (Phase 21.1 — ADBC dispatch URI-positional fix)
+
+Surfaced by `/ultrareview` of Phase 21: `create_pool()` raises `TypeError: connect() missing 1 required positional argument: 'uri'` for any PyPI driver whose `connect()` declares `uri` as a required positional AND has `db_kwargs` in its signature. Affects Quack (Phase 21), Postgres (latent since v1.0.0), and FlightSQL (latent since v1.0.0). Closes the Phase 21 QUACK-08 verification gap.
+
+### Dispatch fix
+
+- [ ] **DISP-01**: `_driver_api.create_adbc_connection` detects when the target `connect()` signature has a required-positional `uri` parameter (no default) AND `db_kwargs` in parameters, and in that case pops `"uri"` from kwargs to pass positionally: `mod.connect(uri_val, db_kwargs=kwargs)`
+- [ ] **DISP-02**: All other signature shapes continue to work unchanged (Snowflake optional-uri, BigQuery no-uri, SQLite no-db_kwargs)
+
+### Verified happy paths
+
+- [ ] **DISP-03**: `create_pool(QuackConfig(uri="quack://h:p"))` returns a working `QueuePool` when `adbc-driver-quack` is installed
+- [ ] **DISP-04**: `create_pool(PostgreSQLConfig(uri="postgresql://..."))` returns a working `QueuePool` when `adbc-driver-postgresql` is installed
+- [ ] **DISP-05**: `create_pool(FlightSQLConfig(uri="grpc://..."))` returns a working `QueuePool` when `adbc-driver-flightsql` is installed
+
+### Test hardening
+
+- [ ] **DISP-06**: `TestQuackImports`, `TestPostgreSQLImports`, and `TestFlightSQLImports` patch `dbapi.connect` with a signature-preserving stub (not bare `MagicMock`) so future regressions of this class are caught
+- [ ] **DISP-07**: Add a dispatch-level unit test in `tests/test_driver_api.py` exercising the new uri-positional branch against a faked module with the affected signature shape
+- [ ] **DISP-08**: Delete the duplicate `test_quack_returns_short_name` at `tests/test_drivers.py` (identical to the in-class `TestPyPIDriverPath::test_quack_missing_returns_package_name`) — `/ultrareview` bug_005
+- [ ] **DISP-09**: All existing tests continue to pass (current count: 265, post-21)
+
+### Documentation
+
+- [ ] **DISP-10**: `docs/src/guides/custom-backends.md` updated with a brief note explaining the `_dbapi_module()` dispatch contract — when to return a module path vs `None` — so third-party backend authors don't hit the same trap
+- [ ] **DISP-11**: `uv run mkdocs build --strict` passes; humanizer pass on any new prose
+
 ## Future Requirements
 
 None deferred for this milestone — Quack surface is small and fully addressed.
@@ -56,7 +83,7 @@ None deferred for this milestone — Quack surface is small and fully addressed.
 
 ## Traceability
 
-All v1.3 requirements consolidated into Phase 21 (Quack Backend) per v1.0.0 retrospective lesson — single backend addition with config + tests + docs in one phase.
+v1.3 requirements consolidated into Phase 21 (Quack Backend) per v1.0.0 retrospective lesson — single backend addition with config + tests + docs in one phase. DISP-* requirements added in Phase 21.1 to close the QUACK-08 verification gap (signature-shape regression).
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
@@ -78,10 +105,21 @@ All v1.3 requirements consolidated into Phase 21 (Quack Backend) per v1.0.0 retr
 | QUACK-16 | Phase 21 | Pending |
 | QUACK-17 | Phase 21 | Pending |
 | QUACK-18 | Phase 21 | Pending |
+| DISP-01 | Phase 21.1 | Pending |
+| DISP-02 | Phase 21.1 | Pending |
+| DISP-03 | Phase 21.1 | Pending |
+| DISP-04 | Phase 21.1 | Pending |
+| DISP-05 | Phase 21.1 | Pending |
+| DISP-06 | Phase 21.1 | Pending |
+| DISP-07 | Phase 21.1 | Pending |
+| DISP-08 | Phase 21.1 | Pending |
+| DISP-09 | Phase 21.1 | Pending |
+| DISP-10 | Phase 21.1 | Pending |
+| DISP-11 | Phase 21.1 | Pending |
 
 **Coverage:**
-- v1.3 requirements: 18 total
-- Mapped to phases: 18 ✓
+- v1.3 requirements: 29 total (18 QUACK + 11 DISP)
+- Mapped to phases: 29 ✓
 - Unmapped: 0
 
 ---
