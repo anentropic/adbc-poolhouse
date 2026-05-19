@@ -17,6 +17,7 @@ dependencies = [
 duckdb = ["duckdb>=0.9.1"]
 snowflake = ["adbc-driver-snowflake>=1.0.0"]
 postgresql = ["adbc-driver-postgresql>=1.0.0"]
+quack = ["adbc-driver-quack>=0.1.0a1"]
 flightsql = ["adbc-driver-flightsql>=1.0.0"]
 bigquery = ["adbc-driver-bigquery>=1.3.0"]
 sqlite = ["adbc-driver-sqlite>=1.0.0"]
@@ -24,6 +25,7 @@ all = [
     "adbc-poolhouse[duckdb]",
     "adbc-poolhouse[snowflake]",
     "adbc-poolhouse[postgresql]",
+    "adbc-poolhouse[quack]",
     "adbc-poolhouse[flightsql]",
     "adbc-poolhouse[bigquery]",
     "adbc-poolhouse[sqlite]",
