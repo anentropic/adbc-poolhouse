@@ -116,19 +116,19 @@ wheels = [
 
 [[package]]
 name = "adbc-driver-sqlite"
-version = "1.10.0"
+version = "1.11.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "adbc-driver-manager" },
     { name = "importlib-resources" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/72/34/f4924d98a340835988f135303c7e562f7a388308a3fbb949f357bcb94b04/adbc_driver_sqlite-1.10.0.tar.gz", hash = "sha256:064ed5f1372578d2063cd920514cd2597c6a6db3b0163c2116e373faeedffec6", size = 18298, upload-time = "2026-01-09T07:13:49.001Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/3a/dd/8a5f4908aa4bdec64dcd672734fa314d692517458ce169591639d0123fe1/adbc_driver_sqlite-1.11.0.tar.gz", hash = "sha256:a4c6b4962610f7cd67cd754c42dd74e18a2c11fabeec9488c5501d73ae62dc62", size = 28885, upload-time = "2026-04-07T00:17:31.325Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/d1/d0/e7b0632d3098a209a4700cf75e69dcecfea8e4de369b2b07431a10195234/adbc_driver_sqlite-1.10.0-py3-none-macosx_10_15_x86_64.whl", hash = "sha256:ebef54331c006a42adbe0510ae0f9b3a37fd5e1819214e875fe36a72ce7bf883", size = 1051483, upload-time = "2026-01-09T07:13:34.252Z" },
-    { url = "https://files.pythonhosted.org/packages/c8/a5/968f2031dd97b7907ccfd90b28de3629ce7f31cfd8041e1f509cb1e30a28/adbc_driver_sqlite-1.10.0-py3-none-macosx_11_0_arm64.whl", hash = "sha256:1de3fb50a3a4bcad1b097d3805b41681226a5c35ccc625637a8dfb87fc4123c1", size = 1030203, upload-time = "2026-01-09T07:13:36.149Z" },
-    { url = "https://files.pythonhosted.org/packages/c0/f0/71d53fc347b3a598c3f1f562aad7be1e4548c55c06ebda7c6e1ae04f7695/adbc_driver_sqlite-1.10.0-py3-none-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:1f8fa45ca274502e145a0fd43af5253f508fe2c17e82857a898392abeb577588", size = 1139328, upload-time = "2026-01-09T07:13:37.837Z" },
-    { url = "https://files.pythonhosted.org/packages/bc/88/7f900b29099764307d1c9816c30b05d0076df120a7ca57c759b3a7a5e82b/adbc_driver_sqlite-1.10.0-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:435cbf57c42e6c57762f6998041a8129ddf7a3f0b407712cbb62d46e0729a450", size = 1158802, upload-time = "2026-01-09T07:13:40.612Z" },
-    { url = "https://files.pythonhosted.org/packages/91/46/bea7cfb4b0779ff67a40833c652b15e702c9e5d1232aff96e577211eb60d/adbc_driver_sqlite-1.10.0-py3-none-win_amd64.whl", hash = "sha256:c6adfb5a934cd1573076fdd71b03492140c8563b6a0d9d2d46c7e718e736b3e0", size = 960435, upload-time = "2026-01-09T07:13:42.333Z" },
+    { url = "https://files.pythonhosted.org/packages/fe/5b/f03b0b654abb679066da022d064b083752d3df6b4e0c9e8f451a1aa82f75/adbc_driver_sqlite-1.11.0-py3-none-macosx_10_15_x86_64.whl", hash = "sha256:d227ab10a56b0b5f106d9f85f3f8bce8b75c2b34a28ad962b71e8a3a0b6dc0ed", size = 1414587, upload-time = "2026-04-07T00:17:16.744Z" },
+    { url = "https://files.pythonhosted.org/packages/bd/f4/26da6de1ff772bfc95c2257a0d9e7b7d1d3525e5170f6d67d715138e6690/adbc_driver_sqlite-1.11.0-py3-none-macosx_11_0_arm64.whl", hash = "sha256:98fd35e14c85e44eeffae1ef9a56466169719ad7bd15e314c2ff88c342e50d9d", size = 1362696, upload-time = "2026-04-07T00:17:18.821Z" },
+    { url = "https://files.pythonhosted.org/packages/52/aa/ab2373cdac52ebcf42fd6cc80f9cdb7b98416ff15f6cd340aa4cceaf970e/adbc_driver_sqlite-1.11.0-py3-none-manylinux_2_28_aarch64.whl", hash = "sha256:9c28401c31d775d5506ed1188b73de9f7ed1a292927157f2171c7dca67f6cb9e", size = 1501255, upload-time = "2026-04-07T00:17:20.862Z" },
+    { url = "https://files.pythonhosted.org/packages/09/05/a2dec7d6e4300f3c81b75d727007a146977f018765c8b0607ed49b28e0dd/adbc_driver_sqlite-1.11.0-py3-none-manylinux_2_28_x86_64.whl", hash = "sha256:2bcab0cfe9380c1691cf995430f8b0b56bf8b9875d8fd9d69a5aecf2b72159e6", size = 1550696, upload-time = "2026-04-07T00:17:22.833Z" },
+    { url = "https://files.pythonhosted.org/packages/0a/35/d189ce413bdeda6dae71eaa1effd96ec0a2f82ef0a1693e20a36a7082504/adbc_driver_sqlite-1.11.0-py3-none-win_amd64.whl", hash = "sha256:e41246c5bf929bb5d768227606eb10add420171134ae6ba7928136376f5842fd", size = 1378169, upload-time = "2026-04-07T00:17:24.783Z" },
 ]
 
 [[package]]
