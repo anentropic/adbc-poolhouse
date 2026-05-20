@@ -99,19 +99,19 @@ wheels = [
 
 [[package]]
 name = "adbc-driver-snowflake"
-version = "1.10.0"
+version = "1.11.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "adbc-driver-manager" },
     { name = "importlib-resources" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/70/f3/46727eead86527ae9bb05ca9b830cf18481dbe6ac1973d7abb8e81ca0cfb/adbc_driver_snowflake-1.10.0.tar.gz", hash = "sha256:56d5d6e3be86684068f86d49a66f85336b8faa9a4b520b98a122c585d007ce83", size = 20168, upload-time = "2026-01-09T07:13:47.87Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/fd/c1/561549e36abe8644bedc6b4848abb79ab41a6b0fc4b106ceef944b0c3493/adbc_driver_snowflake-1.11.0.tar.gz", hash = "sha256:7fce54ae7540c6c63aad6cc9ec2795a05647cc147c8af41ca2bd4e95455e8eae", size = 30570, upload-time = "2026-04-07T00:17:30.403Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/ff/cb/f2606741776efc4621607ff6fe565aa073b048174ef0f41dfb7d147dd7c4/adbc_driver_snowflake-1.10.0-py3-none-macosx_10_15_x86_64.whl", hash = "sha256:30237689e6930710b79dcd91fa949f713ead1fd2bb9745fc0ca2b31b876b5ec3", size = 14931557, upload-time = "2026-01-09T07:13:09.198Z" },
-    { url = "https://files.pythonhosted.org/packages/34/3b/c7e9aa0da008e321450a0c8c89875dbaa45ee12b277faa29ff7bf7e78d24/adbc_driver_snowflake-1.10.0-py3-none-macosx_11_0_arm64.whl", hash = "sha256:5d96885c7e2e291c0e8cbb98fade45d326cf08681773cce9c2f68bca8ab3dd75", size = 13395954, upload-time = "2026-01-09T07:13:12.679Z" },
-    { url = "https://files.pythonhosted.org/packages/65/d4/3323a56d0bf8fd0b78294c389d6fe441bc135e32d080892aff341b15af59/adbc_driver_snowflake-1.10.0-py3-none-manylinux1_x86_64.manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_5_x86_64.whl", hash = "sha256:d2822989e137c773c4d7fecafeb0031428379bad28e55020d01fd0ad9534daf2", size = 27112164, upload-time = "2026-01-09T07:13:16.659Z" },
-    { url = "https://files.pythonhosted.org/packages/7b/30/1fd5424b0eae94112dd81993eccf23e95a5a72d425832afbb201f68a0014/adbc_driver_snowflake-1.10.0-py3-none-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:13d47c5e8715001496095201083f6e3b8f69a79305a9e86bfe9a767d13b02916", size = 24220654, upload-time = "2026-01-09T07:13:24.533Z" },
-    { url = "https://files.pythonhosted.org/packages/3d/4a/f29fd0d5df8b9070adabf24129ee79f7aa6c5e4a1ed23120e2d68f2afb8b/adbc_driver_snowflake-1.10.0-py3-none-win_amd64.whl", hash = "sha256:dd67757909dc3aa9cdfca32c62b490d90a486ccc3f0ed8676d7b29b98dc3af2e", size = 26781446, upload-time = "2026-01-09T07:13:31.667Z" },
+    { url = "https://files.pythonhosted.org/packages/2a/f3/1125c7929faf750e7a5bdcec33ca22259ce040338dae12f75f3eb8080def/adbc_driver_snowflake-1.11.0-py3-none-macosx_10_15_x86_64.whl", hash = "sha256:5ebddfa5fc0b5cd7c86b5cce17bb578889c8db5ff2b756903b64e684b56829e8", size = 15094744, upload-time = "2026-04-07T00:16:55.86Z" },
+    { url = "https://files.pythonhosted.org/packages/d5/1d/88d564a8941607e6e555a3d3290ecb92852d4aa5a926a1cdbe86b17a8424/adbc_driver_snowflake-1.11.0-py3-none-macosx_11_0_arm64.whl", hash = "sha256:be862f8d0b6a507dae5c0644e13be79290180532c097d97c5a95a294c0bb5302", size = 13517204, upload-time = "2026-04-07T00:17:00.137Z" },
+    { url = "https://files.pythonhosted.org/packages/6f/26/baa44b8b9faaf26846dd8c0e513c7ce6862d7f35de46ee61175ac976699f/adbc_driver_snowflake-1.11.0-py3-none-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl", hash = "sha256:7c7d7ecef7246303648a08cee3d78c383133bea8f2e1568cf6e8750ab94b5a57", size = 27574063, upload-time = "2026-04-07T00:17:04.862Z" },
+    { url = "https://files.pythonhosted.org/packages/5d/41/fe557f0d8414037dfe86fcba6338eb094a51da894050ec9a4c9f4504513d/adbc_driver_snowflake-1.11.0-py3-none-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:07b5edbeb1b85be0882d7095641df26a24b3b4c2ba4d8edda35e3bbe89e70a06", size = 24767291, upload-time = "2026-04-07T00:17:09.763Z" },
+    { url = "https://files.pythonhosted.org/packages/e9/ca/542793fc9a164f013e3248061e922ac5d5246ce93718a5c0cb44bbd2219e/adbc_driver_snowflake-1.11.0-py3-none-win_amd64.whl", hash = "sha256:83b1a363a44ae4cb1e4956f9cc6c4e44dddd7c768a0f0a8b42d9cb8eb8906305", size = 27264722, upload-time = "2026-04-07T00:17:14.083Z" },
 ]
 
 [[package]]
