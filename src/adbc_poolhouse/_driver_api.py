@@ -96,15 +96,21 @@ def create_adbc_connection(
         if "db_kwargs" in params:
             uri_param = params.get("uri")
             if uri_param is not None and uri_param.default is inspect.Parameter.empty:
-                # Family A' (PostgreSQL / FlightSQL / Quack): uri is required-positional.
-                # Pop "uri" out of kwargs and pass positionally; remaining keys ride as
-                # db_kwargs=. db_kwargs is passed by name because Quack declares it
-                # KEYWORD_ONLY. KeyError from the pop is intentional — fail loud on a
-                # config-shape mismatch rather than silently mis-dispatching.
+                # Family A' — uri is a REQUIRED parameter. Pop it from kwargs and
+                # pass explicitly so the driver's signature is satisfied; remaining
+                # keys ride as db_kwargs=. KeyError from the pop is intentional —
+                # fail loud on a config-shape mismatch.
+                # db_kwargs is passed by name because Quack declares it KEYWORD_ONLY.
                 uri_val = kwargs.pop("uri")
-                conn = mod.connect(uri_val, db_kwargs=kwargs)  # type: ignore[no-any-return]
+                if uri_param.kind is inspect.Parameter.KEYWORD_ONLY:
+                    # `def connect(*, uri, db_kwargs=None)` — pass uri by name.
+                    conn = mod.connect(uri=uri_val, db_kwargs=kwargs)  # type: ignore[no-any-return]
+                else:
+                    # POSITIONAL_ONLY / POSITIONAL_OR_KEYWORD (Quack, Postgres, FlightSQL).
+                    conn = mod.connect(uri_val, db_kwargs=kwargs)  # type: ignore[no-any-return]
             else:
-                # Family A (Snowflake / BigQuery): uri optional or absent.
+                # Family A (Snowflake / BigQuery): uri optional or absent — driver
+                # picks `uri` out of db_kwargs itself if it cares.
                 conn = mod.connect(db_kwargs=kwargs)  # type: ignore[no-any-return]
         else:
             # Family B (DuckDB / SQLite): no db_kwargs parameter.

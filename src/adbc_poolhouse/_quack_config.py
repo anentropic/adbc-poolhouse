@@ -18,8 +18,8 @@ class QuackConfig(BaseWarehouseConfig):
 
     Targets the DuckDB Quack remote protocol via the
     [adbc-driver-quack](https://github.com/gizmodata/adbc-driver-quack) PyPI
-    driver. The driver is alpha (`0.1.0-alpha.1`), so install with the
-    `--pre` flag:
+    driver. The driver is on an alpha release track, so install with the
+    `--pre` flag (the version constraint is in `pyproject.toml`):
 
         pip install --pre adbc-poolhouse[quack]
 
