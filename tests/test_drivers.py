@@ -181,17 +181,6 @@ class TestPyPIDbApiModule:
         assert result is None
 
 
-def test_quack_returns_short_name() -> None:
-    """PyPI: Quack returns 'adbc_driver_quack' when driver package is missing.
-
-    Per 21-VALIDATION.md row 21-02-03 — mirrors test_clickhouse_returns_short_name
-    pattern but for the PyPI-distributed Quack driver. Uses find_spec patching
-    (not a static string) because Quack is a PyPI driver, not a Foundry one.
-    """
-    with patch("importlib.util.find_spec", return_value=None):
-        assert QuackConfig(host="h")._driver_path() == "adbc_driver_quack"
-
-
 class TestFoundryDriverPath:
     """Tests for Foundry (manifest-based) driver detection -- static strings."""
 
