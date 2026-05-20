@@ -598,18 +598,18 @@ class TestQuackConfig:
             QuackConfig()
 
     def test_port_alone_raises(self) -> None:
-        """port alone (no host, no uri) raises ValidationError."""
+        """Port alone (no host, no uri) raises ValidationError."""
         with pytest.raises(ValidationError):
             QuackConfig(port=1234)
 
     def test_uri_is_plain_str_not_secretstr(self) -> None:
-        """uri field is plain str (driver URI cannot embed credentials)."""
+        """Uri field is plain str (driver URI cannot embed credentials)."""
         c = QuackConfig(uri="quack://h")
         assert type(c.uri) is str
         assert not isinstance(c.uri, SecretStr)
 
     def test_token_is_secretstr(self) -> None:
-        """token is SecretStr — repr masking prevents leakage."""
+        """Token is SecretStr — repr masking prevents leakage."""
         c = QuackConfig(host="h", token=SecretStr("tk"))  # pragma: allowlist secret
         assert isinstance(c.token, SecretStr)
         assert "tk" not in repr(c)
@@ -630,7 +630,7 @@ class TestQuackConfig:
         assert c.to_adbc_kwargs() == {"uri": "quack://h:1234"}
 
     def test_to_adbc_kwargs_token_passthrough(self) -> None:
-        """token passes through adbc.quack.token kwarg (never embedded in URI)."""
+        """Token passes through adbc.quack.token kwarg (never embedded in URI)."""
         c = QuackConfig(host="h", token=SecretStr("tk"))  # pragma: allowlist secret
         k = c.to_adbc_kwargs()
         assert k["adbc.quack.token"] == "tk"  # pragma: allowlist secret

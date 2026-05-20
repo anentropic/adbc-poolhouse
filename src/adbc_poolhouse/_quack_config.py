@@ -85,13 +85,9 @@ class QuackConfig(BaseWarehouseConfig):
         has_uri = self.uri is not None
         has_host = self.host is not None
         if has_uri and has_host:
-            raise ConfigurationError(
-                "QuackConfig accepts either 'uri' or 'host', not both."
-            )
+            raise ConfigurationError("QuackConfig accepts either 'uri' or 'host', not both.")
         if not has_uri and not has_host:
-            raise ConfigurationError(
-                "QuackConfig requires either 'uri' or 'host'. Got neither."
-            )
+            raise ConfigurationError("QuackConfig requires either 'uri' or 'host'. Got neither.")
         return self
 
     def _driver_path(self) -> str:
@@ -103,7 +99,8 @@ class QuackConfig(BaseWarehouseConfig):
         return None
 
     def to_adbc_kwargs(self) -> dict[str, str]:
-        """Convert config to ADBC driver connection kwargs.
+        """
+        Convert config to ADBC driver connection kwargs.
 
         Returns:
             A dict with `uri` always set. `adbc.quack.token` is included
