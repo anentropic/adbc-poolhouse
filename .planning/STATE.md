@@ -4,14 +4,14 @@ milestone: v1.3.0
 milestone_name: Quack Backend
 status: executing
 stopped_at: Roadmap created for v1.3.0 — Phase 21 ready for planning
-last_updated: "2026-05-19T22:04:37.482Z"
-last_activity: 2026-05-19
+last_updated: "2026-05-20T10:34:19.541Z"
+last_activity: 2026-05-19 -- Phase 21.1 execution started
 progress:
-  total_phases: 1
+  total_phases: 2
   completed_phases: 1
-  total_plans: 3
+  total_plans: 6
   completed_plans: 3
-  percent: 100
+  percent: 50
 ---
 
 # Project State
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-19)
 
 **Core value:** One config in, one pool out — `create_pool(SnowflakeConfig(...))` returns a ready-to-use SQLAlchemy QueuePool in a single call.
-**Current focus:** Phase 21 — Quack Backend
+**Current focus:** Phase 21.1 — adbc-dispatch-uri-positional-fix
 
 ## Current Position
 
-Phase: 21
-Plan: Not started
-Status: Executing Phase 21
-Last activity: 2026-05-19
+Phase: 21.1 (adbc-dispatch-uri-positional-fix) — EXECUTING
+Plan: 1 of 3
+Status: Executing Phase 21.1
+Last activity: 2026-05-19 -- Phase 21.1 execution started
 
 ## Accumulated Context
 
