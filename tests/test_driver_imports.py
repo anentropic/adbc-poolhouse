@@ -15,6 +15,7 @@ Mocking strategy (per user decision in CONTEXT.md):
 from __future__ import annotations
 
 import importlib.util
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 from pydantic import SecretStr
@@ -108,22 +109,44 @@ class TestQuackImports:
     """Semi-integration test: real Quack driver import (if available), mocked connection."""
 
     def test_create_pool_wiring(self) -> None:
-        """Import real Quack driver (if installed), mock connection, assert correct kwargs."""
+        """
+        Import real Quack driver (if installed), mock connection, assert correct kwargs.
+
+        When the Quack driver is installed, this exercises the Family A' dispatch
+        branch (required-positional `uri` + keyword-only `db_kwargs`). The stub
+        below reproduces the live `adbc_driver_quack.dbapi.connect` signature
+        exactly so `inspect.signature` in `_driver_api.create_adbc_connection`
+        sees `uri` as required-positional and routes the call accordingly.
+        """
         config = QuackConfig(host="h")
         mock_conn = MagicMock()
         mock_conn.adbc_clone = MagicMock(return_value=MagicMock())
 
         if _driver_installed("adbc_driver_quack"):
-            # Driver installed: mock driver's own dbapi.connect
-            with patch(
-                "adbc_driver_quack.dbapi.connect",
-                return_value=mock_conn,
-            ) as mock_connect:
+            # Signature-preserving stub: shape matches
+            # adbc_driver_quack.dbapi.connect so the dispatcher takes Family A'.
+            captured: dict[str, Any] = {}
+
+            def stub_connect(
+                uri: str,
+                *,
+                db_kwargs: dict[str, str] | None = None,
+                conn_kwargs: dict[str, str] | None = None,
+                autocommit: bool = False,
+            ) -> MagicMock:
+                captured["uri"] = uri
+                captured["db_kwargs"] = db_kwargs
+                return mock_conn
+
+            with patch("adbc_driver_quack.dbapi.connect", new=stub_connect):
                 pool = create_pool(config)
                 pool.dispose()
 
-            mock_connect.assert_called_once()
-            assert "uri" in mock_connect.call_args.kwargs
+            # uri arrived positionally; `uri` was popped from db_kwargs.
+            assert captured["uri"] == "quack://h"
+            assert "uri" not in (captured.get("db_kwargs") or {})
+            # No token/tls set in this config, so db_kwargs is empty after pop.
+            assert captured["db_kwargs"] == {}
         else:
             # Driver not installed: mock adbc_driver_manager.dbapi.connect
             with patch(
@@ -175,21 +198,44 @@ class TestPostgreSQLImports:
     """Semi-integration test: real PostgreSQL driver import, mocked connection."""
 
     def test_create_pool_wiring(self) -> None:
-        """Import real PostgreSQL driver, mock connection, assert correct kwargs."""
-        config = PostgreSQLConfig()
+        """
+        Import real PostgreSQL driver, mock connection, assert correct kwargs.
+
+        When the PostgreSQL driver is installed, this exercises the Family A'
+        dispatch branch (required-positional `uri` + `db_kwargs`). The stub
+        reproduces the affected shape of `adbc_driver_postgresql.dbapi.connect`
+        so `inspect.signature` routes the call through the fix introduced in
+        plan 21.1-01.
+        """
+        config = PostgreSQLConfig(uri="postgresql://h:5432/db")
         mock_conn = MagicMock()
         mock_conn.adbc_clone = MagicMock(return_value=MagicMock())
 
         if _driver_installed("adbc_driver_postgresql"):
-            # Driver installed: mock driver's own dbapi.connect
-            with patch(
-                "adbc_driver_postgresql.dbapi.connect",
-                return_value=mock_conn,
-            ) as mock_connect:
+            # Signature-preserving stub: shape matches
+            # adbc_driver_postgresql.dbapi.connect closely enough that the two
+            # dispatch-detection conditions hold — `db_kwargs` in params AND
+            # `uri` is required-positional (no default).
+            captured: dict[str, Any] = {}
+
+            def stub_connect(
+                uri: str,
+                db_kwargs: dict[str, str] | None = None,
+                conn_kwargs: dict[str, str] | None = None,
+                *,
+                autocommit: bool = False,
+                **kwargs: object,
+            ) -> MagicMock:
+                captured["uri"] = uri
+                captured["db_kwargs"] = db_kwargs
+                return mock_conn
+
+            with patch("adbc_driver_postgresql.dbapi.connect", new=stub_connect):
                 pool = create_pool(config)
                 pool.dispose()
 
-            mock_connect.assert_called_once()
+            assert captured["uri"] == "postgresql://h:5432/db"
+            assert "uri" not in (captured.get("db_kwargs") or {})
         else:
             # Driver not installed: mock adbc_driver_manager.dbapi.connect
             with patch(
@@ -209,21 +255,40 @@ class TestFlightSQLImports:
     """Semi-integration test: real FlightSQL driver import, mocked connection."""
 
     def test_create_pool_wiring(self) -> None:
-        """Import real FlightSQL driver, mock connection, assert correct kwargs."""
+        """
+        Import real FlightSQL driver, mock connection, assert correct kwargs.
+
+        When the FlightSQL driver is installed, this exercises the Family A'
+        dispatch branch. The stub reproduces the affected shape of
+        `adbc_driver_flightsql.dbapi.connect` so the dispatcher pops `uri`
+        from kwargs and passes it positionally.
+        """
         config = FlightSQLConfig(uri="grpc://localhost:8815")
         mock_conn = MagicMock()
         mock_conn.adbc_clone = MagicMock(return_value=MagicMock())
 
         if _driver_installed("adbc_driver_flightsql"):
-            # Driver installed: mock driver's own dbapi.connect
-            with patch(
-                "adbc_driver_flightsql.dbapi.connect",
-                return_value=mock_conn,
-            ) as mock_connect:
+            # Signature-preserving stub: shape matches
+            # adbc_driver_flightsql.dbapi.connect closely enough for the two
+            # detection conditions to hold (db_kwargs param + required uri).
+            captured: dict[str, Any] = {}
+
+            def stub_connect(
+                uri: str,
+                db_kwargs: dict[str, str] | None = None,
+                conn_kwargs: dict[str, str] | None = None,
+                **kwargs: object,
+            ) -> MagicMock:
+                captured["uri"] = uri
+                captured["db_kwargs"] = db_kwargs
+                return mock_conn
+
+            with patch("adbc_driver_flightsql.dbapi.connect", new=stub_connect):
                 pool = create_pool(config)
                 pool.dispose()
 
-            mock_connect.assert_called_once()
+            assert captured["uri"] == "grpc://localhost:8815"
+            assert "uri" not in (captured.get("db_kwargs") or {})
         else:
             # Driver not installed: mock adbc_driver_manager.dbapi.connect
             with patch(
