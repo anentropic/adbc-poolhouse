@@ -115,3 +115,31 @@ class TestDbApiModuleSignatureDispatch:
         assert call_record["uri_keyword"] == "kw://h:1"
         assert call_record["db_kwargs"] == {"extra": "v"}
         assert "uri" not in (call_record["db_kwargs"] or {})
+
+    def test_family_a_prime_does_not_mutate_caller_kwargs(self) -> None:
+        """
+        Pinning the no-mutation contract: the Family A' pop must not be visible.
+
+        The raw call path `create_pool(dbapi_module=..., db_kwargs=user_dict)` forwards
+        `user_dict` through `_pool_factory` by reference, so a bare `kwargs.pop("uri")`
+        inside the dispatcher would mutate the caller's dict. `create_adbc_connection`
+        shallow-copies on entry to keep its input dict pristine.
+        """
+
+        def connect(uri: str, *, db_kwargs: dict[str, str] | None = None) -> MagicMock:
+            return MagicMock()
+
+        mock_mod = MagicMock()
+        mock_mod.connect = connect
+
+        caller_kwargs = {"uri": "quack://h:1", "adbc.quack.token": "t"}
+        snapshot = dict(caller_kwargs)
+
+        with patch("importlib.import_module", return_value=mock_mod):
+            create_adbc_connection(
+                "",
+                caller_kwargs,
+                dbapi_module="mock_no_mutation_check",
+            )
+
+        assert caller_kwargs == snapshot

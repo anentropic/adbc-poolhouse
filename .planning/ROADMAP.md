@@ -2,7 +2,7 @@
 
 ## Milestones
 
-- 🚧 **v1.3.0 Quack Backend** — Phase 21 (in progress)
+- 🚧 **v1.3.0 Quack Backend** — Phases 21–21.1 (awaiting release)
 - ✅ **v1.2.0 Plugin/Extensibility API** — Phases 16-20 (shipped 2026-03-15)
 - ✅ **v1.0.0 MVP + Backend Expansion** — Phases 1-15 (shipped 2026-03-07)
 
@@ -10,7 +10,8 @@
 
 ### v1.3.0 Quack Backend
 
-- [ ] **Phase 21: Quack Backend** — Add `QuackConfig` (config + tests + docs) for `adbc-driver-quack`
+- [x] **Phase 21: Quack Backend** — Add `QuackConfig` (config + tests + docs) for `adbc-driver-quack` (completed 2026-05-19)
+- [x] **Phase 21.1: ADBC dispatch URI-positional fix** — Fix `create_pool()` dispatch for Quack/Postgres/FlightSQL (completed 2026-05-20)
 
 <details>
 <summary>✅ v1.2.0 Plugin/Extensibility API (Phases 16-20) — SHIPPED 2026-03-15</summary>
@@ -66,6 +67,7 @@
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
+| 21.1. ADBC dispatch URI-positional fix | v1.3.0 | 3/3 | Complete | 2026-05-20 |
 | 21. Quack Backend | v1.3.0 | 3/3 | Complete    | 2026-05-19 |
 | 16. Driver Import Semi-Integration Tests | v1.2.0 | 2/2 | Complete | 2026-03-12 |
 | 17. Registry Infrastructure | v1.2.0 | 2/2 | Complete | 2026-03-12 |

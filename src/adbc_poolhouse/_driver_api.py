@@ -49,10 +49,13 @@ def create_adbc_connection(
       and either has no ``uri`` parameter or ``uri`` has a default --
       called as ``connect(db_kwargs=kwargs)``.
     - **Family A'** (PostgreSQL, FlightSQL, Quack): accepts ``db_kwargs``
-      AND declares ``uri`` as a required positional (no default). The
-      dispatcher pops ``"uri"`` from ``kwargs`` and calls
-      ``connect(uri_val, db_kwargs=kwargs)``. ``db_kwargs`` is always passed
-      by name because some of these drivers declare it KEYWORD_ONLY.
+      AND declares ``uri`` as a required parameter (no default), either
+      positional-or-keyword or keyword-only. The dispatcher pops ``"uri"``
+      from ``kwargs`` and passes it explicitly — positionally as
+      ``connect(uri_val, db_kwargs=kwargs)`` when ``uri`` is
+      positional-or-keyword, or as ``connect(uri=uri_val, db_kwargs=kwargs)``
+      when ``uri`` is keyword-only. ``db_kwargs`` is always passed by name
+      because some of these drivers declare it KEYWORD_ONLY.
     - **Family B** (DuckDB, SQLite): no ``db_kwargs`` parameter -- called as
       ``connect(**kwargs)`` with kwargs unpacked directly.
 
@@ -90,6 +93,10 @@ def create_adbc_connection(
             Message contains ``https://docs.adbc-drivers.org/``.
     """
     if dbapi_module is not None:
+        # Shallow copy so the Family A' branch can pop("uri") without mutating
+        # the caller's dict (visible on the raw create_pool(dbapi_module=...,
+        # db_kwargs=user_dict) path where _pool_factory forwards by reference).
+        kwargs = dict(kwargs)
         mod = importlib.import_module(dbapi_module)
         sig = inspect.signature(mod.connect)  # type: ignore[reportUnknownMemberType]
         params = sig.parameters
