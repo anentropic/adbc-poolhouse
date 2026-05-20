@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cargo test)",
+      "Bash(cargo test:*)",
+      "Bash(just test-all)",
+      "Bash(just test-sql)",
+      "Bash(just docs-check)"
+    ]
+  }
+}
