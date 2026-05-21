@@ -2,7 +2,17 @@
 
 ## What This Is
 
-A focused Python library that takes a typed warehouse configuration and returns a pooled ADBC connection. Supports 12 warehouse backends (DuckDB, Snowflake, BigQuery, PostgreSQL, FlightSQL, Databricks, Redshift, Trino, MSSQL, SQLite, MySQL, ClickHouse) with both PyPI and Foundry driver detection. Published to PyPI as `adbc-poolhouse`.
+A focused Python library that takes a typed warehouse configuration and returns a pooled ADBC connection. Supports 13 warehouse backends (DuckDB, Snowflake, BigQuery, PostgreSQL, FlightSQL, Databricks, Redshift, Trino, MSSQL, SQLite, MySQL, ClickHouse, Quack) with both PyPI and Foundry driver detection. Published to PyPI as `adbc-poolhouse`.
+
+## Current Milestone: v1.3.0 Quack Backend
+
+**Goal:** Add `QuackConfig` warehouse backend for `adbc-driver-quack` (DuckDB remote/Quack protocol).
+
+**Target features:**
+- `QuackConfig` class implementing the `WarehouseConfig` Protocol (URI + optional token + TLS)
+- Driver detection via PyPI path (`adbc_driver_quack`)
+- Semi-integration test with conditional mock target
+- Documentation: per-warehouse guide, configuration.md row, index.md listing
 
 ## Core Value
 
@@ -32,9 +42,13 @@ One config in, one pool out — `create_pool(SnowflakeConfig(...))` returns a re
 - ✓ WarehouseConfig Protocol as third-party contract — v1.2.0
 - ✓ Custom backends guide with Protocol reference — v1.2.0
 - ✓ Semi-integration tests for all 12 backends — v1.2.0
+- ✓ `QuackConfig` backend for `adbc-driver-quack` (URI + decomposed host/port + token + tls), plus guide, configuration table, index listing, mkdocs nav — v1.3.0 (Phase 21, 2026-05-19)
 
 ### Active
 
+**Milestone v1.3.0 — Quack Backend:** Complete (Phase 21 verified 2026-05-19; QUACK-01 through QUACK-18 satisfied)
+
+**Carried (externally blocked):**
 - [ ] Verify Teradata field names against real Columnar ADBC Teradata driver
 - [ ] Live integration tests for non-DuckDB, non-Snowflake backends (blocked on test account availability)
 - [ ] Async pool support (blocked on ADBC adding async dbapi interface)
@@ -67,7 +81,7 @@ Two concrete consumers:
 
 Integration tests use pytest-adbc-replay cassettes (VCR-style record/replay) for Snowflake and Databricks — CI runs without credentials.
 
-241 tests passing.
+265 tests passing (241 from v1.2.0 baseline + 24 new in Phase 21 for QuackConfig).
 
 ## Constraints
 
@@ -97,5 +111,22 @@ Integration tests use pytest-adbc-replay cassettes (VCR-style record/replay) for
 | `_create_pool_impl()` shared helper | Avoids overload forwarding issues between `managed_pool()` and `create_pool()` | ✓ Good — single implementation, three call patterns |
 | Direct `to_adbc_kwargs()` over aliases | Field-to-key mappings too divergent for Pydantic alias approach | ✓ Good — explicit, readable, correct |
 
+## Evolution
+
+This document evolves at phase transitions and milestone boundaries.
+
+**After each phase transition** (via `/gsd-transition`):
+1. Requirements invalidated? → Move to Out of Scope with reason
+2. Requirements validated? → Move to Validated with phase reference
+3. New requirements emerged? → Add to Active
+4. Decisions to log? → Add to Key Decisions
+5. "What This Is" still accurate? → Update if drifted
+
+**After each milestone** (via `/gsd-complete-milestone`):
+1. Full review of all sections
+2. Core Value check — still the right priority?
+3. Audit Out of Scope — reasons still valid?
+4. Update Context with current state
+
 ---
-*Last updated: 2026-03-15 after v1.2.0 milestone*
+*Last updated: 2026-05-19 after starting v1.3.0 milestone*

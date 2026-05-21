@@ -14,6 +14,7 @@ from adbc_poolhouse._mssql_config import MSSQLConfig
 from adbc_poolhouse._mysql_config import MySQLConfig
 from adbc_poolhouse._pool_factory import close_pool, create_pool, managed_pool
 from adbc_poolhouse._postgresql_config import PostgreSQLConfig
+from adbc_poolhouse._quack_config import QuackConfig
 from adbc_poolhouse._redshift_config import RedshiftConfig
 from adbc_poolhouse._snowflake_config import SnowflakeConfig
 from adbc_poolhouse._sqlite_config import SQLiteConfig
@@ -31,6 +32,7 @@ __all__ = [
     "MySQLConfig",
     "PoolhouseError",
     "PostgreSQLConfig",
+    "QuackConfig",
     "RedshiftConfig",
     "SnowflakeConfig",
     "SQLiteConfig",

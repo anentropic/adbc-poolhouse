@@ -115,6 +115,30 @@ def _dbapi_module(self) -> str | None:
     return None
 ```
 
+#### Dispatch contract
+
+When `_dbapi_module()` returns a string, `create_pool()` imports that module
+and inspects `connect()`'s signature to pick the call shape. Your driver's
+`connect()` must fall into one of these shapes:
+
+| Signature shape | Call form | Examples |
+|---|---|---|
+| No `db_kwargs` parameter | `connect(**to_adbc_kwargs())` | DuckDB, SQLite |
+| Has `db_kwargs`; `uri` absent or with a default | `connect(db_kwargs=to_adbc_kwargs())` | Snowflake, BigQuery |
+| Has `db_kwargs`; `uri` required, positional-or-keyword | `connect(uri, db_kwargs={...})` with `uri` popped from kwargs first | PostgreSQL, FlightSQL, Quack |
+| Has `db_kwargs`; `uri` required, keyword-only | `connect(uri=uri, db_kwargs={...})` with `uri` popped from kwargs first | (none in the wild yet) |
+
+If you ship a new ADBC driver, the simplest safe choice is to keep `uri`
+optional (give it a default of `None`). The dispatcher then routes through
+the second row above and never has to pop `uri` out of `db_kwargs`. Note
+that `db_kwargs` is always passed by name, so it is fine for your `connect()`
+to declare it keyword-only.
+
+Return `None` from `_dbapi_module()` when the driver should route through
+`adbc_driver_manager.dbapi.connect()` instead (the Foundry path). That is
+the right default for native shared-library drivers without a Python `dbapi`
+submodule.
+
 ## Pool tuning
 
 `BaseWarehouseConfig` inherits four pool fields from

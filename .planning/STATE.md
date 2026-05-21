@@ -1,47 +1,57 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.2
-milestone_name: Plugin/Extensibility API
-status: completed
-stopped_at: Milestone v1.2.0 archived
-last_updated: "2026-03-15T23:00:00.000Z"
-last_activity: 2026-03-15 — Milestone v1.2.0 archived
+milestone: v1.3.0
+milestone_name: Quack Backend
+status: executing
+stopped_at: Roadmap created for v1.3.0 — Phase 21 ready for planning
+last_updated: "2026-05-20T10:34:19.541Z"
+last_activity: 2026-05-19 -- Phase 21.1 execution started
 progress:
-  total_phases: 6
-  completed_phases: 6
-  total_plans: 17
-  completed_plans: 17
-  percent: 100
+  total_phases: 2
+  completed_phases: 1
+  total_plans: 6
+  completed_plans: 3
+  percent: 50
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-03-15)
+See: .planning/PROJECT.md (updated 2026-05-19)
 
 **Core value:** One config in, one pool out — `create_pool(SnowflakeConfig(...))` returns a ready-to-use SQLAlchemy QueuePool in a single call.
-**Current focus:** Planning next milestone
+**Current focus:** Phase 21.1 — adbc-dispatch-uri-positional-fix
 
 ## Current Position
 
-Milestone: v1.2.0 — Plugin/Extensibility API (SHIPPED 2026-03-15)
-All phases complete (16-20). Milestone archived.
+Phase: 21.1 (adbc-dispatch-uri-positional-fix) — EXECUTING
+Plan: 1 of 3
+Status: Executing Phase 21.1
+Last activity: 2026-05-19 -- Phase 21.1 execution started
 
 ## Accumulated Context
 
 ### Decisions
 
-All v1.2.0 decisions recorded in PROJECT.md Key Decisions table.
+All v1.0.0–v1.2.0 decisions recorded in PROJECT.md Key Decisions table.
+
+v1.3.0 roadmap decisions:
+
+- Single combined Phase 21 (config + tests + docs) rather than splitting into separate implementation and documentation phases — follows v1.0.0 retrospective lesson "Every new backend should update all three doc surfaces in the same plan, not as a separate phase"
+- Phase numbering continues from v1.2.0's Phase 20 (monotonic across milestones, per v1.2.0 lesson)
+- Mirrors single-phase backend pattern of Phase 10 (SQLite) and Phase 12 (ClickHouse) from v1.0.0
 
 ### Roadmap Evolution
 
 - 20 phases completed across v1.0.0 and v1.2.0 milestones
 - v1.2.0 underwent architectural pivot: registry → self-describing configs
+- v1.3.0 follows established phase-per-backend pattern — single combined phase for the small Quack surface
+- Phase 21.1 inserted after Phase 21: ADBC dispatch URI-positional fix (URGENT) — /ultrareview surfaced a `TypeError` in `_driver_api.create_adbc_connection` that breaks `create_pool(QuackConfig(...))` and latently also `create_pool(PostgreSQLConfig(...))` and `create_pool(FlightSQLConfig(...))` when their PyPI drivers are installed; closes the Phase 21 QUACK-08 verification gap and fixes pre-existing bugs from v1.0.0
 
 ### Blockers/Concerns
 
-None — milestone shipped.
+None — adbc-driver-quack is alpha (v0.1.0-alpha.1); document alpha status and pin lower bound carefully.
 
 ### Quick Tasks Completed
 
@@ -51,6 +61,6 @@ None — milestone shipped.
 
 ## Session Continuity
 
-Last session: 2026-03-15
-Stopped at: Milestone v1.2.0 archived
-Next step: `/gsd:new-milestone` to start next milestone
+Last session: 2026-05-19
+Stopped at: Roadmap created for v1.3.0 — Phase 21 ready for planning
+Next step: `/gsd-plan-phase 21`

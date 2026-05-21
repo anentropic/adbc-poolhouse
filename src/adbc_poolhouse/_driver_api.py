@@ -43,10 +43,19 @@ def create_adbc_connection(
     When ``dbapi_module`` is provided, the connection is created through that
     driver's own ``.dbapi.connect()`` instead of routing through
     ``adbc_driver_manager.dbapi``. The function introspects the target
-    module's ``connect()`` signature to handle two distinct families:
+    module's ``connect()`` signature to handle three distinct shapes:
 
-    - **Family A** (Snowflake, PostgreSQL, BigQuery, FlightSQL): accepts a
-      ``db_kwargs`` parameter -- called as ``connect(db_kwargs=kwargs)``.
+    - **Family A** (Snowflake, BigQuery): accepts a ``db_kwargs`` parameter
+      and either has no ``uri`` parameter or ``uri`` has a default --
+      called as ``connect(db_kwargs=kwargs)``.
+    - **Family A'** (PostgreSQL, FlightSQL, Quack): accepts ``db_kwargs``
+      AND declares ``uri`` as a required parameter (no default), either
+      positional-or-keyword or keyword-only. The dispatcher pops ``"uri"``
+      from ``kwargs`` and passes it explicitly — positionally as
+      ``connect(uri_val, db_kwargs=kwargs)`` when ``uri`` is
+      positional-or-keyword, or as ``connect(uri=uri_val, db_kwargs=kwargs)``
+      when ``uri`` is keyword-only. ``db_kwargs`` is always passed by name
+      because some of these drivers declare it KEYWORD_ONLY.
     - **Family B** (DuckDB, SQLite): no ``db_kwargs`` parameter -- called as
       ``connect(**kwargs)`` with kwargs unpacked directly.
 
@@ -84,11 +93,34 @@ def create_adbc_connection(
             Message contains ``https://docs.adbc-drivers.org/``.
     """
     if dbapi_module is not None:
+        # Shallow copy so the Family A' branch can pop("uri") without mutating
+        # the caller's dict (visible on the raw create_pool(dbapi_module=...,
+        # db_kwargs=user_dict) path where _pool_factory forwards by reference).
+        kwargs = dict(kwargs)
         mod = importlib.import_module(dbapi_module)
         sig = inspect.signature(mod.connect)  # type: ignore[reportUnknownMemberType]
-        if "db_kwargs" in sig.parameters:
-            conn = mod.connect(db_kwargs=kwargs)  # type: ignore[no-any-return]
+        params = sig.parameters
+        if "db_kwargs" in params:
+            uri_param = params.get("uri")
+            if uri_param is not None and uri_param.default is inspect.Parameter.empty:
+                # Family A' — uri is a REQUIRED parameter. Pop it from kwargs and
+                # pass explicitly so the driver's signature is satisfied; remaining
+                # keys ride as db_kwargs=. KeyError from the pop is intentional —
+                # fail loud on a config-shape mismatch.
+                # db_kwargs is passed by name because Quack declares it KEYWORD_ONLY.
+                uri_val = kwargs.pop("uri")
+                if uri_param.kind is inspect.Parameter.KEYWORD_ONLY:
+                    # `def connect(*, uri, db_kwargs=None)` — pass uri by name.
+                    conn = mod.connect(uri=uri_val, db_kwargs=kwargs)  # type: ignore[no-any-return]
+                else:
+                    # POSITIONAL_ONLY / POSITIONAL_OR_KEYWORD (Quack, Postgres, FlightSQL).
+                    conn = mod.connect(uri_val, db_kwargs=kwargs)  # type: ignore[no-any-return]
+            else:
+                # Family A (Snowflake / BigQuery): uri optional or absent — driver
+                # picks `uri` out of db_kwargs itself if it cares.
+                conn = mod.connect(db_kwargs=kwargs)  # type: ignore[no-any-return]
         else:
+            # Family B (DuckDB / SQLite): no db_kwargs parameter.
             conn = mod.connect(**kwargs)  # type: ignore[no-any-return]
         return conn  # type: ignore[return-value]
 

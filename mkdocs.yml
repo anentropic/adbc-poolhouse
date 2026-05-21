@@ -108,6 +108,7 @@ nav:
       - MSSQL: guides/mssql.md
       - ClickHouse: guides/clickhouse.md
       - MySQL: guides/mysql.md
+      - Quack: guides/quack.md
       - SQLite: guides/sqlite.md
   - API Reference: reference/
   - Changelog: changelog.md
