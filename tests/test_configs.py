@@ -220,6 +220,90 @@ class TestFoundryBackendConfigs:
         assert isinstance(db.token, SecretStr)
         assert "dapi123" not in repr(db)
 
+    def test_databricks_catalog_and_schema_appended(self) -> None:
+        """Decomposed mode appends ?catalog=...&schema=... when both are set."""
+        db = DatabricksConfig(
+            host="h",
+            http_path="/p",
+            token=SecretStr("t"),  # pragma: allowlist secret
+            catalog="my_catalog",
+            schema="my_schema",
+        )
+        uri = db.to_adbc_kwargs()["uri"]
+        assert uri.endswith("?catalog=my_catalog&schema=my_schema")
+
+    def test_databricks_only_catalog_appended(self) -> None:
+        """Only catalog set -> ?catalog=... present, schema= absent."""
+        db = DatabricksConfig(
+            host="h",
+            http_path="/p",
+            token=SecretStr("t"),  # pragma: allowlist secret
+            catalog="my_catalog",
+        )
+        uri = db.to_adbc_kwargs()["uri"]
+        assert "catalog=my_catalog" in uri
+        assert "schema=" not in uri
+
+    def test_databricks_only_schema_appended(self) -> None:
+        """Only schema set -> ?schema=... present, catalog= absent."""
+        db = DatabricksConfig(
+            host="h",
+            http_path="/p",
+            token=SecretStr("t"),  # pragma: allowlist secret
+            schema="my_schema",
+        )
+        uri = db.to_adbc_kwargs()["uri"]
+        assert "schema=my_schema" in uri
+        assert "catalog=" not in uri
+
+    def test_databricks_no_namespace_no_query_string(self) -> None:
+        """Both catalog and schema None -> no query string (regression guard)."""
+        db = DatabricksConfig(
+            host="h",
+            http_path="/p",
+            token=SecretStr("t"),  # pragma: allowlist secret
+        )
+        uri = db.to_adbc_kwargs()["uri"]
+        assert "?" not in uri
+
+    def test_databricks_namespace_percent_encoded(self) -> None:
+        """Reserved chars in catalog/schema are percent-encoded in the URI."""
+        db = DatabricksConfig(
+            host="h",
+            http_path="/p",
+            token=SecretStr("t"),  # pragma: allowlist secret
+            schema="a b/c",
+        )
+        uri = db.to_adbc_kwargs()["uri"]
+        assert "a b/c" not in uri
+        assert "%20" in uri
+        assert "%2F" in uri
+
+    def test_databricks_uri_mode_verbatim_with_namespace(self) -> None:
+        """URI mode returns the user URI verbatim even when catalog/schema are set."""
+        raw = "databricks://token:dapi@host:443/sql/1.0/warehouses/abc"  # pragma: allowlist secret
+        db = DatabricksConfig(
+            uri=SecretStr(raw),  # pragma: allowlist secret
+            catalog="my_catalog",
+            schema="my_schema",
+        )
+        uri = db.to_adbc_kwargs()["uri"]
+        assert uri == raw
+        assert "?catalog" not in uri
+
+    def test_databricks_token_stays_in_built_uri(self) -> None:
+        """Token stays inside the built URI as SecretStr, not leaked in repr."""
+        db = DatabricksConfig(
+            host="h",
+            http_path="/p",
+            token=SecretStr("dapi-secret"),  # pragma: allowlist secret
+            catalog="my_catalog",
+        )
+        uri = db.to_adbc_kwargs()["uri"]
+        assert "token:dapi-secret@" in uri
+        assert isinstance(db.token, SecretStr)
+        assert "dapi-secret" not in repr(db)
+
     def test_redshift_default_construction(self) -> None:
         rs = RedshiftConfig()
         assert rs.pool_size == 5
