@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.3.0
 milestone_name: Quack Backend
-status: executing
-stopped_at: Roadmap created for v1.3.0 — Phase 21 ready for planning
-last_updated: "2026-05-20T10:34:19.541Z"
-last_activity: 2026-05-19 -- Phase 21.1 execution started
+status: shipped
+stopped_at: v1.3.0 shipped (Phases 21 + 21.1 complete); preparing v1.3.1 patch — Databricks catalog/schema fix
+last_updated: "2026-06-24T20:40:59.998Z"
+last_activity: 2026-06-24 -- Quick task 260624-u45: Databricks catalog/schema fix (v1.3.1 prep)
 progress:
   total_phases: 2
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 6
-  completed_plans: 3
-  percent: 50
+  completed_plans: 6
+  percent: 100
 ---
 
 # Project State
@@ -58,9 +58,10 @@ None — adbc-driver-quack is alpha (v0.1.0-alpha.1); document alpha status and 
 | # | Description | Date | Commit | Status | Directory |
 |---|-------------|------|--------|--------|-----------|
 | 10 | Rewrite integration tests to use pool API and wire up conftest fixtures | 2026-03-07 | 7721866 | Verified | [10-rewrite-integration-tests-to-use-pool-ap](./quick/10-rewrite-integration-tests-to-use-pool-ap/) |
+| 260624-u45 | Fix DatabricksConfig dropping catalog/schema in to_adbc_kwargs (DBX-02 follow-up) | 2026-06-24 | f72517b | Verified | [260624-u45-databricks-catalog-schema](./quick/260624-u45-databricks-catalog-schema/) |
 
 ## Session Continuity
 
-Last session: 2026-05-19
-Stopped at: Roadmap created for v1.3.0 — Phase 21 ready for planning
-Next step: `/gsd-plan-phase 21`
+Last session: 2026-06-24
+Stopped at: v1.3.0 shipped; Databricks catalog/schema fix landed on branch gsd/quick-260624-databricks-catalog-schema — preparing v1.3.1 patch release
+Next step: finalize v1.3.1 (version bump + changelog), then open PR / tag
