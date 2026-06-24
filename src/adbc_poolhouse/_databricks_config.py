@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from typing import Self
-from urllib.parse import quote
+from urllib.parse import quote, urlencode
 
 from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import SettingsConfigDict
@@ -110,4 +110,15 @@ class DatabricksConfig(BaseWarehouseConfig):
 
         encoded_token = quote(self.token.get_secret_value(), safe="")
         uri = f"databricks://token:{encoded_token}@{self.host}:443{self.http_path}"
+
+        # The Databricks Go SQL driver reads catalog/schema from the DSN query
+        # string, so append them when set to honour the default namespace.
+        params: dict[str, str] = {}
+        if self.catalog is not None:
+            params["catalog"] = self.catalog
+        if self.schema_ is not None:
+            params["schema"] = self.schema_
+        if params:
+            uri = f"{uri}?{urlencode(params, quote_via=quote)}"
+
         return {"uri": uri}
