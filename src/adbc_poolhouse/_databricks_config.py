@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from typing import Self
-from urllib.parse import quote
+from urllib.parse import quote, urlencode
 
 from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import SettingsConfigDict
@@ -91,14 +91,19 @@ class DatabricksConfig(BaseWarehouseConfig):
 
         Supports two modes:
 
-        - **URI mode** (``uri`` set): extracts ``SecretStr`` value and returns
-          ``{"uri": ...}``.
-        - **Decomposed mode**: builds ``databricks://token:{encoded}@{host}:443{http_path}``
-          from ``host``, ``http_path``, and ``token``. Token is URL-encoded via
-          `urllib.parse.quote` with ``safe=""``.
+        - **URI mode** (`uri` set): extracts the `SecretStr` value and returns
+          it verbatim as `{"uri": ...}`. The URI is never mutated, so any
+          catalog/schema you want must already be in the DSN.
+        - **Decomposed mode**: builds `databricks://token:{encoded}@{host}:443{http_path}`
+          from `host`, `http_path`, and `token`. The token is URL-encoded via
+          `urllib.parse.quote` with `safe=""`. When `catalog` or `schema_` is
+          set, each is appended to the DSN as a URL-encoded query parameter
+          (`?catalog=...&schema=...`) so unqualified table and view names resolve
+          against that default namespace. When both are unset, no query string
+          is added.
 
         Returns:
-            ADBC driver kwargs for ``adbc_driver_manager.dbapi.connect()``.
+            ADBC driver kwargs for `adbc_driver_manager.dbapi.connect()`.
         """
         if self.uri is not None:
             return {"uri": self.uri.get_secret_value()}
@@ -110,4 +115,15 @@ class DatabricksConfig(BaseWarehouseConfig):
 
         encoded_token = quote(self.token.get_secret_value(), safe="")
         uri = f"databricks://token:{encoded_token}@{self.host}:443{self.http_path}"
+
+        # The Databricks Go SQL driver reads catalog/schema from the DSN query
+        # string, so append them when set to honour the default namespace.
+        params: dict[str, str] = {}
+        if self.catalog is not None:
+            params["catalog"] = self.catalog
+        if self.schema_ is not None:
+            params["schema"] = self.schema_
+        if params:
+            uri = f"{uri}?{urlencode(params, quote_via=quote)}"
+
         return {"uri": uri}
