@@ -46,6 +46,30 @@ config = DatabricksConfig(
 pool = create_pool(config)
 ```
 
+### Default catalog and schema
+
+Set `catalog` and `schema` to pin a default namespace. The driver appends them
+to the connection string, so you can query unqualified table and view names
+instead of writing `catalog.schema.table` every time.
+
+```python
+from pydantic import SecretStr
+from adbc_poolhouse import DatabricksConfig, create_pool
+
+config = DatabricksConfig(
+    host="adb-xxx.azuredatabricks.net",
+    http_path="/sql/1.0/warehouses/abc123",
+    token=SecretStr("dapi..."),  # pragma: allowlist secret
+    catalog="main",
+    schema="sales",
+)
+pool = create_pool(config)
+```
+
+With this config, `SELECT * FROM orders` resolves to `main.sales.orders`. Both
+fields are optional: set one, the other, or neither. In URI mode, put the
+namespace in the DSN yourself — `adbc-poolhouse` returns the URI untouched.
+
 ## Loading from environment variables
 
 [`DatabricksConfig`][adbc_poolhouse.DatabricksConfig] reads all fields from environment variables with the `DATABRICKS_` prefix.
@@ -56,6 +80,14 @@ For individual field mode, all three variables must be set at the same time — 
 export DATABRICKS_HOST=adb-xxx.azuredatabricks.net
 export DATABRICKS_HTTP_PATH=/sql/1.0/warehouses/abc123
 export DATABRICKS_TOKEN=dapi...  # pragma: allowlist secret
+```
+
+Set `DATABRICKS_CATALOG` and `DATABRICKS_SCHEMA` to pin the default namespace
+from the environment, the same way the `catalog` and `schema` fields do:
+
+```bash
+export DATABRICKS_CATALOG=main
+export DATABRICKS_SCHEMA=sales
 ```
 
 ```python
