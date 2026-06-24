@@ -292,7 +292,7 @@ class TestFoundryBackendConfigs:
         assert "?catalog" not in uri
 
     def test_databricks_token_stays_in_built_uri(self) -> None:
-        """Built URI contains the token; `db.token` remains a SecretStr and `repr(db)` does not leak it."""
+        """Built URI holds the token; `db.token` stays a SecretStr and `repr` does not leak it."""
         db = DatabricksConfig(
             host="h",
             http_path="/p",
