@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.3.1] - 2026-06-24
+
+### Bug Fixes
+
+- Propagate `catalog` and `schema` to the Databricks connection (DBX-02). `DatabricksConfig.to_adbc_kwargs()` now appends URL-encoded `?catalog=...&schema=...` to the DSN in decomposed mode, so unqualified table and view names resolve against the configured default namespace instead of failing with `TABLE_OR_VIEW_NOT_FOUND`. URI mode is unchanged. Matches how `SnowflakeConfig` and `TrinoConfig` already wire their namespace through.
+
+## [1.3.0] - 2026-05-21
+
 ### Refactoring
 
 - Route PyPI drivers through their own DBAPI module so pytest-adbc-replay monkeypatches intercept at the correct location
