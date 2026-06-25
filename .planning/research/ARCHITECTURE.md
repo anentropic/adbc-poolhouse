@@ -1,540 +1,414 @@
-# Architecture Patterns
+# Architecture Research
 
-**Domain:** adbc-poolhouse — ADBC backend expansion and Foundry driver tooling
-**Researched:** 2026-03-01
-**Confidence:** HIGH — based on direct source inspection of all files in the codebase plus dbc CLI reference docs from GitHub
+**Domain:** Async API layer over a shipped sync ADBC connection-pool library (adbc-poolhouse v1.4.0)
+**Researched:** 2026-06-25
+**Confidence:** HIGH
+
+> Scope: how an *optional* async surface (behind an `[async]` extra) integrates with the existing
+> sync architecture. The sync API is frozen and unchanged. Every key decision below is grounded in
+> the real source (`_pool_factory.py`, `_driver_api.py`, `_base_config.py`) and in the authoritative
+> ADBC C header / Cython source and anyio docs (see Sources).
 
 ---
 
-## Recommended Architecture
+## Settled Decisions (read this first)
 
-The codebase already implements a clean slice-per-warehouse pattern. Every new backend
-follows the same slotting model: one config file, one translator file, one entry in two
-dispatch tables, one public re-export, one test class per file, one docs guide. The
-pattern is mechanical and additive — no cross-cutting rewrites required.
+| # | Question | Decision | Confidence |
+|---|----------|----------|------------|
+| 1 | Offload model | New `_async/` package. Wrap each blocking call in `anyio.to_thread.run_sync`. Reuse `_create_pool_impl()` **verbatim** — pool construction stays sync; only checkout + cursor/conn methods are offloaded. | HIGH |
+| 2 | Checkout-wait strategy | **Option (a): keep plain sync `QueuePool`, offload `pool.connect()` via `to_thread`.** Reject building an anyio-native limiter as the checkout gate. `AsyncAdaptedQueuePool` is **not used** (asyncio+greenlet-bound; would break trio neutrality and does not replace the execute offload). | HIGH |
+| 3 | Thread/concurrency sizing | The async pool **owns a dedicated `CapacityLimiter`** sized to `pool_size + max_overflow`. Do **not** rely on anyio's shared 40-token default limiter — it is global and would let unrelated `to_thread` work starve DB checkouts (and vice-versa). | HIGH |
+| 4 | Connection thread-affinity | **No thread-affinity.** ADBC explicitly permits serialized cross-thread access ("one thread may make a call, and once finished, another thread may make a call"). `to_thread` using different workers across awaits is **safe**, *provided one connection is never used concurrently from two tasks* — which the pool checkout already guarantees. | HIGH |
+| 5 | Cancellation flow | On anyio cancellation, call `cursor.adbc_cancel()` / `conn.adbc_cancel()` from the event-loop thread. ADBC's cancel functions are the **documented exception** to the serialize rule: "This must always be thread-safe (other operations are not)." The blocked `execute` worker then returns `ADBC_STATUS_CANCELLED`; the connection is invalidated and returned to the pool. | HIGH |
+| 6 | Build order | foundation (limiter + pool factory) → connection/cursor wrappers → cancellation → backend-generic verification → docs. Dependency-ordered below. | HIGH |
+
+---
+
+## Standard Architecture
+
+### System Overview
 
 ```
-create_pool(config)
-    └─ resolve_driver(config)      <- _drivers.py   (dispatch: type -> driver path/name)
-    └─ translate_config(config)    <- _translators.py (dispatch: type -> dict[str,str])
-    └─ config._adbc_entrypoint()   <- _base_config.py (default None; DuckDB overrides)
-         └─ create_adbc_connection(driver_path, kwargs, entrypoint)
-                                   <- _driver_api.py  (single adbc_driver_manager facade)
+┌──────────────────────────────────────────────────────────────────────┐
+│  ASYNC SURFACE  (new, behind [async] extra — src/adbc_poolhouse/_async)│
+│                                                                        │
+│  create_async_pool()   managed_async_pool()   close_async_pool()       │
+│        │                      │                       │                │
+│        └──────────┬───────────┴───────────────────────┘                │
+│                   ▼                                                     │
+│            AsyncPool (wrapper)                                          │
+│            - holds sync QueuePool  (from _create_pool_impl)             │
+│            - holds dedicated anyio.CapacityLimiter(pool_size+overflow)  │
+│            - async connect()  ── to_thread ──▶ pool.connect()          │
+│                   │                                                     │
+│                   ▼                                                     │
+│            AsyncConnection (wrapper)                                    │
+│            - wraps the checked-out sync ConnectionFairy / dbapi conn    │
+│            - async cursor(), async close()                             │
+│                   │                                                     │
+│                   ▼                                                     │
+│            AsyncCursor (wrapper)                                        │
+│            - execute / executemany / fetchone / fetchmany / fetchall   │
+│              / fetch_arrow_table  ── each via to_thread + limiter      │
+│            - cancel scope wired to cursor.adbc_cancel()                 │
+└───────────────────────────────┬──────────────────────────────────────┘
+                                 │  anyio.to_thread.run_sync(fn, limiter=…)
+                                 ▼
+┌──────────────────────────────────────────────────────────────────────┐
+│  EXISTING SYNC CORE  (UNCHANGED)                                       │
+│  _pool_factory._create_pool_impl()  ──▶  sqlalchemy.pool.QueuePool     │
+│       (creator = source.adbc_clone, reset = _release_arrow_allocators) │
+│  _driver_api.create_adbc_connection()  (config dispatch lives here)    │
+│  _base_config.WarehouseConfig (Protocol) / BaseWarehouseConfig         │
+└───────────────────────────────┬──────────────────────────────────────┘
+                                 ▼
+┌──────────────────────────────────────────────────────────────────────┐
+│  ADBC dbapi (C / Cython)  — every execute/fetch wrapped `with nogil:`  │
+│  → GIL released → worker threads run DB I/O truly concurrently         │
+└──────────────────────────────────────────────────────────────────────┘
 ```
 
-### Component Boundaries
+### Component Responsibilities
 
-| File | Responsibility | What Changes Per New Backend |
-|------|---------------|------------------------------|
-| `_[warehouse]_config.py` | Pydantic BaseSettings model, env_prefix, field validators | NEW FILE — always |
-| `_[warehouse]_translator.py` | Pure function: config -> dict[str, str] ADBC kwargs | NEW FILE — always |
-| `_translators.py` | isinstance dispatch: config type -> translator fn | ADD import + elif branch |
-| `_drivers.py` | type -> (pkg_name, extra) for PyPI; type -> short_name for Foundry | ADD entry to `_PYPI_PACKAGES` or `_FOUNDRY_DRIVERS` dict |
-| `__init__.py` | Public re-exports | ADD import + `__all__` entry |
-| `tests/test_configs.py` | Config model unit tests | ADD test class |
-| `tests/test_translators.py` | Translator pure-function tests | ADD test class + dispatch test case |
-| `tests/test_drivers.py` | Driver detection path tests | ADD test for new config type |
-| `pyproject.toml` | Optional dependencies | ADD extra for PyPI backends only |
-| `docs/src/guides/[warehouse].md` | Per-warehouse installation and usage guide | NEW FILE — always |
-| `DEVELOP.md` | Developer guide | ADD dbc section |
-| `justfile` | Developer task recipes | ADD dbc recipes |
+| Component | Responsibility | New / Modified |
+|-----------|----------------|----------------|
+| `_create_pool_impl()` | Build the sync `QueuePool` from config dispatch. **Reused unchanged** by the async factory. | **Unchanged** |
+| `create_adbc_connection()` | Driver/config dispatch (Family A/A'/B). Runs once, synchronously, at pool creation. | **Unchanged** |
+| `AsyncPool` | Own one sync `QueuePool` + one dedicated `CapacityLimiter`. Offload `connect()` and `close()`. | **New** |
+| `AsyncConnection` | Wrap a checked-out connection; produce `AsyncCursor`; offload `close()`/`commit()`/`rollback()`. | **New** |
+| `AsyncCursor` | Offload `execute`/`executemany`/`fetch*`/`fetch_arrow_table`; bind anyio cancel scope to `adbc_cancel`. | **New** |
+| `create_async_pool` / `managed_async_pool` / `close_async_pool` | Public async entry points mirroring the sync trio. | **New** |
+| `_release_arrow_allocators` (reset event) | Arrow cleanup on checkin. Fires identically for async-checked-out connections (it is a pool-level event). | **Unchanged — reused** |
 
 ---
 
-## PyPI Backend: File-Level Change List
+## Recommended Project Structure
 
-A PyPI backend is one where the ADBC driver is published to PyPI and installed via pip.
-Current PyPI backends: Snowflake, BigQuery, PostgreSQL, FlightSQL.
+```
+src/adbc_poolhouse/
+├── __init__.py              # MODIFIED: lazy/extra-guarded re-export of async API
+├── _pool_factory.py         # UNCHANGED (sync trio + _create_pool_impl)
+├── _driver_api.py           # UNCHANGED (config dispatch)
+├── _base_config.py          # UNCHANGED (Protocol)
+├── _async/                  # NEW package — the entire async surface
+│   ├── __init__.py          # public: create_async_pool, managed_async_pool, close_async_pool
+│   ├── _factory.py          # async factory; calls _create_pool_impl, builds AsyncPool + limiter
+│   ├── _pool.py             # AsyncPool (connect/close offload, owns CapacityLimiter)
+│   ├── _connection.py       # AsyncConnection wrapper
+│   ├── _cursor.py           # AsyncCursor wrapper (+ cancellation)
+│   └── _offload.py          # tiny helper: run_sync(fn, *, limiter) thin wrapper + cancel glue
+tests/
+└── async/                   # NEW: async-specific tests (anyio pytest plugin, both backends)
+```
 
-**New files (create):**
+### Structure Rationale
 
-1. `src/adbc_poolhouse/_[warehouse]_config.py`
-   - Subclass `BaseWarehouseConfig`
-   - Set `model_config = SettingsConfigDict(env_prefix="[WAREHOUSE]_")`
-   - Map driver-specific connection params as typed Pydantic fields
-   - Use `SecretStr` for passwords, tokens, URIs that embed credentials
-   - Override `_adbc_entrypoint()` only if the driver requires a non-None entrypoint symbol (currently only DuckDB does; all other drivers return the base class default of `None`)
-   - Do NOT implement `_adbc_driver_key()` — that method was removed in a prior tech debt cleanup and no longer exists on BaseWarehouseConfig
-
-2. `src/adbc_poolhouse/_[warehouse]_translator.py`
-   - Single pure function `translate_[warehouse](config: [Warehouse]Config) -> dict[str, str]`
-   - Config type import under `TYPE_CHECKING` guard (avoids circular imports)
-   - Map config fields to exact ADBC driver parameter key names
-   - Omit `None` fields; include bool defaults as `'true'`/`'false'` strings
-
-3. `docs/src/guides/[warehouse].md`
-   - Installation: `pip install adbc-poolhouse[[warehouse]]`
-   - Connection code examples
-   - Env-var loading pattern
-
-**Modified files (edit):**
-
-4. `src/adbc_poolhouse/_drivers.py`
-   - Add config class import at module level
-   - Add entry to `_PYPI_PACKAGES` dict: `[Warehouse]Config: ("[pkg_name]", "[extra]")`
-   - Example: `BigQueryConfig: ("adbc_driver_bigquery", "bigquery")`
-
-5. `src/adbc_poolhouse/_translators.py`
-   - Add config class import at module level
-   - Add translator function import at module level
-   - Add `if isinstance(config, [Warehouse]Config): return translate_[warehouse](config)` branch before the final `raise TypeError`
-   - Alphabetical order within PyPI group per existing convention
-
-6. `src/adbc_poolhouse/__init__.py`
-   - Add `from adbc_poolhouse._[warehouse]_config import [Warehouse]Config`
-   - Add `"[Warehouse]Config"` to `__all__`
-
-7. `pyproject.toml`
-   - Add `[warehouse] = ["[pypi-package]>=[min-version]"]` to `[project.optional-dependencies]`
-   - Add `"adbc-poolhouse[[warehouse]]"` to the `all` extra list
-
-8. `tests/test_configs.py` — add test class `Test[Warehouse]Config`
-9. `tests/test_translators.py` — add test class `Test[Warehouse]Translator` + dispatch test case
-10. `tests/test_drivers.py` — add Path 1 and Path 2 tests for the new config type
+- **A dedicated `_async/` package, not a single `_async.py`:** the surface is four wrapper classes plus
+  a factory and offload helper — co-locating keeps the import cost (and the `anyio` dependency) isolated
+  so the sync path never imports anyio.
+- **`__init__.py` guarded import:** importing the async names must not hard-fail when the `[async]`
+  extra (and therefore `anyio`) is absent. Use a lazy `__getattr__` (PEP 562) on the package `__init__`
+  that imports `_async` on first access and raises a clear `ImportError` ("install adbc-poolhouse[async]")
+  if `anyio` is missing. This keeps `import adbc_poolhouse` zero-cost for sync users and basedpyright-strict clean.
+- **Reuse, don't fork, `_create_pool_impl()`:** config dispatch (the Family A/A'/B signature detection in
+  `_driver_api.py`) is genuinely hard logic. The async factory calls `_create_pool_impl(...)` to get a real
+  `QueuePool`, then wraps it. Zero duplication of dispatch; one async layer covers all 13 backends via the Protocol.
 
 ---
 
-## Foundry Backend: File-Level Change List
+## Architectural Patterns
 
-A Foundry backend is one whose ADBC driver is distributed by the ADBC Driver Foundry
-(not on PyPI) and accessed via `adbc_driver_manager` manifest resolution. Current
-Foundry backends: Databricks, Redshift, Trino, MSSQL.
+### Pattern 1: Wrap-and-offload (do not re-implement)
 
-**New files (create):**
-
-1. `src/adbc_poolhouse/_[warehouse]_config.py`
-   - Same structure as PyPI config
-   - No `_adbc_entrypoint()` override needed (Foundry drivers use manifest resolution, not a shared-lib entrypoint symbol)
-   - Do not reference the dbc install name in the config model — that lives in `_drivers.py`
-
-2. `src/adbc_poolhouse/_[warehouse]_translator.py`
-   - Same pattern. For Foundry backends, connection is typically URI-only or URI-first with decomposed-field fallback. Verify key names against `docs.adbc-drivers.org` and `adbc-quickstarts` examples.
-
-3. `docs/src/guides/[warehouse].md`
-   - Installation: `pip install adbc-poolhouse` (no extra — Foundry drivers have no PyPI package)
-   - dbc install command: `dbc install [short_name]`
-   - Connection code examples
-
-**Modified files (edit):**
-
-4. `src/adbc_poolhouse/_drivers.py`
-   - Add config class import at module level
-   - Add entry to `_FOUNDRY_DRIVERS` dict: `[Warehouse]Config: ("[short_name]", "[short_name]")`
-   - The first string is the `adbc_driver_manager` manifest name; the second is the `dbc install` name
-   - Example: `DatabricksConfig: ("databricks", "databricks")`
-   - `_driver_api.py` uses this dict to build the `dbc install [name]` error message automatically — no changes needed to `_driver_api.py`
-
-5. `src/adbc_poolhouse/_translators.py`
-   - Same as PyPI path — add imports and isinstance branch
-
-6. `src/adbc_poolhouse/__init__.py`
-   - Same as PyPI path — add import and `__all__` entry
-
-7. `pyproject.toml`
-   - No new optional dependency entry — Foundry drivers have no PyPI package
-   - No change to the `all` extra
-
-8. `tests/test_configs.py` — add test class
-9. `tests/test_translators.py` — add test class + dispatch test
-10. `tests/test_drivers.py` — add Foundry short-name test (assert `resolve_driver(Config())` returns the short name without calling `find_spec`)
-
-**Not modified for Foundry:**
-
-`_driver_api.py` — already handles all Foundry NOT_FOUND errors via the `_FOUNDRY_DRIVERS`
-reverse-lookup. Adding a new entry to `_FOUNDRY_DRIVERS` in `_drivers.py` is the only
-change needed. `_driver_api.py` imports that dict at runtime and builds `dbc install
-[name]` error messages automatically.
-
----
-
-## Dispatch Table Update Patterns
-
-### `_drivers.py` — Two distinct dispatch dicts
+**What:** Each async method is a thin coroutine that offloads exactly one blocking sync call to a worker
+thread via `anyio.to_thread.run_sync`, passing the pool's dedicated limiter.
+**When:** Every blocking boundary — checkout, `execute`, `fetch*`, `fetch_arrow_table`, `close`.
+**Trade-offs:** Minimal new logic, trivially correct, anyio-neutral (asyncio + trio). Cost is one
+thread-hop per call; negligible vs. DB round-trip latency.
 
 ```python
-# PyPI: find_spec -> path, with manifest fallback
-_PYPI_PACKAGES: dict[type, tuple[str, str]] = {
-    SnowflakeConfig:  ("adbc_driver_snowflake",  "snowflake"),
-    BigQueryConfig:   ("adbc_driver_bigquery",   "bigquery"),
-    PostgreSQLConfig: ("adbc_driver_postgresql", "postgresql"),
-    FlightSQLConfig:  ("adbc_driver_flightsql",  "flightsql"),
-    # NEW PyPI backend:
-    # [Warehouse]Config: ("[pkg_name]", "[extra]"),
-}
+# _async/_offload.py
+from anyio import to_thread
+from anyio import CapacityLimiter
 
-# Foundry: skip find_spec, return short name for manifest resolution
-_FOUNDRY_DRIVERS: dict[type, tuple[str, str]] = {
-    DatabricksConfig: ("databricks", "databricks"),
-    RedshiftConfig:   ("redshift",   "redshift"),
-    TrinoConfig:      ("trino",      "trino"),
-    MSSQLConfig:      ("mssql",      "mssql"),
-    # NEW Foundry backend:
-    # MySQLConfig:     ("mysql",      "mysql"),
-    # TeradataConfig:  ("teradata",   "teradata"),
-}
+async def offload(fn, /, *args, limiter: CapacityLimiter):
+    # abandon_on_cancel=False (default): we handle cancellation explicitly
+    # via adbc_cancel rather than abandoning the worker (see Pattern 3).
+    return await to_thread.run_sync(lambda: fn(*args), abandon_on_cancel=False, limiter=limiter)
+
+# _async/_cursor.py
+class AsyncCursor:
+    async def execute(self, sql, parameters=None):
+        return await offload(self._cur.execute, sql, parameters, limiter=self._limiter)
+
+    async def fetch_arrow_table(self):
+        return await offload(self._cur.fetch_arrow_table, limiter=self._limiter)
 ```
 
-**Key invariant:** A config type belongs in exactly one dict. If a driver is available
-both on PyPI and through Foundry (currently no such case), prefer the PyPI path so
-`find_spec` can resolve the shared library directly.
+### Pattern 2: Dedicated CapacityLimiter sized to the pool
 
-### `_translators.py` — isinstance chain
+**What:** `AsyncPool` constructs `CapacityLimiter(pool_size + max_overflow)` and threads it through
+every `run_sync`. Checkout offload and execute/fetch offload share *this* limiter.
+**When to use:** Always, for the async pool. Never use the shared default 40-token limiter for DB work.
+**Trade-offs:** Guarantees the number of in-flight DB worker threads can never exceed the number of
+connections the pool can hand out, so there is no oversubscription and no head-of-line blocking from
+unrelated `to_thread` callers in the host application.
 
 ```python
-def translate_config(config: WarehouseConfig) -> dict[str, str]:
-    # Order within each group is alphabetical (existing convention).
-    if isinstance(config, BigQueryConfig):    return translate_bigquery(config)
-    if isinstance(config, DatabricksConfig):  return translate_databricks(config)
-    if isinstance(config, DuckDBConfig):      return translate_duckdb(config)
-    if isinstance(config, FlightSQLConfig):   return translate_flightsql(config)
-    if isinstance(config, MSSQLConfig):       return translate_mssql(config)
-    if isinstance(config, PostgreSQLConfig):  return translate_postgresql(config)
-    if isinstance(config, RedshiftConfig):    return translate_redshift(config)
-    if isinstance(config, SnowflakeConfig):   return translate_snowflake(config)
-    if isinstance(config, TrinoConfig):       return translate_trino(config)
-    # INSERT new backend here, maintaining alphabetical order:
-    # if isinstance(config, MySQLConfig):     return translate_mysql(config)
-    raise TypeError(f"Unsupported config type: {type(config).__name__}")
+# _async/_pool.py
+class AsyncPool:
+    def __init__(self, sync_pool, pool_size, max_overflow):
+        self._pool = sync_pool
+        self._limiter = anyio.CapacityLimiter(pool_size + max_overflow)
+
+    async def connect(self):
+        fairy = await offload(self._pool.connect, limiter=self._limiter)
+        return AsyncConnection(fairy, self._limiter)
 ```
 
-All concrete config classes are direct siblings of `BaseWarehouseConfig` (no
-multi-level inheritance), so `isinstance` check order does not affect correctness.
+> **Sizing rationale (Q3).** A checked-out connection is busy for the whole lifetime of a query, so the
+> *steady-state* in-flight thread count equals the number of checked-out connections, bounded by
+> `pool_size + max_overflow`. Sizing the limiter to exactly that bound means: (i) execute/fetch never
+> queue behind the limiter (a connection you hold already "owns" a token via its checkout); (ii) checkout
+> offload itself participates in the same bound, so a flood of `connect()` calls is throttled at the
+> limiter rather than spawning unbounded threads. The shared 40-token default is rejected because it is
+> process-global: another part of the host app doing `to_thread` work could exhaust it and deadlock DB
+> checkouts, and our checkouts could starve theirs.
 
----
+### Pattern 3: Cancellation via `adbc_cancel` from the loop thread
 
-## New Backends: Research-Confirmed Connection Parameter Patterns
-
-The following patterns were verified from the `columnar-tech/adbc-quickstarts` repository
-via GitHub API (HIGH confidence for URI shape).
-
-### MySQL (Foundry — `dbc install mysql`)
+**What:** On anyio cancellation of an in-flight `execute`/fetch, call the cursor's (or connection's)
+`adbc_cancel()` from the event-loop thread to unblock the worker, then invalidate the connection.
+**When:** Any awaited DB call inside a cancel scope / timeout / task-group cancellation.
+**Trade-offs:** True cooperative cancellation (the blocked C call actually returns), no abandoned-thread
+leak. Requires a small amount of glue because `run_sync` by itself can only *abandon* (ignore the result
+of) a thread, not interrupt it.
 
 ```python
-# URI format (verified: columnar-tech/adbc-quickstarts/python/mysql/mysql/main.py)
-db_kwargs = {"uri": "root:password@tcp(localhost:3306)/dbname"}
+# _async/_cursor.py — cancellation glue
+async def execute(self, sql, parameters=None):
+    try:
+        return await offload(self._cur.execute, sql, parameters, limiter=self._limiter)
+    except anyio.get_cancelled_exc_class():
+        # Called from the loop thread while the worker is blocked in execute().
+        # adbc_cancel is documented thread-safe vs. all other (non-thread-safe) ops.
+        with anyio.CancelScope(shield=True):
+            await to_thread.run_sync(self._cur.adbc_cancel)   # unblocks the worker
+        self._conn._invalidate()                              # mark dirty -> pool discards
+        raise
 ```
-
-MySQL URI format uses the Go DSN style (`tcp(host:port)/db`), not a standard URL scheme.
-`MySQLConfig` fields: `uri: str | None`, plus decomposed `host`, `port`, `user`,
-`password`, `database` for field-mode connection.
-
-### Teradata (Foundry — `dbc install teradata`)
-
-```python
-# URI format (verified: columnar-tech/adbc-quickstarts/python/teradata/main.py)
-db_kwargs = {"uri": "teradata://username:password@host:1025"}
-```
-
-Standard URL scheme. `TeradataConfig` fields: `uri: SecretStr | None`, plus decomposed
-`host`, `port`, `user`, `password`.
-
-Note: Teradata was previously dropped from this project because no Foundry driver existed
-at that time (per `.planning/.continue-here.md`). The driver now exists in the
-`adbc-drivers` GitHub org and has quickstart examples. Verify driver stability before
-re-adding.
-
-### ClickHouse (Foundry — `dbc install clickhouse`)
-
-```python
-# URI + decomposed (verified: columnar-tech/adbc-quickstarts/python/clickhouse/main.py)
-db_kwargs = {"uri": "http://localhost:8123", "username": "user", "password": "pass"}
-```
-
-ClickHouse uses HTTP URI plus separate `username`/`password` keys.
-
-### Oracle (Foundry — `dbc install oracle`)
-
-```python
-# URI format (verified: columnar-tech/adbc-quickstarts/python/oracle/main.py)
-db_kwargs = {"uri": "oracle://system:password@localhost:1521/FREEPDB1"}
-```
-
-Standard Oracle connection string. `OracleConfig` fields: `uri: SecretStr | None`, plus
-decomposed `host`, `port`, `user`, `password`, `service_name`.
 
 ---
 
-## justfile Recipes: dbc Tooling
+## Data Flow
 
-The `dbc` CLI (v0.2.0, February 2026) is the tool for installing Foundry drivers.
-The following recipe shapes are derived from `columnar-tech/dbc/docs/reference/cli.md`
-(HIGH confidence — fetched directly from GitHub).
-
-### Available `dbc` Commands (v0.2.0)
-
-| Command | Purpose |
-|---------|---------|
-| `dbc search [PATTERN]` | Search available drivers |
-| `dbc install <DRIVER>` | Install a driver (user level by default) |
-| `dbc uninstall <DRIVER>` | Uninstall a driver |
-| `dbc info <DRIVER>` | Show driver metadata and version |
-| `dbc init` | Create `dbc.toml` driver list file |
-| `dbc add <DRIVER>` | Add driver to `dbc.toml` |
-| `dbc remove <DRIVER>` | Remove driver from `dbc.toml` |
-| `dbc sync` | Install all drivers from `dbc.toml` |
-| `dbc docs [DRIVER]` | Open driver documentation in browser |
-
-**There is no `dbc verify` subcommand.** The `dbc info <DRIVER>` subcommand shows
-version and metadata. Runtime verification (is the driver loadable?) is handled by
-the existing `create_adbc_connection()` in `_driver_api.py`, which raises a clear
-`ImportError` when the manifest is missing.
-
-### Recommended justfile Recipes
-
-```just
-# Install the dbc CLI via pipx (isolated, puts dbc on PATH)
-dbc-install-cli:
-    pipx install dbc
-
-# Install all Foundry drivers supported by adbc-poolhouse
-dbc-install-drivers:
-    dbc install databricks
-    dbc install redshift
-    dbc install trino
-    dbc install mssql
-
-# Show metadata for each supported Foundry driver
-dbc-info:
-    dbc info databricks
-    dbc info redshift
-    dbc info trino
-    dbc info mssql
-
-# Uninstall all Foundry drivers
-dbc-uninstall-drivers:
-    dbc uninstall databricks
-    dbc uninstall redshift
-    dbc uninstall trino
-    dbc uninstall mssql
-
-# Search all available drivers (for discovery)
-dbc-search:
-    dbc search
-```
-
-### Recipe Design Notes
-
-1. `dbc install` installs at user level by default. For CI or system-wide installs
-   add `--level system`. For venv-local installs, `VIRTUAL_ENV` is auto-detected.
-
-2. As of dbc 0.2.0, multiple drivers can be installed in a single call
-   (`dbc install databricks redshift`). Separate lines in the justfile recipe are
-   preferred for clear error attribution.
-
-3. `dbc install` accepts version constraints: `dbc install databricks>=1.0.0`.
-   The justfile recipes install latest stable (no version pin).
-
-4. When a new Foundry backend is added to adbc-poolhouse: add the corresponding
-   `dbc install [name]` line to `dbc-install-drivers` and `dbc uninstall [name]`
-   to `dbc-uninstall-drivers`. Keep the list in alphabetical order.
-
----
-
-## DEVELOP.md Changes Required
-
-The existing `DEVELOP.md` has no section on Foundry driver management. The following
-changes are needed:
-
-### New section: "Foundry driver management"
-
-Add under `## Common Tasks`. Content to cover:
-
-1. What the ADBC Driver Foundry is (Columnar, not Apache) and why some drivers are not on PyPI
-2. Installing the `dbc` CLI: `just dbc-install-cli` (or `pipx install dbc` directly)
-3. Installing all supported Foundry drivers: `just dbc-install-drivers`
-4. Checking driver metadata: `just dbc-info`
-5. Reference to `https://docs.columnar.tech/dbc/` and `https://docs.adbc-drivers.org/`
-6. `adbc_driver_manager` version requirement: `>=1.8.0` for manifest resolution. The
-   dbc README explicitly states `adbc-driver-manager>=1.8.0` is required. The current
-   `pyproject.toml` pins `>=1.0.0` — this should be updated.
-7. The `ADBC_DRIVER_PATH` environment variable for per-project driver isolation
-8. Brief note on the three-path detection strategy in `_drivers.py` so contributors
-   understand how new Foundry backends integrate
-
-### Update `## Project Structure` section
-
-The current structure listing references files that no longer exist:
-- Remove `_pool_types.py` from the listing (deleted in prior tech debt cleanup)
-- The listing should not include `_teradata_*.py` (Teradata support was dropped)
-
-### Update `## Common Tasks`
-
-Add entries for:
-- `just dbc-install-cli`
-- `just dbc-install-drivers`
-- `just dbc-info`
-
----
-
-## Tech Debt Removals: Interaction With New Backend Additions
-
-### Current Status of Declared Tech Debt
-
-| Item | Actual Status | Impact on New Backends |
-|------|--------------|------------------------|
-| Remove `_pool_types.py` (AdbcCreatorFn) | DONE — file does not exist in repo | None — do not import this |
-| Remove `_adbc_driver_key()` from BaseWarehouseConfig and all subclasses | DONE — not present in current source | New config files MUST NOT implement this method |
-| Fix DatabricksConfig decomposed-field gap (host/http_path/token silently produce `{}` when URI absent) | PENDING — `translate_databricks()` only emits `uri` | Must fix before adding new Foundry backends that use decomposed fields (MySQL, Teradata, ClickHouse) |
-| Verify Teradata field names against real Columnar ADBC Teradata driver | PENDING — but Teradata config/translator don't exist yet | Teradata is a new backend, not a fix to existing code |
-
-The PROJECT.md file still lists items 1 and 2 as `[ ]` (open), but the source files
-confirm they were completed in a prior session. The `.planning/.continue-here.md` file
-records this explicitly: "Deleted `_pool_types.py` (AdbcCreatorFn unused)" and
-"Removed dead `_adbc_driver_key()` abstract method from base + all 10 subclasses".
-
-### Build Order Implication
-
-Fix the DatabricksConfig decomposed-field gap **before** adding MySQL, Teradata, or
-ClickHouse. The fix establishes the authoritative pattern for URI-first with
-decomposed-field fallback that those translators will follow. Adding them before the
-fix means their translators are modelled on a broken Databricks translator.
-
----
-
-## Correct Build Order
-
-The dependency DAG for this milestone is:
+### Query flow (async)
 
 ```
-1. Tech debt removals (already done in prior session — no work needed)
-   - _pool_types.py deleted
-   - _adbc_driver_key() removed
-
-2. DatabricksConfig decomposed-field fix
-   - translate_databricks() gains host/http_path/token decomposed path
-   - test_translators.py gains decomposed-field test cases
-   - MUST come before new Foundry backends with decomposed fields
-
-3. justfile dbc recipes (independent of backend additions)
-   - dbc-install-cli, dbc-install-drivers, dbc-info, dbc-uninstall-drivers, dbc-search
-
-4. DEVELOP.md dbc section (depends on justfile recipes existing)
-
-5. pyproject.toml adbc-driver-manager version bump
-   - Change >=1.0.0 to >=1.8.0 (manifest resolution requires 1.8.0 per dbc README)
-   - Independent of backend additions but affects Foundry driver correctness
-
-6. New Foundry backend: Teradata (verify driver stability before implementing)
-   - _teradata_config.py
-   - _teradata_translator.py
-   - _drivers.py: entry in _FOUNDRY_DRIVERS
-   - _translators.py: entry in isinstance chain
-   - __init__.py: export
-   - tests/test_configs.py: class
-   - tests/test_translators.py: class
-   - tests/test_drivers.py: case
-   - docs/src/guides/teradata.md (replaces existing placeholder page)
-   - justfile: add teradata to dbc-install-drivers and dbc-uninstall-drivers
-
-7. New Foundry backend: MySQL (parallel with Teradata — independent slices)
-   - Same file list as step 6 with mysql substituted
-
-8. New backends: ClickHouse, Oracle, others (same pattern; verify driver stability each)
-
-9. (No separate docs step — docs are created as part of each backend slice)
+await pool.connect()
+    │  offload ──▶ QueuePool.connect()      (worker thread; blocks if exhausted, bounded by timeout)
+    ▼
+AsyncConnection ──▶ await conn.cursor()  (cheap; may be sync or trivially offloaded)
+    ▼
+await cursor.execute(sql)
+    │  offload ──▶ cursor.execute()        (worker thread; ADBC C call runs `with nogil:` → real concurrency)
+    ▼
+await cursor.fetch_arrow_table()
+    │  offload ──▶ cursor.fetch_arrow_table()  (worker thread; GIL released during pull)
+    ▼
+async ctx exit ──▶ offload conn.close()/return to pool
+    │
+    ▼
+pool `reset` event ──▶ _release_arrow_allocators (UNCHANGED, fires on checkin/invalidate/error)
 ```
 
-**Why this order:**
+### Cancellation flow (Q5, concrete)
 
-- Step 2 before steps 6-8: DatabricksConfig fix establishes the correct decomposed-field pattern
-- Steps 3-5 are independent and can be parallelised or done in any order relative to each other
-- Steps 6-8 are independent slices that touch disjoint files
-- Any step can be committed independently since each slice is self-contained
+```
+event-loop thread                         worker thread
+─────────────────                         ─────────────
+await cursor.execute(sql)  ───offload───▶  cursor.execute()  ── blocked in AdbcStatementExecuteQuery (nogil)
+   │
+   │  (timeout fires / task cancelled)
+   ▼
+catch cancelled exc
+   │
+   ├─ shield + to_thread(cursor.adbc_cancel())  ──▶  AdbcStatementCancel()  ← THREAD-SAFE by spec
+   │                                                      │
+   │                                                      ▼
+   │                                         execute() returns ADBC_STATUS_CANCELLED → raises
+   ├─ conn._invalidate()  (SQLAlchemy ConnectionFairy.invalidate)
+   │      → pool will NOT reuse this connection; reset event still closes cursors
+   ▼
+re-raise cancelled exc  (no leak, no half-open connection reused)
+```
 
----
-
-## Anti-Patterns to Avoid
-
-### Anti-Pattern 1: Putting driver logic in the config model
-
-**What:** Adding dispatch logic, driver path resolution, or dbc install commands into
-the config model (`_[warehouse]_config.py`).
-
-**Why bad:** Config models are data containers. Driver resolution lives in `_drivers.py`
-dispatch tables. Mixing them creates coupling that makes testing harder and breaks the
-separation that lets `_driver_api.py` be the single `adbc_driver_manager` importer.
-
-**Instead:** Config model fields only. Detection logic in `_drivers.py` dict entries.
-
-### Anti-Pattern 2: Importing driver packages at module level in `_drivers.py`
-
-**What:** Adding `import adbc_driver_[warehouse]` at the top of `_drivers.py`.
-
-**Why bad:** Breaks bare-import safety (the module docstring calls this DRIV-04). The
-library must be importable without any ADBC driver installed. Driver package imports
-are guarded inside function bodies (`_resolve_pypi_driver` uses `__import__` after
-`find_spec` confirms presence).
-
-**Instead:** Only config class imports at module level in `_drivers.py`. Driver package
-imports inside function bodies under `find_spec` guard.
-
-### Anti-Pattern 3: Adding Foundry backends to `_PYPI_PACKAGES`
-
-**What:** Adding a Foundry-distributed driver (Databricks, MySQL, Teradata) to the
-`_PYPI_PACKAGES` dict rather than `_FOUNDRY_DRIVERS`.
-
-**Why bad:** `_PYPI_PACKAGES` triggers a `find_spec` call that always returns `None` for
-Foundry-only drivers. The Path 2 fallback returns the package name as a manifest key,
-which accidentally works — but it bypasses the `_FOUNDRY_DRIVERS` reverse lookup used
-by `_driver_api.py` to build the `dbc install [name]` error message.
-
-**Instead:** Foundry-only drivers go in `_FOUNDRY_DRIVERS`. The `_driver_api.py`
-NOT_FOUND handler uses `_FOUNDRY_DRIVERS.values()` to resolve the correct install name.
-
-### Anti-Pattern 4: Emitting empty dict from decomposed-field translators
-
-**What:** Implementing a translator that only emits `uri` when set and silently returns
-`{}` when decomposed fields (host, port, user, password) are provided instead.
-
-**Why bad:** Silent connection failures. The driver receives no parameters and raises
-an unhelpful error at connection time rather than a clear error at translation time.
-
-**Instead:** For URI-first translators, implement both paths: if `uri` is set, return
-early with `{"uri": ...}`; otherwise map decomposed fields. This is the pattern the
-DatabricksConfig fix will establish — follow it for all new Foundry backends.
-
-### Anti-Pattern 5: Implementing `_adbc_driver_key()` on a new config class
-
-**What:** Adding `def _adbc_driver_key(self) -> str:` to a new config class.
-
-**Why bad:** This method was removed in tech debt cleanup. It is no longer part of
-`BaseWarehouseConfig` or the `WarehouseConfig` Protocol. Any new implementation will
-be dead code immediately.
-
-**Instead:** Register the config type in `_PYPI_PACKAGES` or `_FOUNDRY_DRIVERS`.
+> **Why this is safe and leak-free (Q5).** `AdbcStatementCancel`/`AdbcConnectionCancel` are the *only*
+> ADBC operations the C header marks "must always be thread-safe (other operations are not)." So calling
+> `adbc_cancel()` from the loop thread while the worker is mid-`execute()` is exactly the supported pattern.
+> The worker's `execute` then returns an error promptly, releasing the worker thread (and its limiter token).
+> We invalidate rather than check-in the connection so a possibly half-consumed result set / dirty statement
+> is never reused; SQLAlchemy's pool discards it and the `reset` event still runs cursor cleanup. We do **not**
+> use `abandon_on_cancel=True` as the primary mechanism, because abandoning leaks a busy worker thread that
+> still holds the connection — `adbc_cancel` actively reclaims it instead.
 
 ---
 
-## Scalability Considerations
+## Connection Thread-Affinity — answered from evidence (Q4)
 
-| Concern | Current (9 warehouses) | At 20 warehouses | At 50 warehouses |
-|---------|------------------------|-----------------|-----------------|
-| `_translators.py` isinstance chain | 9 branches, ~70 lines | ~20 branches, ~140 lines | Too long — refactor to dict dispatch |
-| `_drivers.py` import block | 9 config imports | ~20 imports | Acceptable |
-| `__init__.py` export list | 10 symbols | ~22 symbols | Acceptable |
-| `tests/test_translators.py` | ~270 lines | ~540 lines | Split into per-warehouse test files |
+**Verdict: ADBC dbapi connections do NOT require thread-affinity. Serialized cross-thread use is safe.**
 
-At 20 warehouses the isinstance chain in `_translators.py` is still acceptable. At 50
-warehouses, refactor to a `dict[type, Callable]` dispatch table (same shape as
-`_drivers.py` already uses). That refactor does not change external behaviour.
+Evidence:
+
+1. ADBC concurrency spec: *"In general, objects allow serialized access from multiple threads: one
+   thread may make a call, and once finished, another thread may make a call."* No same-OS-thread
+   requirement is stated anywhere in the spec or the C header.
+2. dbapi module: `threadsafety = 1` ("threads may share the module, but not connections"). This is a
+   *sharing* (concurrency) constraint, not an affinity constraint — it forbids two threads touching one
+   connection *at once*, not the same connection on different threads *over time*.
+3. The C header's per-object docstrings say operations "are not [thread-safe]" — i.e. must be serialized —
+   with `Cancel` the sole explicit exception.
+
+**Consequence for the wrapper design:** `to_thread.run_sync` may dispatch successive calls on different
+worker threads, and that is fine, because (a) ADBC permits serialized cross-thread access and (b) a pool-
+checked-out connection is owned by exactly one async task at a time, so two threads never touch it
+concurrently. **No per-connection dedicated thread, no thread-pinning, no per-connection serialization
+lock is required.** (If a future driver turns out to mis-handle cross-thread serialized access, the
+fallback is a per-`AsyncConnection` `anyio.Lock` to serialize its calls — cheap to add, but not needed by spec.)
+
+---
+
+## Checkout-Wait Strategy — decision with rationale (Q2)
+
+**Decision: Option (a) — plain sync `QueuePool`, offload `pool.connect()` through `to_thread`.**
+
+Rationale:
+
+- **Simplicity & correctness.** The sync pool already implements exhaustion waiting, `timeout`,
+  `max_overflow`, recycle, and the Arrow `reset` event. Re-implementing checkout queueing in anyio
+  duplicates battle-tested logic and risks subtle bugs (fairness, recycle, invalidation).
+- **anyio-neutral.** Offloading the blocking checkout keeps the whole stack asyncio+trio neutral with no
+  greenlet. The only cost is that a worker thread is briefly held during an exhausted-pool wait — but that
+  wait is bounded by the existing `timeout` (default 30s) and, with the dedicated limiter sized to the
+  pool, the number of threads parked in checkout-wait can never exceed the connection budget anyway.
+- **The dedicated limiter already gives us the "anyio-native" benefit that option (b) was reaching for**
+  (back-pressure that the event loop can see), without a second queueing mechanism. A task waiting on a
+  checkout is either waiting on the limiter (event-loop-native) or briefly on a worker thread inside
+  `QueuePool.connect` (bounded). We get back-pressure visibility without re-implementing the pool.
+
+**Rejected — Option (b) anyio-native limiter as the checkout gate:** adds a second source of truth for
+"how many connections are out" that must be kept perfectly in sync with the sync pool's own counters;
+divergence causes either spurious waits or oversubscription. Not worth it. (We *do* use a CapacityLimiter,
+but as the *thread* budget — Pattern 2 — not as a replacement for the pool's checkout queue.)
+
+**`AsyncAdaptedQueuePool` verdict (reference only, NOT used):** SQLAlchemy's `AsyncAdaptedQueuePool`
+swaps the pool's internal wait primitive for an asyncio-based one driven via **greenlet** (the
+`greenlet_spawn`/`await_only` bridge). It is **asyncio-bound** (breaks trio neutrality, a hard project
+constraint), and — critically — it only changes *checkout waiting*; it does **nothing** for the actual
+blocking `execute`/`fetch` C calls, which still must be offloaded to threads. So it solves the smaller
+half of the problem at the cost of the neutrality constraint. Use it as a reference for "how SQLAlchemy
+thinks about async checkout," not as a foundation.
+
+---
+
+## Scaling Considerations
+
+| Scale | Architecture adjustments |
+|-------|--------------------------|
+| Light (few concurrent queries) | Defaults fine: `pool_size=5, max_overflow=3` → limiter of 8. |
+| Many concurrent async tasks | Raise `pool_size`/`max_overflow`; the limiter auto-tracks because it is sized from them. Watch DB-side connection limits. |
+| High fan-out across pools | Each `AsyncPool` owns its own limiter, so multiple pools don't contend on a shared thread budget; total worker threads ≈ Σ(pool_size+overflow). Keep an eye on host thread count. |
+
+### Scaling priorities
+
+1. **First bottleneck:** connection count / DB server limits — tune `pool_size`, not the limiter directly.
+2. **Second bottleneck:** total OS worker threads if many large pools coexist — the per-pool limiter keeps
+   this proportional and predictable.
+
+---
+
+## Anti-Patterns
+
+### Anti-Pattern 1: Using the default anyio thread limiter for DB work
+**What people do:** call `to_thread.run_sync(...)` with no `limiter=`.
+**Why it's wrong:** the 40-token default is process-global and shared with all other `to_thread` users in
+the host app; DB checkouts and unrelated CPU offload can starve each other or deadlock.
+**Instead:** pass the pool's dedicated `CapacityLimiter` to every DB offload.
+
+### Anti-Pattern 2: `abandon_on_cancel=True` as the cancellation mechanism
+**What people do:** rely on anyio abandoning the worker on cancel.
+**Why it's wrong:** the worker keeps running, still holding the connection and a limiter token → leak;
+the connection may return to the pool in a half-open state.
+**Instead:** call `adbc_cancel()` (thread-safe by spec) to actively unblock the worker, then invalidate
+the connection.
+
+### Anti-Pattern 3: Sharing one checked-out connection across concurrent tasks
+**What people do:** await two `execute`s on the same `AsyncConnection` from two tasks at once.
+**Why it's wrong:** ADBC `threadsafety=1` forbids concurrent access to one connection; two workers would
+touch it simultaneously.
+**Instead:** one `AsyncConnection` per task; the pool hands out distinct connections. (Optionally guard
+with a per-connection `anyio.Lock` for defense-in-depth.)
+
+### Anti-Pattern 4: Forking `_create_pool_impl` / config dispatch into the async layer
+**What people do:** re-derive driver path / kwargs in the async factory.
+**Why it's wrong:** duplicates the Family A/A'/B signature-detection logic and the 13-backend coverage.
+**Instead:** call `_create_pool_impl(...)` and wrap its `QueuePool`.
+
+---
+
+## Integration Points
+
+### Internal boundaries
+
+| Boundary | Communication | Notes |
+|----------|---------------|-------|
+| `_async/_factory.py ↔ _pool_factory._create_pool_impl` | direct sync call | Reuse; do not duplicate dispatch. Factory passes the same pool-tuning kwargs through. |
+| `AsyncPool ↔ sqlalchemy QueuePool` | wraps instance; offloads `connect`/`dispose` | The `reset` event (`_release_arrow_allocators`) is registered by `_create_pool_impl` and fires unchanged. |
+| `AsyncCursor ↔ adbc dbapi Cursor` | offload + `adbc_cancel()` | `adbc_cancel` is the only call made from the loop thread while a worker is busy. |
+| `__init__.py ↔ _async` | PEP 562 lazy `__getattr__` | Guards the `anyio` import behind the `[async]` extra; clear `ImportError` if missing. |
+| `close_async_pool ↔ close_pool` | offload `close_pool(pool)` | Reuse sync `close_pool` (dispose + source.close) inside a thread. |
+
+### External / packaging
+
+| Item | Decision | Notes |
+|------|----------|-------|
+| `[async]` extra | adds `anyio>=4.0` only | Sync path never imports anyio. |
+| basedpyright strict | async wrappers fully typed | ADBC types stay suppressed only in `_driver_api.py`; wrappers type against the dbapi stubs/`Any` at the boundary. |
+| Tests | `anyio` pytest plugin, parametrized over asyncio **and** trio backends; cover DuckDB (in-proc) + Snowflake cassette | Proves trio-neutrality and backend-generic behaviour. |
+
+---
+
+## Suggested Build Order (Q6 — dependency-ordered)
+
+1. **Foundation.** `_async/_offload.py` (`offload` helper) + `_async/_factory.py` + `AsyncPool` owning a
+   dedicated `CapacityLimiter`; `create_async_pool` / `managed_async_pool` / `close_async_pool` calling
+   `_create_pool_impl` and `close_pool`. *Verifies:* pool creation + offloaded checkout work on both anyio
+   backends for one backend (DuckDB).
+2. **Connection + cursor wrappers.** `AsyncConnection`, `AsyncCursor` with `execute`/`executemany`/
+   `fetch*`/`fetch_arrow_table` offloaded through the pool's limiter. *Verifies:* end-to-end async query;
+   Arrow `reset` cleanup still fires on checkin.
+3. **Cancellation.** Wire anyio cancel scopes → `cursor.adbc_cancel()` / `conn.adbc_cancel()` from the loop
+   thread; invalidate-on-cancel. *Verifies:* a timeout interrupts a long `execute` and the connection does
+   not leak (limiter token reclaimed, no half-open reuse).
+4. **Backend-generic verification.** Run the async suite across the Protocol for the cassette backends
+   (Snowflake) + in-proc backends (DuckDB/SQLite); confirm one async layer covers all 13 via config dispatch.
+   Parametrize tests over asyncio **and** trio to lock in neutrality.
+5. **Docs.** Async usage guide + configuration/index/API-reference updates; Google-style docstrings on all
+   new public symbols; `mkdocs build --strict` (Phase ≥7 quality gate per CLAUDE.md).
 
 ---
 
 ## Sources
 
-- **HIGH confidence** (direct source inspection): All files in `src/adbc_poolhouse/`,
-  `tests/`, `justfile`, `DEVELOP.md`, `pyproject.toml`, `.planning/.continue-here.md`,
-  `docs/src/guides/`
-- **HIGH confidence** (dbc CLI reference): `columnar-tech/dbc/docs/reference/cli.md`
-  fetched via GitHub raw URL (v0.2.0, released 2026-02-10)
-- **HIGH confidence** (dbc driver list reference): `columnar-tech/dbc/docs/reference/driver_list.md`
-- **HIGH confidence** (dbc README): `columnar-tech/dbc/README.md` — confirms `>=1.8.0`
-  requirement for manifest resolution
-- **HIGH confidence** (adbc-drivers org repos): `api.github.com/orgs/adbc-drivers/repos`
-  — 23 repositories confirmed including mysql, clickhouse, mssql, databricks, redshift,
-  trino (also: oracle via quickstarts)
-- **HIGH confidence** (connection parameter shapes): `columnar-tech/adbc-quickstarts`
-  Python examples for mysql, teradata, clickhouse, oracle — fetched via GitHub API
-- **MEDIUM confidence** (decomposed-field key names for MySQL, Teradata, ClickHouse):
-  quickstarts show URI only; individual key names for decomposed-field mode need
-  verification against driver source or `docs.adbc-drivers.org`
+- ADBC C/C++ Concurrency & Thread Safety — "objects allow serialized access from multiple threads" (drives Q4) — https://arrow.apache.org/adbc/main/cpp/concurrency.html — **HIGH**
+- ADBC `adbc.h` header (main): `AdbcConnectionCancel` / `AdbcStatementCancel` docstrings — *"This must always be thread-safe (other operations are not)"* (drives Q5) — https://raw.githubusercontent.com/apache/arrow-adbc/main/c/include/arrow-adbc/adbc.h — **HIGH**
+- ADBC `_lib.pyx` (Cython) — every execute/fetch C call wrapped `with nogil:`; `cancel()` → `AdbcStatementCancel`/`AdbcConnectionCancel` (confirms GIL release + cancel wiring) — https://raw.githubusercontent.com/apache/arrow-adbc/main/python/adbc_driver_manager/adbc_driver_manager/_lib.pyx — **HIGH**
+- ADBC `dbapi.py` — `Cursor.adbc_cancel()` / `Connection.adbc_cancel()`; `threadsafety = 1`, `apilevel = "2.0"` — https://raw.githubusercontent.com/apache/arrow-adbc/main/python/adbc_driver_manager/adbc_driver_manager/dbapi.py — **HIGH**
+- ADBC `adbc_driver_manager` API reference — `adbc_cancel` semantics, "connections may not be shared" — https://arrow.apache.org/adbc/current/python/api/adbc_driver_manager.html — **HIGH**
+- anyio threads guide — default worker-thread limiter = 40 (shared); `abandon_on_cancel`; worker may differ per call — https://anyio.readthedocs.io/en/stable/threads.html — **HIGH**
+- anyio API — `to_thread.run_sync(func, *args, abandon_on_cancel, limiter)`; `CapacityLimiter(total_tokens)`; `current_default_thread_limiter()` (drives Q1/Q3) — https://anyio.readthedocs.io/en/stable/api.html — **HIGH**
+- Existing source read directly: `src/adbc_poolhouse/_pool_factory.py`, `_driver_api.py`, `_base_config.py`, `__init__.py`, `pyproject.toml` — **HIGH**
+
+---
+*Architecture research for: async layer over sync ADBC pool library (adbc-poolhouse v1.4.0)*
+*Researched: 2026-06-25*

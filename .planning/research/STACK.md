@@ -1,412 +1,220 @@
-# Stack Research: adbc-poolhouse
+# Stack Research: adbc-poolhouse v1.4.0 Async API
 
-**Research Date:** 2026-03-01
-**Research Type:** Subsequent Milestone — New ADBC backends and `dbc` CLI tooling
-**Milestone:** v1.1.0 — Backend Expansion & Foundry Driver Tooling
+**Research Date:** 2026-06-25
+**Research Type:** Subsequent Milestone — Optional async API layer over the existing sync ADBC pool
+**Milestone:** v1.4.0 — Async API
+**Confidence:** HIGH
 
 ---
 
 ## Scope Note
 
-This file extends the original STACK.md (dated 2026-02-23) which documented the base stack for v1.0.
-The v1.0 stack decisions (pydantic-settings, SQLAlchemy QueuePool, basedpyright, ruff, uv) are
-**not re-researched here**. This file covers only:
+This file covers ONLY the additions/changes the new async layer needs. The existing validated
+stack (Pydantic BaseSettings; SQLAlchemy `sqlalchemy.pool` / `sqlalchemy.event`; ADBC Driver
+Manager + per-backend drivers; mkdocs-material + mkdocstrings; uv; ruff; basedpyright strict; prek)
+is settled and unchanged and is **not re-researched here**. Prior-milestone driver/CLI stack
+research lives in git history.
 
-1. New ADBC driver packages on PyPI (beyond the five already in the library)
-2. The `dbc` CLI — commands, flags, and driver names for Foundry-distributed backends
-3. What NOT to add — unstable, redundant, or wrong-distribution drivers
+The async layer adds exactly **one runtime dependency** (`anyio`) behind an `[async]` extra, plus
+test wiring that reuses the existing pytest stack. No greenlet, no `sqlalchemy[asyncio]`, no native
+async ADBC driver.
 
 ---
 
 ## Confidence Key
 
-- HIGH — confirmed from multiple current sources (PyPI + official docs or release blog)
-- MEDIUM — confirmed from one authoritative source (PyPI or official docs)
-- LOW — from web search only, single source, or unverified claim
+- HIGH — confirmed from multiple current sources (PyPI JSON API + official docs)
+- MEDIUM — confirmed from one authoritative source
+- LOW — single web-search source, unverified
 
 ---
 
-## 1. New ADBC Driver Packages on PyPI
+## Recommended Stack
 
-### 1.1 adbc-driver-sqlite
+### Core Technologies (new for v1.4.0)
 
-**Recommendation:** Add as optional extra `sqlite = ["adbc-driver-sqlite>=1.0.0"]`
-**Current version:** 1.10.0 (released January 9, 2026, as part of ADBC 22)
-**PyPI name:** `adbc-driver-sqlite`
-**Confidence:** HIGH
+| Technology | Version | Purpose | Why Recommended |
+|------------|---------|---------|-----------------|
+| `anyio` | `>=4.0.0` (current stable **4.14.1**) | Async runtime-abstraction layer. Provides `anyio.to_thread.run_sync()` to offload blocking sync ADBC calls to a worker thread; `CapacityLimiter` to bound concurrent thread checkouts; cancellation scopes (`CancelScope` / `fail_after` / `move_on_after`) to wire `adbc_cancel` to cooperative cancellation; `anyio.Path` if async filesystem access is ever needed. | ADBC releases the GIL in its C calls, so thread-offload yields *real* concurrency with no native async driver. anyio is the only widely-used library that is **backend-neutral** (asyncio *and* trio) — required for the project's trio+asyncio neutrality posture. `to_thread.run_sync` already integrates a shared `CapacityLimiter` and propagates cancellation, so the cooperative-cancellation plumbing comes for free. Single small pure-Python dep. |
 
-**Why add:**
-- Stable, on PyPI, maintained by the Apache Arrow project (same team as postgresql, flightsql, snowflake).
-- Provides an ADBC-native connection for SQLite — useful for local development, testing, and lightweight
-  embedded data pipelines where consumers don't want a server-side warehouse.
-- Follows the same install pattern as the other PyPI drivers: `pip install adbc-poolhouse[sqlite]`.
-- ADBC 22 (January 2026) added more `info` key support; driver is actively maintained.
-- The library's config + pool abstraction adds value here: consumers get the same `create_pool(SQLiteConfig(...))`
-  API and a QueuePool-managed connection, not a one-off `connect()` call.
+That is the **entire** new runtime dependency surface.
 
-**Why it is NOT redundant with DuckDB:**
-- DuckDB is for analytical/OLAP workloads and ships as a full embedded engine with its own SQL dialect.
-  SQLite is for lightweight transactional/embedded use where standard SQL and portability matter.
-  Different use cases; different user profiles.
+### Supporting Libraries
 
-**Key design note — pool_size=1 for :memory: databases:**
-- Identical constraint to DuckDB: in-memory SQLite databases are connection-scoped.
-  The config model must enforce `pool_size=1` when `database=":memory:"`, matching the pattern
-  already established in `DuckDBConfig`.
+| Library | Version | Purpose | When to Use |
+|---------|---------|---------|-------------|
+| `typing-extensions` | (transitive `>=4.5`) | Back-compat typing primitives. | **Do NOT add as a direct dep.** anyio already pulls it transitively on Python `< 3.13`. On our 3.11 floor `ParamSpec`, `Self`, `Coroutine`, `Awaitable` are all in stdlib `typing` / `collections.abc`. Add a direct dep only if our own code imports a genuinely 3.12+-only symbol (none identified). |
+| `exceptiongroup` | — | PEP 654 `ExceptionGroup` / `except*` backport. | **Do NOT add.** anyio task groups raise native `ExceptionGroup` on 3.11+. anyio only declares the backport for `python_version < "3.11"`; our floor is 3.11, so it is never installed and `except*` is native. |
+| `trio` | `>=0.32.0` (current **0.33.0**) | Trio event loop. | **Test-only, optional.** Pull via `anyio[trio]` in the dev group only if the suite is parametrized across asyncio + trio. Never a runtime dependency. |
 
-**Distribution:** PyPI (`pip install adbc-driver-sqlite`)
-**Driver path resolution:** PyPI path (find_spec → `adbc_driver_sqlite._driver_path()`)
-**`_PYPI_PACKAGES` entry:** `SQLiteConfig: ("adbc_driver_sqlite", "sqlite")`
+### Development Tools (new test wiring)
 
-**Sources:**
-- https://pypi.org/project/adbc-driver-sqlite/1.10.0
-- https://arrow.apache.org/blog/2026/01/09/adbc-22-release/
-- https://arrow.apache.org/adbc/current/driver/sqlite.html
+| Tool | Purpose | Notes |
+|------|---------|-------|
+| anyio's **built-in pytest plugin** | Runs `@pytest.mark.anyio` (or auto-mode) coroutine tests; supplies the `anyio_backend` fixture. | **Bundled with anyio — no extra install.** Do **not** add `pytest-asyncio` (asyncio-only; conflicts with anyio's plugin in auto mode). Enable via marker mode (recommended) or `anyio_mode = "auto"` in `[tool.pytest.ini_options]`. |
+| `anyio_backend` fixture | Parametrizes async tests across backends. | Defaults to asyncio only. To also cover trio, override in `conftest.py` (snippet below). Recommend default = asyncio for the cassette-replay suite, with an opt-in trio param over a thin smoke subset to prove backend-neutrality. |
+| existing `pytest` (**9.1.1**, pinned `>=8.0.0`) + `pytest-adbc-replay` (`>=1.0.0a3`) | Cassette record/replay, reused unchanged. | The replay machinery patches the **sync** ADBC dbapi modules (`adbc_auto_patch`). Because the async wrapper calls the *same* sync methods via `to_thread.run_sync`, existing cassettes replay correctly when the async wrapper is driven from an `@pytest.mark.anyio` test — no new cassette format. |
 
 ---
 
-### 1.2 ClickHouse — DO NOT ADD
-
-**PyPI candidate:** `adbc_clickhouse` (GitHub: ClickHouse/adbc_clickhouse)
-**Current status:** Work-in-progress. Many methods return `NotImplemented`.
-**Confidence:** HIGH (confirmed from GitHub description and multiple search results)
-
-**Why NOT to add:**
-- Official project description: "Work-in-progress. Not production-ready. Many methods are stubbed and
-  return NotImplemented errors."
-- Not on PyPI as a stable release; the repository exists at ClickHouse/adbc_clickhouse but is
-  explicitly marked as incomplete.
-- Adding a WIP driver exposes users to silent query failures and broken ADBC protocol compliance.
-- If ClickHouse connectivity is needed, the correct path today is `clickhouse-connect` (the mature
-  ClickHouse Python driver at v0.13.0, February 2026) — but that is not ADBC-based and would
-  require a completely different architecture path; it is out of scope for this library.
-
-**Revisit when:** adbc_clickhouse reaches v1.0 and is published to PyPI with full ADBC compliance.
-
-**Sources:**
-- https://github.com/ClickHouse/adbc_clickhouse (project description)
-
----
-
-### 1.3 MySQL — Foundry-distributed, NOT a new PyPI optional extra
-
-**PyPI package:** Does not exist. No `adbc-driver-mysql` on PyPI.
-**Distribution:** ADBC Driver Foundry via `dbc install mysql`
-**Confidence:** MEDIUM (no `adbc-driver-mysql` PyPI package found in multiple searches;
-  Foundry distribution confirmed by adbc-drivers.org and columnar-tech/adbc-quickstarts)
-
-**What the MySQL driver covers:**
-- Columnar launched the MySQL ADBC driver as part of the Driver Foundry (October 2025).
-- Connects to MySQL, MariaDB, TiDB, and Vitess (MySQL-wire-compatible systems) via `driver="mysql"`
-  in `adbc_driver_manager.dbapi.connect()`.
-- Installed via `dbc install mysql`; loaded via `adbc_driver_manager` at runtime.
-
-**Implication for adbc-poolhouse:**
-- If `MySQLConfig` is added, it goes in `_FOUNDRY_DRIVERS` alongside Databricks/Redshift/Trino/MSSQL.
-- The dbc driver name is `"mysql"`.
-- No PyPI optional extra; users must install the Foundry driver separately with `dbc`.
-
-**Sources:**
-- https://github.com/adbc-drivers (org page lists mysql repo)
-- https://github.com/columnar-tech/adbc-quickstarts (python/ dir lists MySQL)
-- https://siliconangle.com/2025/10/29/columnar-launches-redefine-data-connectivity-arrow-powered-adbc-drivers/
-
----
-
-### 1.4 Spark — Does not exist as an ADBC driver
-
-**Status:** No `adbc-driver-spark` exists on PyPI. No Foundry driver found.
-**Confidence:** MEDIUM (absence confirmed across multiple searches and official driver lists)
-
-**Why not:**
-- Spark is a compute engine, not a database. ADBC targets SQL databases and query engines that
-  return columnar results via Arrow — Spark's Python interface is PySpark, not a driver in this model.
-- FlightSQL is the correct mechanism for connecting to Spark with Arrow semantics:
-  Spark Thrift Server or Databricks SQL Warehouse both expose Arrow Flight SQL endpoints,
-  accessible via the existing `adbc-driver-flightsql` already in the library.
-- Do not add a Spark config. Direct consumers to FlightSQL or DatabricksConfig.
-
----
-
-### 1.5 Oracle — Foundry-listed, not yet confirmed as stable
-
-**Status:** Oracle mentioned in some `dbc` driver lists, but not confirmed as officially released
-  or stable by Columnar or the ADBC Drivers org.
-**Confidence:** LOW
-
-**Recommendation:** Do not add in v1.1.0. The adbc-drivers.org official driver list as of
-  early 2026 covers: BigQuery, Databricks, MSSQL, MySQL, Redshift, Snowflake, Trino.
-  Oracle is not confirmed in official Foundry documentation.
-  Revisit if/when `dbc install oracle` is documented on docs.columnar.tech.
-
----
-
-## 2. Current Versions — Updated Reference for Existing PyPI Drivers
-
-All Apache Arrow ADBC C/Go/Python packages versioned together and released as ADBC 22
-(January 9, 2026). Python packages are at version **1.10.0**.
-
-| PyPI Package | Recommended Minimum | ADBC 22 Version | Confidence |
-|---|---|---|---|
-| `adbc-driver-manager` | `>=1.0.0` | 1.10.0 | HIGH |
-| `adbc-driver-snowflake` | `>=1.0.0` | 1.10.0 | HIGH |
-| `adbc-driver-postgresql` | `>=1.0.0` | 1.10.0 | HIGH |
-| `adbc-driver-flightsql` | `>=1.0.0` | 1.10.0 | HIGH |
-| `adbc-driver-bigquery` | `>=1.3.0` | separate release cadence | MEDIUM |
-| `adbc-driver-sqlite` | `>=1.0.0` | 1.10.0 | HIGH |
-
-The existing minimum version pins in `pyproject.toml` (`>=1.0.0` for most packages) remain
-appropriate — they do not need to be bumped to `>=1.10.0` because the library does not rely on
-features introduced after 1.0.0. Keeping the floor low maximises consumer compatibility.
-
-**Sources:**
-- https://arrow.apache.org/blog/2026/01/09/adbc-22-release/
-- https://pypi.org/project/adbc-driver-sqlite/1.10.0
-
----
-
-## 3. The `dbc` CLI — Foundry Driver Management
-
-### 3.1 What `dbc` is
-
-`dbc` is the ADBC driver management CLI tool from [Columnar](https://columnar.tech/dbc/), launched
-October 2025 alongside the ADBC Driver Foundry. It installs pre-built ADBC drivers from a public
-driver registry (analogous to pip for Python packages, but for native ADBC shared libraries).
-
-**Installation methods (all equivalent):**
-```bash
-# Linux / macOS shell installer
-curl -LsSf https://dbc.columnar.tech/install.sh | sh
-
-# Windows PowerShell
-powershell -ExecutionPolicy ByPass -c "irm https://dbc.columnar.tech/install.ps1 | iex"
-
-# uv tool (Python ecosystem, cross-platform)
-uv tool install dbc
-
-# Homebrew (macOS)
-brew install columnar-tech/tap/dbc
-
-# Windows MSI
-# Download from https://dbc.columnar.tech/latest/dbc-latest-x64.msi
-```
-
-**Confidence:** MEDIUM (installation methods confirmed from docs.columnar.tech search results;
-  uv tool install confirmed via columnar documentation)
-
----
-
-### 3.2 Core `dbc` Commands
-
-**Confidence:** MEDIUM for install/sync/info; LOW for exact flags of search/list
-(official docs at docs.columnar.tech/dbc/ could not be fetched directly — assembled from
-multiple search results including DeepWiki, GitHub issues, and blog posts).
-
-#### `dbc install` — Install a driver
+## Installation
 
 ```bash
-dbc install DRIVER [--level LEVEL] [--json] [--no-verify]
+# Add the async runtime dep as an optional extra (uv edits pyproject + lockfile)
+uv add --optional async "anyio>=4.0.0"
+
+# Add trio to the dev group ONLY if parametrizing tests across backends
+uv add --group dev "anyio[trio]>=4.0.0"   # or: uv add --group dev "trio>=0.32.0"
 ```
 
-| Argument/Flag | Description |
-|---|---|
-| `DRIVER` | Driver name (see driver names table below) |
-| `--level LEVEL` | Installation scope: `user` (default) or `system`. When omitted, checks `ADBC_DRIVER_PATH`, then `VIRTUAL_ENV`, then `CONDA_PREFIX`, then falls back to User level |
-| `--json` | Output machine-readable JSON |
-| `--no-verify` | Skip post-install verification step |
+### pyproject.toml wiring
 
-**Installation locations by level:**
-- **User:** `~/.config/columnar/adbc_drivers/` (Linux/macOS), `%APPDATA%\columnar\adbc_drivers\` (Windows)
-- **System:** system-wide path (requires elevated privileges)
-- **Virtual env:** `$VIRTUAL_ENV/etc/adbc/drivers/` (detected automatically when `VIRTUAL_ENV` is set)
-- **Conda:** `$CONDA_PREFIX/etc/adbc/drivers/` (detected automatically when `CONDA_PREFIX` is set)
-
-**Single driver installation (current v1.x behaviour):**
-```bash
-dbc install databricks
-dbc install redshift
-dbc install mssql
-dbc install mysql
-dbc install trino
-```
-
-Note: Installing multiple drivers in a single command (`dbc install databricks redshift`) was
-raised as a feature request in [GitHub issue #277](https://github.com/columnar-tech/dbc/issues/277)
-and may not be supported in the current release. Write justfile recipes with one `dbc install`
-call per driver.
-
-**Confidence:** MEDIUM (command syntax confirmed; multi-driver flag unconfirmed)
-
----
-
-#### `dbc info` — Get information about a driver
-
-```bash
-dbc info DRIVER
-```
-
-Example:
-```bash
-dbc info duckdb
-dbc info mssql
-```
-
-Returns metadata about the driver (version, description, supported platforms).
-**Confidence:** MEDIUM (confirmed from search results referencing the info subcommand)
-
----
-
-#### `dbc search` — Search the driver registry
-
-```bash
-dbc search [QUERY]
-```
-
-Lists available drivers matching the query (or all drivers if query is omitted).
-Used to discover what is available in the Foundry registry.
-**Confidence:** LOW (subcommand name confirmed from docs structure references; exact flags unknown)
-
----
-
-#### `dbc sync` — Synchronise installed drivers
-
-```bash
-dbc sync [--level LEVEL]
-```
-
-Updates installed drivers to their latest versions, respecting the same `--level` flag as install.
-Analogous to `pip install --upgrade` for the driver registry.
-**Confidence:** MEDIUM (confirmed from multiple references to sync as a parallel to install)
-
----
-
-### 3.3 Foundry Driver Names
-
-The following table maps adbc-poolhouse config classes to their `dbc` driver names.
-Driver names are the exact string passed to `dbc install` and used as the `driver` argument
-in `adbc_driver_manager.dbapi.connect()`.
-
-| Config Class | `dbc install` name | `adbc_driver_manager` driver string | Distribution |
-|---|---|---|---|
-| `DatabricksConfig` | `databricks` | `"databricks"` | Foundry |
-| `RedshiftConfig` | `redshift` | `"redshift"` | Foundry |
-| `TrinoConfig` | `trino` | `"trino"` | Foundry |
-| `MSSQLConfig` | `mssql` | `"mssql"` | Foundry |
-| *(future)* `MySQLConfig` | `mysql` | `"mysql"` | Foundry |
-
-Note: Teradata is listed in some dbc documentation. Verify via `dbc info teradata` or
-`dbc search teradata` before finalising field names for `TeradataConfig` — this is called
-out in PROJECT.md as "verify Teradata field names against real Columnar ADBC Teradata driver".
-
-**Confidence:** HIGH for databricks/redshift/trino/mssql (confirmed by existing `_FOUNDRY_DRIVERS`
-in `_drivers.py` and corroborated by Foundry documentation); MEDIUM for mysql (Foundry-confirmed,
-not yet in the library); LOW for oracle (mentioned in some lists, not confirmed in official Foundry docs).
-
-**Sources:**
-- https://docs.columnar.tech/dbc/ (official reference)
-- https://docs.adbc-drivers.org/ (ADBC Driver Foundry documentation)
-- https://deepwiki.com/columnar-tech/adbc-quickstarts/4.1-microsoft-sql-server
-- https://github.com/columnar-tech/dbc/issues/277
-- https://columnar.tech/blog/announcing-dbc-0.2.0/
-- https://docs.columnar.tech/dbc/reference/config_level/
-
----
-
-### 3.4 `dbc` in Justfile Recipes
-
-The justfile recipes for v1.1.0 should cover:
-
-```just
-# Install the dbc CLI (run once per machine)
-install-dbc:
-    curl -LsSf https://dbc.columnar.tech/install.sh | sh
-
-# Install all Foundry drivers (run after install-dbc)
-install-foundry-drivers:
-    dbc install databricks
-    dbc install redshift
-    dbc install trino
-    dbc install mssql
-
-# Verify a specific driver is installed and working
-verify-driver driver:
-    dbc info {{driver}}
-
-# List what's installed
-list-drivers:
-    dbc search
-```
-
-Note: `dbc install` detects `VIRTUAL_ENV` automatically — running inside a uv venv will install
-drivers into the venv's `etc/adbc/drivers/` path without any extra flags. This means `uv run just
-install-foundry-drivers` will scope the drivers to the project venv.
-
-**Confidence:** MEDIUM (virtual env auto-detection confirmed from config_level docs; recipe
-structure inferred from install command semantics)
-
----
-
-## 4. New `pyproject.toml` Optional-Dependency Block
-
-The only new PyPI extra from this research is `sqlite`. All new Foundry backends (MySQL) do not
-have PyPI packages and therefore do not get extras entries.
+Add to `[project.optional-dependencies]` alongside the per-backend extras:
 
 ```toml
 [project.optional-dependencies]
-duckdb = ["duckdb>=0.9.1"]
-snowflake = ["adbc-driver-snowflake>=1.0.0"]
-postgresql = ["adbc-driver-postgresql>=1.0.0"]
-flightsql = ["adbc-driver-flightsql>=1.0.0"]
-bigquery = ["adbc-driver-bigquery>=1.3.0"]
-sqlite = ["adbc-driver-sqlite>=1.0.0"]          # NEW
+async = ["anyio>=4.0.0"]
+# ... existing duckdb / snowflake / postgresql / quack / flightsql / bigquery / sqlite ...
 all = [
-    "adbc-poolhouse[duckdb]",
-    "adbc-poolhouse[snowflake]",
-    "adbc-poolhouse[postgresql]",
-    "adbc-poolhouse[flightsql]",
-    "adbc-poolhouse[bigquery]",
-    "adbc-poolhouse[sqlite]",                   # NEW
+    # ... existing backend extras ...
+    "adbc-poolhouse[async]",   # recommended: include async in `all`
 ]
 ```
 
+The existing `dev` group already depends on `adbc-poolhouse[all]`, so once `async` is listed in
+`all`, anyio is automatically available to the test suite. Add `anyio[trio]` to `dev` separately
+**only** if running the trio-parametrized smoke subset:
+
+```toml
+[dependency-groups]
+dev = [
+    "adbc-poolhouse[all]",     # brings anyio once `async` is in `all`
+    "anyio[trio]>=4.0.0",      # add ONLY for trio-parametrized tests
+    # ... existing dev deps unchanged ...
+]
+```
+
+### Test plugin config
+
+Marker mode (recommended — explicit, no clash risk). Mark async tests with `@pytest.mark.anyio`;
+no `anyio_mode` line needed.
+
+Optional `conftest.py` to parametrize across backends (opt-in trio coverage):
+
+```python
+import pytest
+
+@pytest.fixture(
+    params=[
+        pytest.param("asyncio", id="asyncio"),
+        pytest.param("trio", id="trio"),   # requires anyio[trio] in dev group
+    ]
+)
+def anyio_backend(request: pytest.FixtureRequest) -> str:
+    return request.param
+```
+
+Omit the fixture entirely to run asyncio-only (anyio's default).
+
 ---
 
-## 5. What NOT to Add — Decision Table
+## Integration Points
+
+- **Offload primitive:** every async wrapper method (`connect`, `execute`, `executemany`,
+  `fetch*`, `fetch_arrow_table`, pool create/close) calls the corresponding sync ADBC/QueuePool
+  method inside `anyio.to_thread.run_sync(...)`. The sync code path is untouched.
+- **Checkout bounding:** use an anyio `CapacityLimiter` (passed to `to_thread.run_sync(..., limiter=...)`)
+  rather than tuning the worker thread pool directly, so the limit is honoured identically under
+  asyncio and trio. This is the trio-safe analogue of the "anyio-native checkout limiter" option in
+  PROJECT.md's open design decision.
+- **Cancellation:** wrap offloaded calls in an `anyio.CancelScope` (or `fail_after`/`move_on_after`)
+  and, on cancellation, call the connection's `adbc_cancel()` so the in-flight C call is interrupted
+  cooperatively. `to_thread.run_sync(cancellable=...)` controls whether the awaiting task detaches.
+- **Genericity:** the async layer wraps the existing `WarehouseConfig`-driven sync pool, so one async
+  implementation covers all 13 backends with no per-backend code.
+
+---
+
+## Alternatives Considered
+
+| Recommended | Alternative | When to Use Alternative |
+|-------------|-------------|-------------------------|
+| `anyio.to_thread.run_sync` | `asyncio.to_thread` / `loop.run_in_executor` | Only if the project drops trio-neutrality and commits to asyncio-only. These lack a built-in `CapacityLimiter` and cancellation integration and lock out trio users. Not recommended. |
+| anyio built-in pytest plugin | `pytest-asyncio` | Only for an asyncio-exclusive codebase that never touches anyio. Conflicts with anyio's plugin and cannot drive trio. Avoid. |
+| Sync driver + thread-offload | Native async ADBC driver | No native async ADBC/dbapi driver exists. Revisit only if one ships upstream — but feasibility is explicitly thread-offload. |
+| Plain sync `QueuePool` + anyio-offloaded checkout | `sqlalchemy.AsyncAdaptedQueuePool` via `create_async_engine` | Never for this project — see "What NOT to Add". |
+
+---
+
+## What NOT to Add — Decision Table
 
 | Candidate | Verdict | Rationale |
-|---|---|---|
-| `adbc-driver-sqlite` | ADD (PyPI extra) | Stable, on PyPI, useful for local dev and lightweight pipelines |
-| `adbc_clickhouse` | DO NOT ADD | WIP, NotImplemented methods, not production-ready |
-| `adbc-driver-mysql` (PyPI) | DOES NOT EXIST | Foundry-only; install via `dbc install mysql` |
-| `MySQLConfig` (Foundry) | CONSIDER — scope after Teradata verification | Goes in `_FOUNDRY_DRIVERS` if added |
-| Spark driver | DOES NOT EXIST | Use FlightSQL or DatabricksConfig; Spark is a compute engine not a driver target |
-| Oracle driver | NOT YET — LOW confidence | Not confirmed stable in Foundry docs; revisit when `dbc info oracle` is documented |
-| `adbc-driver-duckdb` (separate PyPI package) | DO NOT USE | DuckDB bundles ADBC in its wheel directly; `adbc-driver-duckdb` is redundant (noted in v1.0 research, confirmed still correct) |
+|-----------|---------|-----------|
+| `sqlalchemy[asyncio]` / `AsyncAdaptedQueuePool` / `create_async_engine` | **DO NOT ADD** | `AsyncAdaptedQueuePool` is asyncio-bound and assumes a **natively-async DBAPI** (asyncpg/aiomysql/aiosqlite-style). ADBC has **no** async DBAPI, so it cannot satisfy the pool's await points. SQLAlchemy docs state plain `QueuePool` is "not compatible with asyncio and `create_async_engine()`". It does **not** replace the thread-offload, and adopting it drags in greenlet and pins us to asyncio, breaking trio-neutrality. It remains a *reference*, not a foundation. |
+| `greenlet` (direct/runtime dep) | **DO NOT ADD** | Only relevant as SQLAlchemy's sync↔async shim, which we are not using. asyncio-oriented, adds hidden scheduling, unnecessary for thread-offload. (May still arrive transitively via base SQLAlchemy on some platforms; we never `import greenlet` and never declare it.) |
+| `pytest-asyncio` | **DO NOT ADD** | asyncio-only; conflicts with anyio's bundled pytest plugin in auto mode. Use anyio's plugin (`@pytest.mark.anyio` + `anyio_backend`). |
+| `exceptiongroup` backport | **DO NOT ADD** | Native `ExceptionGroup` / `except*` exist on Python ≥3.11 (our floor). Backport only installs on `<3.11`. |
+| Direct `typing-extensions` dep | **DO NOT ADD** | Redundant on Python ≥3.11 (`ParamSpec`, `Self`, `Coroutine`, `Awaitable` are stdlib); arrives transitively via anyio anyway. |
+| Native async ADBC driver | **DOES NOT EXIST** | Async is achieved by offloading the sync driver to threads. |
+| Upper version caps (e.g. `anyio<5`) | **DO NOT ADD** | Project policy is open lower bounds only; caps cause downstream dep-resolution conflicts for the two known consumers (dbt-open-sl, Semantic ORM). Use `anyio>=4.0.0`. |
 
 ---
 
-## 6. Open Questions / Gaps
+## Version Compatibility
 
-- **Teradata field names:** PROJECT.md flags this explicitly. Run `dbc install teradata && dbc info teradata`
-  on a real machine to confirm the connection parameter names before writing `TeradataConfig`.
-  The Columnar driver may use different field names than the generic Teradata JDBC/ODBC conventions.
-
-- **MySQL driver maturity:** The MySQL Foundry driver launched October 2025. Usage patterns,
-  known bugs, and connection parameter completeness have not been independently tested. Phase-specific
-  research or a live spike is recommended before writing `MySQLConfig`.
-
-- **Oracle driver availability:** Low-confidence listing. Confirm with `dbc search oracle` before
-  planning any OracleConfig work.
-
-- **`dbc` version:** Current dbc version is 0.2.x (the 0.2.0 announcement was the most recent
-  found). The tool is still pre-1.0; command interface may change. Monitor for breaking changes
-  before v1.2.0 work.
-
-- **`dbc search` exact flags:** Only confirmed that the subcommand exists. Full flag reference
-  requires fetching docs.columnar.tech/dbc/ directly.
+| Package A | Compatible With | Notes |
+|-----------|-----------------|-------|
+| `anyio 4.14.1` | Python `>=3.10` | Project floor 3.11 → fully covered. On 3.11/3.12 anyio pulls `typing_extensions>=4.5` transitively; on ≥3.13 it does not. |
+| `anyio 4.x` | `exceptiongroup` only on `python_version < "3.11"` | 3.11 floor → backport never installed; native `ExceptionGroup` used. |
+| `anyio[trio]` 4.14.1 | `trio>=0.32.0` (current 0.33.0) | Test-only extra; never a runtime dep. |
+| `anyio` | `sqlalchemy 2.x` `QueuePool` | Orthogonal — anyio offloads sync `QueuePool` calls to threads. No version constraint between them. |
+| anyio pytest plugin | `pytest 8/9.x` (project `>=8.0.0`, current 9.1.1) | Bundled with anyio; works with current pytest. Must NOT coexist with `pytest-asyncio` auto mode. |
+| `basedpyright 1.38+` strict | anyio typing on 3.11 | anyio ships `py.typed` and is fully typed; wrappers typed with stdlib `ParamSpec` / `Self` / `Coroutine[Any, Any, T]` — no extra typing dep for strict mode. |
 
 ---
 
-*Research by Claude Code — 2026-03-01*
-*Sources: PyPI, arrow.apache.org/blog, docs.columnar.tech, docs.adbc-drivers.org,*
-*github.com/adbc-drivers, deepwiki.com/columnar-tech, siliconangle.com*
+## Lower-Bound Choice
+
+**`anyio>=4.0.0`** (current stable 4.14.1). Rationale:
+
+- anyio 4.0 is the release that adopted native PEP 654 `ExceptionGroup` and the modern
+  `to_thread.run_sync` / `CapacityLimiter` / cancellation-scope API used here.
+- An open `>=4.0.0` lower bound matches the project's "open lower bounds, no upper caps" policy and
+  maximises consumer compatibility while guaranteeing the APIs we rely on.
+- No reason to pin higher (e.g. `>=4.14`); nothing we use was added after 4.0.
+
+---
+
+## Open Questions / Gaps
+
+- **Checkout-wait strategy** (PROJECT.md open design decision): plain sync `QueuePool` with an
+  anyio-offloaded checkout-and-execute vs. an anyio-native `CapacityLimiter` in front of the pool.
+  Stack-wise both need only `anyio` — no extra dependency either way. This is an architecture
+  decision, resolved in ARCHITECTURE research, not a stack addition.
+- **`cancellable=` semantics for `to_thread.run_sync`**: whether to detach the awaiting task on
+  cancellation (the thread keeps running until `adbc_cancel` lands) vs. block. Behavioural detail for
+  the cancellation design; no dependency impact.
+
+---
+
+## Sources
+
+- PyPI JSON API (`pypi.org/pypi/<pkg>/json`) — verified current versions and anyio 4.14.1 dependency
+  markers: anyio 4.14.1 (`requires-python >=3.10`; `exceptiongroup; python_version<"3.11"`,
+  `typing_extensions>=4.5; python_version<"3.13"`, `trio>=0.32.0; extra=="trio"`), exceptiongroup
+  1.3.1, typing-extensions 4.15.0, pytest 9.1.1, greenlet 3.5.2, trio 0.33.0. **HIGH**
+- [AnyIO Testing docs](https://anyio.readthedocs.io/en/stable/testing.html) — built-in pytest plugin,
+  `@pytest.mark.anyio`, `anyio_mode = "auto"`, `anyio_backend` parametrization, explicit conflict
+  warning vs pytest-asyncio. **HIGH**
+- [AnyIO Tasks docs](https://anyio.readthedocs.io/en/stable/tasks.html) +
+  [Migration 3→4](https://anyio.readthedocs.io/en/stable/migration.html) — task groups raise native
+  PEP 654 `ExceptionGroup`; backport only needed `<3.11`. **HIGH**
+- [SQLAlchemy 2.0 asyncio docs](https://docs.sqlalchemy.org/en/20/orm/extensions/asyncio.html) +
+  [Connection Pooling docs](https://docs.sqlalchemy.org/en/20/core/pooling.html) —
+  `AsyncAdaptedQueuePool` requires a natively-async DBAPI and uses greenlet; plain `QueuePool` is
+  "not compatible with asyncio"; confirms thread-offload remains required and
+  greenlet/sqlalchemy[asyncio] should be avoided. **HIGH**
+
+---
+*Research by Claude Code — 2026-06-25*
+*Sources: PyPI JSON API, anyio.readthedocs.io, docs.sqlalchemy.org*

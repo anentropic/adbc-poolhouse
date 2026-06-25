@@ -1,500 +1,302 @@
-# Feature Landscape: New ADBC Backends and Foundry Driver Tooling
-
-**Domain:** Python ADBC connection-pool library — backend expansion and developer tooling
-**Researched:** 2026-03-01
-**Scope:** New backends not yet in adbc-poolhouse (SQLite, MySQL, ClickHouse, Oracle, Teradata); dbc CLI workflow for Foundry driver management
-
----
-
-## Context: What Already Exists
-
-The following backends are already implemented (v1.0) and are **out of scope** for this research:
-
-| Backend | Distribution | Pattern |
-|---------|-------------|---------|
-| DuckDB | PyPI (`duckdb` bundled) | Decomposed fields, `_adbc_entrypoint()` override |
-| Snowflake | PyPI (`adbc-driver-snowflake`) | Decomposed fields, full auth matrix |
-| BigQuery | PyPI (`adbc-driver-bigquery`) | Decomposed fields |
-| PostgreSQL | PyPI (`adbc-driver-postgresql`) | `uri`-only config |
-| FlightSQL | PyPI (`adbc-driver-flightsql`) | Decomposed fields |
-| Databricks | Foundry (`databricks`) | `uri`-based, decomposed as supplemental |
-| Redshift | Foundry (`redshift`) | `uri`-based, cluster-type fields |
-| Trino | Foundry (`trino`) | `uri`-based, decomposed fields |
-| MSSQL | Foundry (`mssql`) | `uri`-based, fedauth fields for Azure |
-
-Teradata `.pyc` files exist in `__pycache__` but the source module is absent from `__init__.py` and the src tree. Teradata is in-progress or previously removed. See note in New Backends section.
-
----
-
-## New Backends
-
-### Decision Framework
-
-Each candidate backend must meet the bar:
-1. A working Foundry or PyPI ADBC driver exists (not just planned)
-2. The driver is installable by consumers without building from source
-3. The driver has confirmed Python support via `adbc_driver_manager`
-
-Sources: `docs.adbc-drivers.org` (confirmed 2026-03-01), `adbc-quickstarts` by-database branch (confirmed 2026-03-01).
-
----
-
-### SQLite — INCLUDE
-
-**Distribution:** PyPI (`adbc-driver-sqlite`, Apache ADBC project)
-**Install:** `pip install adbc-driver-sqlite` or `dbc install sqlite`
-**Status:** Stable (Apache ADBC official driver; described as the reference implementation)
-**Confidence:** HIGH — official Apache ADBC docs, PyPI package confirmed
-
-**Why include:** The only local-file-backed database with a stable PyPI ADBC driver. Useful for testing, embedded data pipelines, and offline development. Complements DuckDB for local-first use cases.
-
-**Connection parameters:**
-
-| Pydantic field | Type | Driver kwarg key | Notes |
-|---------------|------|-----------------|-------|
-| `uri` | `str = ":memory:"` | `"uri"` | Filename path, SQLite URI (e.g. `file:data.db?mode=ro`), or `:memory:`. Defaults to an in-memory database shared across connections when omitted. |
-
-**Additional driver options (set at connection level, not database level):**
-
-| Option key | Type | Notes |
-|-----------|------|-------|
-| `adbc.sqlite.load_extension.enabled` | `"true"/"false"` | Enable extension loading; off by default |
-| `adbc.sqlite.load_extension.path` | string | Path to `.so`/`.dll` to load |
-| `adbc.sqlite.load_extension.entrypoint` | string | Entrypoint symbol in extension |
-| `adbc.sqlite.query.batch_rows` | int string | Result batch size |
-
-The connection-level options are not first-class config fields (they are set after `AdbcConnectionInit`), so they do not belong in `SQLiteConfig`. The `uri` field is the only database-level parameter.
-
-**Pydantic field map:**
-```python
-class SQLiteConfig(BaseWarehouseConfig):
-    model_config = SettingsConfigDict(env_prefix="SQLITE_")
-
-    uri: str = ":memory:"
-    """File path, SQLite URI string, or ':memory:'. Env: SQLITE_URI."""
-```
-
-**Special behaviour:** Like DuckDB `:memory:`, an in-memory SQLite database shared across connections (SQLite's shared-cache mode) is the default when no file is specified. Unlike DuckDB, multiple connections to the same in-memory SQLite DB share state (not isolated). `pool_size=1` is still the safer default for `:memory:` to avoid unexpected concurrent-write errors from SQLite's per-file lock.
-
-**Complexity:** Low. Follows the DuckDB pattern exactly. The `_adbc_entrypoint()` override is needed: the SQLite Apache driver uses the entrypoint `adbc_driver_sqlite_init`.
-
-**Dependency on existing patterns:** Identical to DuckDBConfig. PyPI resolution path in `_drivers.py` via `find_spec("adbc_driver_sqlite")`, then `pkg._driver_path()`.
-
----
-
-### MySQL — INCLUDE
-
-**Distribution:** Foundry (Columnar `adbc-drivers/mysql` repo)
-**Install:** `dbc install mysql`
-**Status:** Stable on Foundry (pre-built binaries on Columnar CDN); not on PyPI
-**Confidence:** HIGH — README confirmed from `adbc-drivers/mysql`, quickstart confirmed from `adbc-quickstarts`
-
-**Why include:** MySQL is the most-deployed open-source RDBMS. MariaDB, TiDB, and Vitess use the same driver (MySQL wire protocol). A single `MySQLConfig` covers all four.
-
-**URI format:** `user:password@tcp(host:port)/dbname`
-
-Note the format is **not** `mysql://` — it follows Go's `database/sql` DSN convention (this driver is written in Go). The Columnar quickstart confirms this format:
-```
-"uri": "root:my-secret-pw@tcp(localhost:3306)/demo"
-```
-
-**Pydantic field map:**
-
-| Pydantic field | Type | Driver kwarg key | Notes |
-|---------------|------|-----------------|-------|
-| `uri` | `SecretStr \| None` | `"uri"` | Full DSN: `user:pass@tcp(host:port)/dbname`. May contain credentials. |
-| `host` | `str \| None` | — | Supplemental; compose into URI at translation time |
-| `port` | `int \| None` | — | Supplemental; default 3306 |
-| `user` | `str \| None` | — | Supplemental |
-| `password` | `SecretStr \| None` | — | Supplemental |
-| `database` | `str \| None` | — | Default database name |
-
-**Translation strategy:** URI wins if provided. If absent, translate decomposed fields into the `user:pass@tcp(host:port)/db` DSN format at translation time. This matches the DatabricksConfig pattern.
-
-**Complexity:** Medium. URI format is unconventional (Go DSN, not `mysql://`). Decomposed-to-URI translation is straightforward but needs a unit test that explicitly covers the non-standard DSN format.
-
-**Dependency on existing patterns:** Foundry driver path in `_drivers.py`. Add to `_FOUNDRY_DRIVERS` dict with key `"mysql"`.
-
-**MariaDB/TiDB/Vitess:** These use the MySQL wire protocol and can share `MySQLConfig` with the same `mysql` Foundry driver. No separate config class is needed.
-
----
-
-### ClickHouse — INCLUDE (with caution)
-
-**Distribution:** Foundry (Columnar, `clickhouse` driver name); official ClickHouse ADBC driver from `ClickHouse/adbc_clickhouse` is separate but **work-in-progress and not production-ready**
-**Install:** `dbc install clickhouse` (Columnar Foundry driver)
-**Status:** Columnar Foundry driver is stable for basic query flow; official ClickHouse ADBC driver is alpha-stage
-**Confidence:** MEDIUM — quickstart confirmed for Columnar driver; ClickHouse's own driver README explicitly says "not ready for production"
-
-**Why include:** ClickHouse is a major OLAP/analytics database increasingly used alongside data warehouses. The Foundry driver supports the HTTP interface which is ClickHouse's most stable API surface.
-
-**Connection parameters:** HTTP-interface based. URI is `http://host:port` or `https://host:port`.
-
-| Pydantic field | Type | Driver kwarg key | Notes |
-|---------------|------|-----------------|-------|
-| `uri` | `str \| None` | `"uri"` | `http://host:port` or `https://host:port`. Required. |
-| `username` | `str \| None` | `"username"` | Note: key is `username`, not `user` — ClickHouse-specific |
-| `password` | `SecretStr \| None` | `"password"` | HTTP basic auth password |
-| `database` | `str \| None` | `"database"` | Default database (ClickHouse schema) |
-
-**Important field naming difference:** ClickHouse uses `username` not `user` as the driver kwarg key. The Pydantic field should be named `username` to match directly and avoid a confusing field-to-kwarg rename.
-
-**Complexity:** Low. URI-only connection with simple additional fields. Translation is trivial — no DSN assembly needed.
-
-**Dependency on existing patterns:** Foundry driver path. Add to `_FOUNDRY_DRIVERS` with key `"clickhouse"`.
-
-**Flag:** The official ClickHouse ADBC driver (`ClickHouse/adbc_clickhouse`) is alpha/WIP and explicitly not production-ready. Do not use it. Only the Columnar Foundry `clickhouse` driver is viable.
-
----
-
-### Teradata — COMPLETE (missing source, not new)
-
-**Distribution:** Foundry private registry (Columnar, `teradata` driver name; requires `dbc auth login`)
-**Install:** `dbc auth login` then `dbc install teradata`
-**Status:** `.pyc` files present in `__pycache__` indicate this was implemented but the source `.py` file is absent from the tree. Not in `__init__.py`.
-**Confidence:** HIGH for connection parameters (quickstart confirmed)
-
-**Why include:** The source module exists as compiled bytecode — it was written but not committed or was deleted. This is not a new backend; it needs to be recovered/rewritten, not researched from scratch.
-
-**Connection parameters:**
-
-| Pydantic field | Type | Driver kwarg key | Notes |
-|---------------|------|-----------------|-------|
-| `uri` | `SecretStr \| None` | `"uri"` | `teradata://user:pass@host:1025` — standard scheme, port 1025 |
-| `host` | `str \| None` | — | Decomposed alternative |
-| `user` | `str \| None` | — | Decomposed alternative |
-| `password` | `SecretStr \| None` | — | Decomposed alternative |
-| `port` | `int \| None` | — | Default 1025 |
-
-**Quickstart reference:**
-```python
-dbapi.connect(
-    driver="teradata",
-    db_kwargs={"uri": "teradata://YOUR_USERNAME:YOUR_PASSWORD@YOUR_HOST:1025"},
-)
-```
-
-**Private registry note:** Teradata requires `dbc auth login` before `dbc install teradata`. This is different from public Foundry drivers (MySQL, ClickHouse, MSSQL etc.) which do not require auth. The justfile recipes must document this distinction.
-
-**Complexity:** Low (standard URI pattern). Medium if the `_teradata_config.py` source needs to be reconstructed from the compiled `.pyc`.
-
----
-
-### Oracle — EXCLUDE (for this milestone)
-
-**Distribution:** Foundry private registry (requires `dbc auth login` then `dbc install oracle`)
-**Status:** Available in dbc 0.2.0+ (launched February 2026) via private registry
-**Confidence:** MEDIUM — dbc 0.2.0 announcement confirmed
-
-**Why exclude:** Requires private registry authentication (`dbc auth login`). Oracle has a more complex licensing environment. Adding a private-registry-only backend adds friction to the developer workflow without a concrete consumer requesting it. Defer to a future milestone when there is a specific consumer asking for Oracle.
-
-**Connection parameters when added:**
-```python
-# quickstart shows: "uri": "oracle://system:password@localhost:1521/FREEPDB1"
-```
-
-Standard URI pattern (`oracle://user:pass@host:port/service_name`). Low complexity when needed.
-
----
-
-## New Backend Summary Table
-
-| Backend | Include? | Distribution | Driver name | URI format | Complexity |
-|---------|----------|-------------|------------|-----------|-----------|
-| SQLite | Yes | PyPI | `adbc_driver_sqlite` | filename or `file:` URI or `:memory:` | Low |
-| MySQL | Yes | Foundry (public) | `mysql` | `user:pass@tcp(host:port)/db` | Medium |
-| ClickHouse | Yes | Foundry (public) | `clickhouse` | `http://host:port` | Low |
-| Teradata | Recover (not new) | Foundry (private) | `teradata` | `teradata://user:pass@host:port` | Low |
-| Oracle | No (future) | Foundry (private) | `oracle` | `oracle://user:pass@host:port/svc` | Low |
-
----
-
-## dbc CLI Developer Workflow
-
-### What dbc Is
-
-`dbc` is the Columnar Technologies CLI for installing and managing ADBC drivers. It downloads pre-built driver binaries from the Columnar CDN (public) or a private registry (Oracle, Teradata), installs them to a user-level or system-level location, and registers them as ADBC driver manifests so that `adbc_driver_manager` can resolve them by name (e.g. `driver="mysql"`).
-
-**Current version:** 0.2.0 (released February 10, 2026)
-**Requires:** `adbc-driver-manager>=1.8.0` for manifest support
-
-### Installation
-
-```bash
-# Recommended: standalone installer (no Python env needed)
-curl -LsSf https://dbc.columnar.tech/install.sh | sh
-
-# Alternative: pipx (puts dbc on PATH without a venv)
-pipx install dbc
-
-# Alternative: uv tool install (similar to pipx)
-uv tool install dbc
-
-# Alternative: Homebrew (macOS)
-brew install columnar-tech/tap/dbc
-
-# Verify install
-dbc --version
-```
-
-### Complete Developer Workflow: Public Foundry Drivers
-
-Public drivers (Databricks, Redshift, Trino, MSSQL, MySQL, ClickHouse) require no authentication:
-
-```bash
-# 1. Install a driver
-dbc install mysql
-
-# 2. Verify the driver is installed and discoverable
-dbc info mysql
-
-# 3. Verify the driver can be loaded by adbc_driver_manager
-#    (the canonical smoke test — same check adbc-poolhouse performs)
-python -c "
-from adbc_driver_manager import dbapi
-import adbc_driver_manager._lib as _lib
-db = _lib.AdbcDatabase(driver='mysql')
-print('mysql driver loaded OK')
-"
-
-# 4. Search for available drivers (read-only, no install)
-dbc search
-
-# 5. List what is installed at the current level
-dbc info mysql  # info for one driver
-# (no bare "dbc list" command; use "dbc search" to see all registry drivers)
-
-# 6. Uninstall / remove a driver
-dbc remove mysql
-```
-
-### Complete Developer Workflow: Private Registry Drivers (Teradata, Oracle)
-
-```bash
-# 1. Authenticate with the private registry (browser OAuth flow)
-dbc auth login
-
-# 2. Install private driver (now authenticated)
-dbc install teradata
-
-# 3. Verify (same as public)
-dbc info teradata
-
-# 4. Smoke test
-python -c "
-from adbc_driver_manager import dbapi
-import adbc_driver_manager._lib as _lib
-db = _lib.AdbcDatabase(driver='teradata')
-print('teradata driver loaded OK')
-"
-```
-
-### Declarative Project Workflow (dbc.toml)
-
-For reproducible dev environments, `dbc` supports a lockfile-based declarative mode:
-
-```bash
-# Initialize a dbc.toml in the project root
-dbc init
-
-# Add drivers to dbc.toml (equivalent to editing the file)
-dbc add mysql
-dbc add clickhouse
-dbc add "databricks>=1.0.0"  # version constraint supported
-
-# Install all listed drivers and write dbc.lock
-dbc sync
-
-# On another machine or CI: reproduce exact installed set
-dbc sync
-```
-
-### dbc CLI Reference (Commands Used in Recipes)
-
-| Command | Purpose | Notes |
-|---------|---------|-------|
-| `dbc install <driver>` | Download and install driver | User level by default; `--level system` for system-wide |
-| `dbc install --pre <driver>` | Install pre-release build | For testing fixes before stable release |
-| `dbc info <driver>` | Show driver metadata, version, path | Read-only; fetches from registry CDN |
-| `dbc search` | List all available drivers in registry | Read-only; `--pre` to include pre-releases |
-| `dbc remove <driver>` | Uninstall a driver | Removes from the installed level |
-| `dbc add <driver>` | Add driver to `dbc.toml` driver list | Declarative; does not install immediately |
-| `dbc sync` | Install all drivers in `dbc.toml` | Creates/updates `dbc.lock` |
-| `dbc init` | Create a `dbc.toml` in current directory | Declarative workflow entry point |
-| `dbc auth login` | Authenticate with private registry | Required for Teradata, Oracle |
-| `dbc docs <driver>` | Open driver documentation (dbc 0.2.0+) | `--no-open` to print URL only |
-
-**Flags available on most subcommands:**
-- `--level user` / `--level system` / `--level env` — installation scope
-- `--quiet` — suppress output (for embedding in scripts)
-- `--json` — structured JSON output (for programmatic consumption)
-- `--pre` — include pre-release builds
-
-### Verifying a Foundry Driver From the Command Line
-
-The canonical verification sequence for a Foundry driver is:
-
-```bash
-# Step 1: confirm dbc sees the driver installed
-dbc info mysql
-
-# Step 2: confirm the ADBC driver manager can resolve and load it
-python -c "
-from adbc_driver_manager import _lib
-try:
-    db = _lib.AdbcDatabase(driver='mysql')
-    print('OK: driver=mysql resolved and loaded')
-except Exception as e:
-    print(f'FAIL: {e}')
-"
-
-# Step 3: confirm a real connection (requires live database)
-#   - not suitable for justfile recipes (no creds in repo)
-#   - leave this as a manual step in docs
-```
-
-The `_lib.AdbcDatabase(driver='<name>')` call is the correct smoke test: it exercises the manifest lookup and shared-library load without requiring a network-reachable database. This is the same internal path that `adbc-poolhouse`'s `create_pool()` takes before attempting a real connection.
-
----
-
-## Justfile Recipes for Foundry Driver Tooling
-
-### Proposed Recipes
-
-```just
-# Install the dbc CLI (standalone installer; no Python env required)
-install-dbc:
-    curl -LsSf https://dbc.columnar.tech/install.sh | sh
-
-# Install all public Foundry drivers supported by adbc-poolhouse
-install-foundry-drivers:
-    dbc install databricks
-    dbc install redshift
-    dbc install trino
-    dbc install mssql
-    dbc install mysql
-    dbc install clickhouse
-
-# Install private Foundry drivers (requires dbc auth login first)
-install-private-drivers:
-    @echo "Authenticating with Columnar private registry..."
-    dbc auth login
-    dbc install teradata
-
-# Verify all installed Foundry drivers are loadable by adbc_driver_manager
-verify-foundry-drivers:
-    #!/usr/bin/env python3
-    from adbc_driver_manager import _lib
-    drivers = ["databricks", "redshift", "trino", "mssql", "mysql", "clickhouse"]
-    failed = []
-    for d in drivers:
-        try:
-            _lib.AdbcDatabase(driver=d)
-            print(f"OK  {d}")
-        except Exception as e:
-            print(f"FAIL {d}: {e}")
-            failed.append(d)
-    if failed:
-        raise SystemExit(f"Failed drivers: {failed}")
-
-# Show info for all public Foundry drivers (version, path)
-info-foundry-drivers:
-    @for driver in databricks redshift trino mssql mysql clickhouse; do \
-        echo "--- $$driver ---"; \
-        dbc info $$driver; \
-    done
-
-# Remove all installed Foundry drivers (cleanup)
-remove-foundry-drivers:
-    dbc remove databricks
-    dbc remove redshift
-    dbc remove trino
-    dbc remove mssql
-    dbc remove mysql
-    dbc remove clickhouse
-```
-
-**Notes on recipe design:**
-- `install-dbc` is a separate recipe from `install-foundry-drivers` so CI can cache the dbc binary
-- `verify-foundry-drivers` uses an inline Python script rather than shelling out to individual commands, so it produces a single summary rather than per-driver exit codes
-- Private drivers (`teradata`, `oracle`) are in a separate recipe because they require interactive auth (`dbc auth login` prompts a browser flow)
-- The `remove-foundry-drivers` recipe is useful for clean test setups but should not be in default CI runs
-
----
-
-## Table Stakes vs Differentiators
-
-### Table Stakes for Each New Backend
-
-These features are required for a backend to ship — absent any of them, the backend is incomplete.
-
-| Feature | SQLite | MySQL | ClickHouse | Teradata |
-|---------|--------|-------|-----------|---------|
-| Config class (`*Config`) | Required | Required | Required | Required (recover) |
-| Parameter translation function | Required | Required | Required | Required (recover) |
-| Registration in `_drivers.py` | Required | Required | Required | Required (recover) |
-| Export in `__init__.py` | Required | Required | Required | Required |
-| Driver name verified working | High confidence | High confidence | Medium confidence | High confidence |
-| Unit tests for translator | Required | Required | Required | Required |
-| Documentation page | Required | Required | Required | Required |
-
-### Differentiators
-
-Features that add genuine value beyond a bare config class:
-
-| Feature | Backend | Value | Complexity |
-|---------|---------|-------|-----------|
-| Decomposed fields with URI assembly | MySQL | Parity with existing Databricks/Trino pattern; consumers don't need to know Go DSN format | Low |
-| Pool size validation for `:memory:` | SQLite | Same as DuckDB: prevent silent isolated-state bug | Low |
-| ClickHouse `username` field (not `user`) | ClickHouse | Correct kwarg name prevents silent auth failure; most users guess `user` | Low |
-| Private registry workflow documentation | Teradata | Auth flow is non-obvious; requires `dbc auth login` before `dbc install` | Low |
-
-### Anti-Features (Explicitly Not Building)
-
-| Anti-Feature | Reason |
-|-------------|--------|
-| Oracle backend | Private registry, no concrete consumer, deferred |
-| ClickHouse official driver (`ClickHouse/adbc_clickhouse`) | Alpha-stage, explicitly not production-ready per their README |
-| MySQL-specific SSL fields | Driver supports TLS but SSL parameters are query-string params in the DSN; initial implementation is URI-only with a note |
-| ClickHouse HTTP auth beyond basic username/password | Columnar quickstart shows only `uri`/`username`/`password`; additional auth (JWT, cert) is undocumented in the Foundry driver |
-| Multiple MySQL-family configs (MariaDB, TiDB, Vitess) | Single `MySQLConfig` covers all; they share the MySQL wire protocol and the same Foundry driver |
-
----
+# Feature Research
+
+**Domain:** Async wrapper API for a sync ADBC connection-pool library (adbc-poolhouse v1.4.0)
+**Researched:** 2026-06-25
+**Confidence:** HIGH (reference APIs and ADBC/anyio mechanics from official docs; one architectural risk flagged)
+
+## Scope Reminder
+
+This research covers ONLY the NEW async surface for v1.4.0. The sync API
+(`create_pool` / `close_pool` / `managed_pool`, the 13 configs, the
+`WarehouseConfig` Protocol, raw `driver_path=` / `dbapi_module=` overloads)
+is shipped and unchanged. The async layer is an OPTIONAL wrapper behind the
+`[async]` extra, built on `anyio.to_thread.run_sync`, that adds awaitable
+versions of pool / connection / cursor operations.
+
+**Critical divergence from sync:** the sync library deliberately stops at
+"pool hands you a connection, you execute yourself." Async CANNOT stop there —
+the whole point of offloading is to move blocking I/O off the event loop, and
+the blocking happens at *execute / fetch*, not at *checkout*. So the async
+layer must wrap connection **and** cursor execute/fetch. This is the one place
+where async is intentionally a bigger surface than sync.
+
+## Reference API Survey (prior art)
+
+| Library | Pool acquire | Execute | Fetch | Async iteration | Streaming | Cancellation safety |
+|---------|--------------|---------|-------|-----------------|-----------|---------------------|
+| **asyncpg** | `async with pool.acquire()` | `await conn.execute/fetch/fetchrow/fetchval` | record list / single | `async for r in conn.cursor(q)` | server-side cursor, prefetch | known leak risk on `CancelledError` (issue #464) |
+| **psycopg3 async** | `async with pool.connection()` | `await cur.execute()` | `await cur.fetchone/many/all` | `async for r in cur` | `cur.stream(q)` → `AsyncIterator` | mirrors sync, "scatter await" |
+| **aiosqlite** | `async with connect()` | `await db.execute()` | `await cur.fetchone/all` | cursor is async iterator | n/a (single shared thread/conn) | thread-per-connection proxy model |
+| **SQLAlchemy 2.x asyncio** | `async with engine.connect()` | `await conn.execute()` → buffered `Result` | via Result | `async for r in result` | `await conn.stream()` → `AsyncResult` | greenlet bridge; **documented leak on cancel** (issue #8145) |
+| **encode/databases** | `async with database.connection()` | `await db.execute()` | `await db.fetch_one/all` | `db.iterate()` → `async for` | `iterate()` | now in maintenance mode |
+| **aiomysql** | `async with pool.acquire()` | `await cur.execute()` | `await cur.fetchone/many/all` | n/a primarily | SSCursor variant | wraps sync via executor |
+
+**Convergent conventions across all of them (these are the norms we mirror):**
+1. Pool / connection / cursor are all **async context managers** (`async with`).
+2. Connection acquire is `await` (or `async with`); cursor creation is usually
+   NOT awaited (no I/O) — psycopg3 explicitly keeps `cursor()` sync.
+3. `execute` / `executemany` / `fetch*` are all `await`-ed.
+4. Result iteration uses `async for row in cursor` (cursor is an async iterator).
+5. Streaming/server-side reads are a SEPARATE method (`stream()` / `iterate()`),
+   distinct from the buffered `fetchall()` path.
+6. Naming mirrors the sync surface so users transfer knowledge by adding `await`.
+
+## Feature Landscape
+
+### Table Stakes (Users Expect These)
+
+These are non-negotiable. An async DB wrapper without them feels broken.
+
+| Feature | Why Expected | Complexity | Notes |
+|---------|--------------|------------|-------|
+| `create_async_pool(config, ...)` | Mirror of sync `create_pool`; entry point | LOW | Wraps sync `create_pool`; pool construction itself is fast/non-blocking, so creation can be sync-under-the-hood, but offer `await` form for symmetry. Depends on `_create_pool_impl`. |
+| `close_async_pool(pool)` | Mirror of sync `close_pool`; clean teardown | LOW | Offload `pool.dispose()` + `_adbc_source.close()` (both can block on driver). Depends on `close_pool`. |
+| `managed_async_pool(config, ...)` | Mirror of sync `managed_pool` | LOW | `@asynccontextmanager`; create on enter, `close_async_pool` on exit (shielded). Depends on `managed_pool` pattern. |
+| `await pool.connect()` → async connection | Async checkout is the core promise | MEDIUM | Offload sync `QueuePool.connect()` (checkout can block on pool timeout). Returns `AsyncConnection` wrapper. **Open design decision** (PROJECT.md): plain QueuePool offloaded vs anyio-native limiter. |
+| Async connection as `async with` | Universal convention; cleanup on exit | MEDIUM | `__aenter__`/`__aexit__`; exit returns conn to pool. Cleanup MUST be cancellation-shielded (see Pitfall below). |
+| `conn.cursor()` → async cursor | Get a cursor to execute against | LOW | Cursor creation does no I/O (matches ADBC + psycopg3) — keep it sync-returning, no `await`. Wrap ADBC dbapi `Cursor`. |
+| `await cursor.execute(sql, params)` | THE blocking call to offload | MEDIUM | `anyio.to_thread.run_sync(cursor.execute, ...)`. ADBC releases GIL → real concurrency. Standard DBAPI method. |
+| `await cursor.executemany(sql, seq)` | Batch param execution | LOW | Same offload pattern as `execute`. Standard DBAPI. |
+| `await cursor.fetchone()` | Single-row fetch | LOW | Offload. Standard DBAPI. Returns row or None. |
+| `await cursor.fetchmany(size)` | Bounded batch fetch | LOW | Offload. Standard DBAPI. |
+| `await cursor.fetchall()` | Buffered full fetch | LOW | Offload. Standard DBAPI. The blocking row-materialization belongs off-loop. |
+| Async cursor as `async with` | Cleanup releases Arrow readers | MEDIUM | `__aexit__` calls `close()` offloaded + shielded. Ties into existing `_release_arrow_allocators` reset hook. |
+| `await cursor.close()` | Explicit cleanup | LOW | Offload `close()`. Must run even on cancel (shielded). |
+| Exception propagation across thread | Errors must surface as if in-loop | LOW | `to_thread.run_sync` already re-raises in the awaiting task — verify ADBC `Error` subclasses propagate cleanly; no swallowing. |
+| Cancellation that doesn't leak connections | Cancelled query must not poison the pool | **HIGH** | The hard problem. See "Cancellation" differentiator + Pitfall. Every reference lib has had leak bugs here. |
+| `commit()` / `rollback()` (async) | Transaction control on connection | LOW | Offload connection-level `commit`/`rollback`. Standard DBAPI. ADBC is autocommit-by-default; still expose. |
+
+### Differentiators (Competitive Advantage)
+
+These set the library apart and align with its Arrow/ADBC core value. Most
+async DB wrappers are row-oriented; this one is Arrow-native and ADBC-aware.
+
+| Feature | Value Proposition | Complexity | Notes |
+|---------|-------------------|------------|-------|
+| `await cursor.fetch_arrow_table()` | Arrow-native bulk fetch off-loop — the headline ADBC feature | MEDIUM | Offload ADBC extension `fetch_arrow_table()`. Returns pyarrow.Table. The single most valuable async method for this library's audience. |
+| `await cursor.fetch_record_batch()` + async batch iteration | Stream Arrow RecordBatches without buffering whole result | **HIGH** | ADBC `fetch_record_batch()` returns a `RecordBatchReader`. Wrap so `async for batch in ...` offloads each `read_next_batch()` to a thread. This is the streaming equivalent of psycopg3 `stream()` / SQLAlchemy `AsyncResult`. Big differentiator; also the trickiest (per-batch cancellation, reader lifetime vs connection checkin). |
+| `adbc_cancel`-based cooperative cancellation | True query cancellation, not just abandon-the-thread | **HIGH** | anyio cannot kill a running thread; on cancel-scope trip, call `cursor.adbc_cancel()` (or `connection.adbc_cancel()`) so the C driver actually aborts the in-flight op. Wire via `anyio.from_thread.check_cancelled()` inside the worker OR an outer scope that fires `adbc_cancel` then awaits the abandoned thread. THE feature that makes async here correct rather than cosmetic. |
+| `await cursor.adbc_ingest(table, data, mode=...)` | Bulk Arrow load offloaded — write-path symmetry | MEDIUM | ADBC extension. Bulk ingest is long-running and blocking → prime offload candidate. Accepts pyarrow Table/RecordBatch/Reader. Pairs naturally with the fetch_arrow path. |
+| `await cursor.fetch_df()` / `fetch_polars()` | DataFrame convenience off-loop | LOW | Thin offload wrappers over ADBC extensions; cheap to add once `fetch_arrow_table` plumbing exists. Optional — gate on demand. |
+| anyio backend-neutral (asyncio + trio) | Works under asyncio AND trio, unlike asyncpg/psycopg3/SQLAlchemy (asyncio-only) | MEDIUM | Using `anyio.to_thread` throughout (never raw `asyncio.to_thread`) buys trio support for free. Genuine differentiator vs every reference lib surveyed. Constrains design: no asyncio-specific primitives, no `AsyncAdaptedQueuePool`. |
+| One async layer, all 13 backends | No per-driver async shim; generic over `WarehouseConfig` | MEDIUM | Because offload is driver-agnostic, the SAME wrapper covers all 13 backends. Reference libs are per-database. Depends on the existing Protocol + `_driver_api` facade. |
+| `await cursor.adbc_prepare()` / `adbc_execute_schema()` | Prepared-statement + schema-only access, async | LOW | Thin offload wrappers; add if/when a consumer needs them. Low cost given the generic offload helper. |
+| Connection-level async metadata (`adbc_get_table_schema`, `adbc_get_objects`) | Async catalog introspection | LOW-MEDIUM | Offload ADBC connection extensions. Useful for the planned Semantic ORM consumer. Add opportunistically. |
+
+### Anti-Features (Commonly Requested, Often Problematic)
+
+| Feature | Why Requested | Why Problematic | Alternative |
+|---------|---------------|-----------------|-------------|
+| Async ORM / query builder | "Make it like SQLAlchemy async / databases" | Out of scope by charter (sync lib is pool-only, ORM explicitly excluded). Massive surface, competes with SQLAlchemy/SQLModel. | Stay a pool+execute wrapper; consumers (Semantic ORM, dbt-open-sl) build their own query layers on top. |
+| Native async ADBC driver shim | "Real async, not threads" | No native async ADBC driver exists; ADBC's C calls release the GIL so thread-offload already yields real concurrency. Building/maintaining a native shim is enormous and unnecessary. | Thread-offload via anyio is the deliberate, documented architecture (PROJECT.md feasibility basis). |
+| Built-in retry / reconnect logic | "Handle transient failures for me" | Retry policy is consumer-specific (idempotency, backoff, budget). Baking it in hides failures and fights the pool's `recycle`. Sync lib has no retry; async shouldn't diverge. | Surface clean exceptions; let consumers wrap with their own retry (tenacity, etc.). Keep `recycle` as the only health mechanism. |
+| Multi-pool routing / async registry | "Route queries across warehouses" | Explicitly out of scope in sync (consumers own the dict). No reason to add it only on the async side. | Consumers call `create_async_pool()` per warehouse and manage the mapping. |
+| Auto-transaction / unit-of-work magic | "Wrap everything in a transaction" | ADBC defaults to autocommit; implicit transaction semantics surprise users and differ per backend. | Expose explicit `commit()`/`rollback()`; document autocommit behavior. No implicit `begin()`. |
+| Asyncio-only fast path (drop trio) | "asyncio is all anyone uses; go native" | Throws away the backend-neutral differentiator and locks out trio/AnyIO-structured users; pulls in asyncio-specific leak patterns (SQLAlchemy #8145). | Commit to anyio everywhere. If asyncio-specific tuning is ever needed, do it behind anyio's backend detection, not by forking the API. |
+| Reusing SQLAlchemy `AsyncAdaptedQueuePool` as the foundation | "SQLAlchemy already has an async pool" | It is asyncio-bound (greenlet) and does NOT replace the thread-offload; adopting it breaks trio support and inverts the architecture. | Treat it as a *reference* only (per PROJECT.md). Keep plain sync `QueuePool` + anyio offload, or an anyio-native checkout limiter. |
+| Implicit cursor auto-fetch on execute (asyncpg `fetch()` style) | "One call to run + return rows" | ADBC/DBAPI separates execute from fetch; merging them hides the Arrow-vs-row choice that is this library's whole value. | Keep DBAPI execute → fetch split. Offer `fetch_arrow_table()` as the ergonomic Arrow path. |
 
 ## Feature Dependencies
 
 ```
-Existing patterns (DatabricksConfig, TrinoConfig):
-  └── MySQL: URI-or-decomposed pattern, Foundry driver path
-  └── MSSQL: URI-or-decomposed pattern, Foundry driver path
+[anyio offload helper: _run_sync_offloaded()]  <- foundational, everything below needs it
+    |--requires--> [async cursor.execute/executemany]
+    |                   |--requires--> [async fetchone/many/all]
+    |                   |--requires--> [async fetch_arrow_table]
+    |                   |                  |--enables--> [async fetch_record_batch + async batch iteration]
+    |                   |--requires--> [async adbc_ingest]
+    |--requires--> [await pool.connect() -> AsyncConnection]
+    |                   |--requires--> [async connection ctx mgr (__aenter__/__aexit__)]
+    |                   |                  |--requires--> [shielded cleanup on cancel]
+    |                   |--requires--> [conn.cursor() -> AsyncCursor (sync-returning)]
+    |--requires--> [create_async_pool / close_async_pool]
+    |                   |--requires--> [managed_async_pool ctx mgr]
+    |--requires--> [adbc_cancel cancellation wiring]
+                        |--conflicts--> [abandon_on_cancel=True WITHOUT adbc_cancel]
+                        |--enhances--> [every execute/fetch method]
 
-Existing patterns (DuckDBConfig):
-  └── SQLite: decomposed uri field, PyPI driver path, pool_size=1 guard for :memory:
-
-New connection model (HTTP-based):
-  └── ClickHouse: uri + username + password, Foundry driver path, username kwarg != user
-
-Existing Foundry-driver infrastructure (_FOUNDRY_DRIVERS dict, resolve_driver()):
-  └── All new Foundry backends extend this dict
-
-New private registry auth flow:
-  └── Teradata: dbc auth login → dbc install teradata → standard Foundry path
+[anyio backend-neutrality] --constrains--> [ALL of the above]  (no raw asyncio primitives)
+[existing WarehouseConfig Protocol] --enables--> [generic over all 13 backends]
+[existing _release_arrow_allocators reset hook] --interacts-with--> [async cursor cleanup]
 ```
 
----
+### Dependency Notes
+
+- **Everything requires the offload helper:** A single internal
+  `_run_sync_offloaded(fn, *args)` over `anyio.to_thread.run_sync` is the
+  foundation. Build and harden it first (cancellation policy lives here).
+- **fetch_record_batch requires fetch_arrow_table plumbing:** Both need the
+  Arrow reader lifecycle understood; the streaming reader is the harder superset.
+- **Connection cleanup requires shielded cleanup:** `__aexit__` must return the
+  connection to the pool even when the surrounding task is cancelled — otherwise
+  the connection leaks (every reference lib has shipped this bug).
+- **adbc_cancel conflicts with bare `abandon_on_cancel=True`:** anyio's
+  `abandon_on_cancel` lets the *await* return on cancel but the *thread keeps
+  running* the query. Without firing `adbc_cancel`, you abandon a thread that
+  still holds the connection → leak. The two MUST be wired together: on cancel,
+  fire `adbc_cancel`, then let the abandoned thread unwind. This is the single
+  most important correctness dependency.
+- **Cursor lifetime vs reset hook:** the existing sync `_release_arrow_allocators`
+  reset event closes open cursors on checkin to free Arrow readers. The async
+  connection's `__aexit__` (checkin) interacts with this — confirm a streaming
+  `RecordBatchReader` is fully consumed or explicitly closed before checkin, or
+  the reset hook closes it mid-stream.
+
+## MVP Definition
+
+### Launch With (v1.4.0 core)
+
+Minimum to deliver a correct, useful async surface.
+
+- [ ] `_run_sync_offloaded()` helper with cancellation policy — foundation for all
+- [ ] `create_async_pool` / `close_async_pool` / `managed_async_pool` — entry trio mirroring sync
+- [ ] `await pool.connect()` → `AsyncConnection` (async ctx mgr, shielded cleanup) — core promise
+- [ ] `AsyncCursor` with `execute`, `executemany`, `fetchone`, `fetchmany`, `fetchall`, `close` — DBAPI table stakes
+- [ ] `await cursor.fetch_arrow_table()` — the headline Arrow differentiator
+- [ ] `adbc_cancel` cancellation wiring (no-leak on cancel) — correctness requirement, NOT optional
+- [ ] `commit()` / `rollback()` async — transaction control
+- [ ] anyio backend-neutral throughout (asyncio + trio tested) — the cross-cutting differentiator
+- [ ] Generic over all 13 backends via existing Protocol — proves the design
+
+### Add After Validation (v1.4.x)
+
+- [ ] `await cursor.fetch_record_batch()` + `async for batch` streaming — trigger: a consumer needs to stream results larger than memory
+- [ ] `await cursor.adbc_ingest()` async bulk load — trigger: write-path demand from dbt-open-sl / Semantic ORM
+- [ ] `fetch_df()` / `fetch_polars()` async convenience — trigger: DataFrame-oriented consumer request
+
+### Future Consideration (v2+)
+
+- [ ] Async ADBC metadata methods (`adbc_get_table_schema`, `adbc_get_objects`) — defer: Semantic ORM may want async catalog introspection; cheap to add when concretely needed
+- [ ] `adbc_prepare` / `adbc_execute_schema` async — defer: niche; add on demand
+- [ ] anyio-native checkout limiter (vs offloaded QueuePool) — defer: only if offloaded-checkout proves a bottleneck under trio (this is the settled-in-research open design decision)
+
+## Feature Prioritization Matrix
+
+| Feature | User Value | Implementation Cost | Priority |
+|---------|------------|---------------------|----------|
+| `_run_sync_offloaded()` helper | HIGH | MEDIUM | P1 |
+| `create/close/managed_async_pool` | HIGH | LOW | P1 |
+| `await pool.connect()` + async conn ctx mgr | HIGH | MEDIUM | P1 |
+| async `execute/executemany` | HIGH | MEDIUM | P1 |
+| async `fetchone/many/all` | HIGH | LOW | P1 |
+| async cursor ctx mgr + `close` | HIGH | MEDIUM | P1 |
+| `adbc_cancel` cancellation (no-leak) | HIGH | HIGH | P1 |
+| `fetch_arrow_table()` async | HIGH | MEDIUM | P1 |
+| `commit/rollback` async | MEDIUM | LOW | P1 |
+| anyio backend-neutral (trio support) | HIGH | MEDIUM | P1 |
+| `fetch_record_batch()` + async streaming | HIGH | HIGH | P2 |
+| `adbc_ingest()` async | MEDIUM | MEDIUM | P2 |
+| `fetch_df` / `fetch_polars` async | MEDIUM | LOW | P2 |
+| async ADBC metadata methods | LOW-MEDIUM | LOW | P3 |
+| `adbc_prepare` / `adbc_execute_schema` | LOW | LOW | P3 |
+
+**Priority key:** P1 = must have for v1.4.0 launch · P2 = v1.4.x once validated · P3 = future.
+
+## Concrete Async Surface to Wrap (exact method set)
+
+**Pool-level (module functions):** `create_async_pool`, `close_async_pool`,
+`managed_async_pool` — signatures identical to sync, including the three
+overloads (config / `driver_path=` / `dbapi_module=`) and keyword defaults.
+
+**`AsyncConnection` (wraps ADBC dbapi `Connection`):**
+- `await pool.connect()` returns it; `async with` scopes it (checkin on exit)
+- `cursor()` → `AsyncCursor` (NOT awaited — no I/O)
+- `await commit()`, `await rollback()`, `await close()`
+- (P3) `await adbc_get_table_schema(...)`, `await adbc_get_objects(...)`, `await adbc_get_info()`
+- `adbc_cancel()` used internally for cancellation wiring
+
+**`AsyncCursor` (wraps ADBC dbapi `Cursor`):**
+- `await execute(operation, parameters=None)`
+- `await executemany(operation, seq_of_parameters)`
+- `await fetchone()`, `await fetchmany(size=None)`, `await fetchall()`
+- `await fetch_arrow_table()` (P1 differentiator)
+- `await fetch_record_batch()` + `async for batch in ...` (P2 streaming)
+- `await adbc_ingest(table_name, data, mode='create', ...)` (P2)
+- `await fetch_df()`, `await fetch_polars()` (P2, optional)
+- `await close()`
+- `adbc_cancel()` used internally for cancellation wiring
+- properties pass-through (sync, no I/O): `description`, `rowcount`, `arraysize`
+
+## Symmetry With the Sync API (naming + conventions)
+
+The async surface must read as "the sync API with `await` and `async with`
+added." Concrete conventions, derived from the sync code and the prior-art norms:
+
+| Sync | Async | Convention |
+|------|-------|------------|
+| `create_pool(config, ...)` | `create_async_pool(config, ...)` | `_async_` infix; identical signature/keywords (`pool_size`, `max_overflow`, `timeout`, `recycle`, `pre_ping`) and the same three overloads. |
+| `close_pool(pool)` | `close_async_pool(pool)` | direct mirror. |
+| `with managed_pool(...) as pool:` | `async with managed_async_pool(...) as pool:` | `@asynccontextmanager`; same call patterns. |
+| `with pool.connect() as conn:` | `async with await pool.connect() as conn:` | `await` to acquire, `async with` to scope — matches psycopg3/SQLAlchemy. |
+| `conn.cursor()` | `conn.cursor()` (NOT awaited) | cursor creation does no I/O — keep sync-returning like psycopg3 and ADBC. |
+| `cursor.execute(...)` | `await cursor.execute(...)` | "scatter await" — same args, same order. |
+| `cursor.fetch_arrow_table()` | `await cursor.fetch_arrow_table()` | identical name + `await`. Same for `fetchone/many/all`, `executemany`, `adbc_ingest`, `commit`, `rollback`. |
+| iterate rows manually | `async for batch in cursor.fetch_record_batch()` | streaming uses `async for` (psycopg3 `stream` / SQLAlchemy `AsyncResult` convention). |
+
+**Naming rules:**
+- Public functions: `create_async_pool` / `close_async_pool` /
+  `managed_async_pool` (decided in milestone context).
+- Wrapper classes: `AsyncConnection` / `AsyncCursor` (matches psycopg3 naming
+  exactly — strong precedent, instantly recognizable).
+- Keep method NAMES identical to the sync/ADBC names — only add `await`. Do not
+  rename `fetch_arrow_table` to something "async-y." Discoverability comes from
+  sameness.
+- Same keyword defaults as `create_pool` (`pool_size=5`, `max_overflow=3`,
+  `timeout=30`, `recycle=3600`, `pre_ping=False`) — copy them verbatim.
+
+## Dependencies on Existing Sync Components
+
+| New async feature | Depends on existing |
+|-------------------|---------------------|
+| `create_async_pool` / `managed_async_pool` / `close_async_pool` | `_pool_factory._create_pool_impl`, `create_pool`, `close_pool` (offload + reuse, don't reimplement) |
+| async connection/cursor wrappers | ADBC dbapi `Connection`/`Cursor` obtained via `_driver_api.create_adbc_connection` and the pool's checked-out connection |
+| generic 13-backend coverage | `_base_config.WarehouseConfig` Protocol + the self-describing configs (no per-backend async code) |
+| cursor cleanup | existing `_release_arrow_allocators` reset hook on the pool (must not double-close or close mid-stream) |
+| exception propagation | ADBC `Error` hierarchy surfaced via `_driver_api`; `to_thread.run_sync` re-raise |
+| type safety | basedpyright strict — all async public API fully typed (constraint from PROJECT.md) |
+
+## Critical Pitfall (flag for ARCHITECTURE/PITFALLS research)
+
+**Cancellation leaks the connection.** Every reference library surveyed
+(asyncpg #464, SQLAlchemy #8145/#12099, the encode stack) has shipped a bug
+where a cancelled task leaves a connection that never returns to the pool,
+eventually exhausting it. Two compounding hazards here:
+
+1. `anyio.to_thread.run_sync` cannot kill the worker thread. With
+   `abandon_on_cancel=True` the await returns but the query keeps running on a
+   connection you've "released" → corruption/leak. MUST pair with
+   `cursor.adbc_cancel()` so the C driver actually aborts.
+2. The async connection `__aexit__` (checkin) is itself an `await` and can be
+   cancelled mid-cleanup. Cleanup must be shielded (anyio `CancelScope(shield=True)`)
+   so the connection always returns to the pool.
+
+This is the highest-risk area of the milestone and warrants its own design
+section. It is a P1 correctness requirement, not a nice-to-have.
+
+## Competitor Feature Analysis
+
+| Feature | asyncpg / psycopg3 | SQLAlchemy 2.x asyncio | Our Approach |
+|---------|--------------------|------------------------|--------------|
+| Async transport | native async sockets | greenlet bridge over sync driver | anyio thread-offload over sync ADBC (GIL-releasing) |
+| Backend support | one DB each | many DBs via dialects | all 13 ADBC backends, one generic layer |
+| Event-loop neutrality | asyncio only | asyncio only | asyncio AND trio (anyio) |
+| Arrow-native fetch | no (row-oriented) | no | `fetch_arrow_table` / `fetch_record_batch` is the headline |
+| Cancellation | CancelledError (leak-prone) | CancelledError (documented leaks) | `adbc_cancel` + shielded checkin (real abort, no leak) |
+| Streaming | server-side cursor / `stream()` | `AsyncResult` / `stream()` | `async for batch in fetch_record_batch()` |
 
 ## Sources
 
-- ADBC Drivers Foundry overview: https://docs.adbc-drivers.org/ (confirmed 2026-03-01) — HIGH confidence
-- dbc CLI README: https://github.com/columnar-tech/dbc (confirmed 2026-03-01) — HIGH confidence
-- dbc 0.2.0 announcement: https://columnar.tech/blog/announcing-dbc-0.2.0/ (February 10, 2026) — HIGH confidence
-- MySQL ADBC driver README: https://github.com/adbc-drivers/mysql (confirmed 2026-03-01) — HIGH confidence
-- ClickHouse ADBC driver README: https://github.com/ClickHouse/adbc_clickhouse (confirmed 2026-03-01) — HIGH confidence (WIP status explicitly stated)
-- adbc-quickstarts by-database branch: https://github.com/columnar-tech/adbc-quickstarts (confirmed 2026-03-01) — HIGH confidence (live code, not docs)
-  - MySQL: `root:my-secret-pw@tcp(localhost:3306)/demo` URI format
-  - ClickHouse: `http://localhost:8123` + `username`/`password` kwargs
-  - SQLite: `games.sqlite` filename URI
-  - Oracle: `oracle://system:password@localhost:1521/FREEPDB1`
-  - Teradata: `teradata://YOUR_USERNAME:YOUR_PASSWORD@YOUR_HOST:1025`
-- Apache ADBC SQLite driver docs: https://arrow.apache.org/adbc/current/driver/sqlite.html — HIGH confidence
-- dbc CLI DeepWiki commands reference: https://deepwiki.com/columnar-tech/dbc/4-commands-reference — MEDIUM confidence (indexed November 2025, pre-0.2.0)
+- ADBC dbapi API reference (Cursor/Connection method set, extensions) — https://arrow.apache.org/adbc/current/python/api/adbc_driver_manager.html — HIGH
+- ADBC DBAPI/Driver Manager recipes — https://arrow.apache.org/adbc/current/python/recipe/driver_manager.html — HIGH
+- anyio threads (to_thread.run_sync, abandon_on_cancel, from_thread.check_cancelled) — https://anyio.readthedocs.io/en/stable/threads.html — HIGH
+- psycopg3 async (AsyncConnection/AsyncCursor, stream, "scatter await", cursor() not awaited) — https://www.psycopg.org/psycopg3/docs/advanced/async.html — HIGH
+- asyncpg API reference (pool acquire/release, execute/fetch/fetchrow/fetchval, cursors) — https://magicstack.github.io/asyncpg/current/api/index.html — HIGH
+- aiosqlite (proxy connection/cursor, async iterator, thread model) — https://aiosqlite.omnilib.dev/ — HIGH
+- SQLAlchemy 2.x asyncio (AsyncEngine/AsyncConnection/AsyncResult, stream, greenlet) — https://docs.sqlalchemy.org/en/20/orm/extensions/asyncio.html — HIGH
+- encode/databases (connect/execute/fetch_all/fetch_one/iterate/transactions) — https://www.encode.io/databases/ — MEDIUM (maintenance mode)
+- SQLAlchemy async cancel-leak issue #8145 / asyncpg #464 (connection-leak-on-cancel pattern) — https://github.com/sqlalchemy/sqlalchemy/issues/8145 , https://github.com/MagicStack/asyncpg/issues/464 — HIGH
+- adbc-poolhouse sync source (`_pool_factory.py`, `_driver_api.py`, `__init__.py`) — local, for mirroring — HIGH
+
+---
+*Feature research for: async wrapper API over sync ADBC connection pool (adbc-poolhouse v1.4.0)*
+*Researched: 2026-06-25*
