@@ -1,17 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.3.0
-milestone_name: Quack Backend
-status: shipped
-stopped_at: v1.3.0 shipped (Phases 21 + 21.1 complete); preparing v1.3.1 patch — Databricks catalog/schema fix
-last_updated: "2026-06-24T20:40:59.998Z"
-last_activity: 2026-06-24 -- Quick task 260624-u45: Databricks catalog/schema fix (v1.3.1 prep)
+milestone: v1.4.0
+milestone_name: Async API
+status: planning
+last_updated: "2026-06-25T21:53:03.979Z"
+last_activity: 2026-06-25
 progress:
-  total_phases: 2
-  completed_phases: 2
-  total_plans: 6
-  completed_plans: 6
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -25,10 +24,10 @@ See: .planning/PROJECT.md (updated 2026-05-19)
 
 ## Current Position
 
-Phase: 21.1 (adbc-dispatch-uri-positional-fix) — EXECUTING
-Plan: 1 of 3
-Status: Executing Phase 21.1
-Last activity: 2026-05-19 -- Phase 21.1 execution started
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-06-25 — Milestone v1.4.0 started
 
 ## Accumulated Context
 

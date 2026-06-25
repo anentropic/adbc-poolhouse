@@ -4,15 +4,22 @@
 
 A focused Python library that takes a typed warehouse configuration and returns a pooled ADBC connection. Supports 13 warehouse backends (DuckDB, Snowflake, BigQuery, PostgreSQL, FlightSQL, Databricks, Redshift, Trino, MSSQL, SQLite, MySQL, ClickHouse, Quack) with both PyPI and Foundry driver detection. Published to PyPI as `adbc-poolhouse`.
 
-## Current Milestone: v1.3.0 Quack Backend
+## Current Milestone: v1.4.0 Async API
 
-**Goal:** Add `QuackConfig` warehouse backend for `adbc-driver-quack` (DuckDB remote/Quack protocol).
+**Goal:** Add an optional async API surface (behind an `[async]` extra) that wraps the sync ADBC pool/connection/cursor methods with anyio thread-offload, exposing awaitable versions of the full poolhouse API for all 13 backends.
 
 **Target features:**
-- `QuackConfig` class implementing the `WarehouseConfig` Protocol (URI + optional token + TLS)
-- Driver detection via PyPI path (`adbc_driver_quack`)
-- Semi-integration test with conditional mock target
-- Documentation: per-warehouse guide, configuration.md row, index.md listing
+- Parallel async functions — `create_async_pool()`, `managed_async_pool()`, `close_async_pool()` mirroring the sync trio
+- Async connection wrapper — `await pool.connect()` returns an async connection
+- Async cursor wrapper — `execute` / `executemany` / `fetch*` / `fetch_arrow_table` offloaded via `anyio.to_thread.run_sync`
+- Cooperative cancellation — `adbc_cancel` wired to anyio cancellation scopes
+- `[async]` optional extra (adds anyio); sync API completely unchanged
+- Generic machinery — one async layer covers every `WarehouseConfig` via the Protocol
+- Documentation — async usage guide + configuration/index/API-reference updates
+
+**Feasibility basis:** ADBC releases the GIL in its C calls, so offloading the sync methods to a thread pool yields real concurrency — no native async ADBC driver required. This reverses the prior "ADBC dbapi is synchronous" out-of-scope decision.
+
+**Open design decision (settled in research):** checkout-wait strategy — plain sync `QueuePool` with anyio-offloaded checkout-and-execute vs. an anyio-native checkout limiter (trio-safe). SQLAlchemy's `AsyncAdaptedQueuePool` is asyncio-bound and does not replace the thread-offload, so it is a reference, not a foundation.
 
 ## Core Value
 
@@ -46,12 +53,11 @@ One config in, one pool out — `create_pool(SnowflakeConfig(...))` returns a re
 
 ### Active
 
-**Milestone v1.3.0 — Quack Backend:** Complete (Phase 21 verified 2026-05-19; QUACK-01 through QUACK-18 satisfied)
+**Milestone v1.4.0 — Async API:** In progress (requirements defined this milestone; async surface for all 13 backends behind an `[async]` extra)
 
 **Carried (externally blocked):**
 - [ ] Verify Teradata field names against real Columnar ADBC Teradata driver
 - [ ] Live integration tests for non-DuckDB, non-Snowflake backends (blocked on test account availability)
-- [ ] Async pool support (blocked on ADBC adding async dbapi interface)
 
 ### Out of Scope
 
@@ -60,7 +66,8 @@ One config in, one pool out — `create_pool(SnowflakeConfig(...))` returns a re
 - Knowledge of dbt, profiles.yml, semantic layers, or MetricFlow
 - REST/HTTP/Flight SQL serving
 - OAuth / SSO auth logic — delegated entirely to ADBC drivers
-- Async connection pools — ADBC dbapi is synchronous
+- ~~Async connection pools — ADBC dbapi is synchronous~~ — **reversed in v1.4.0**: ADBC releases the GIL, so anyio thread-offload delivers real async concurrency without a native async ADBC driver
+- Native async ADBC driver — not required; async is achieved by offloading the sync driver to threads
 - Teradata — private Foundry registry (requires paid Columnar access)
 - Oracle — private Foundry registry
 - ClickHouse via Apache ADBC — github.com/ClickHouse/adbc_clickhouse is WIP with many NotImplemented stubs
@@ -129,4 +136,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-19 after starting v1.3.0 milestone*
+*Last updated: 2026-06-25 after starting v1.4.0 milestone*
