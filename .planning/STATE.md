@@ -2,9 +2,10 @@
 gsd_state_version: 1.0
 milestone: v1.4.0
 milestone_name: Async API
-status: roadmapped
-last_updated: "2026-06-26T00:00:00.000Z"
-last_activity: 2026-06-26
+status: Roadmapped — 7 phases (22–28), 63 requirements mapped
+stopped_at: v1.4.0 roadmap created — 7 phases (22–28), 63 requirements mapped at 100% coverage; ROADMAP.md, STATE.md, and REQUIREMENTS.md traceability updated.
+last_updated: "2026-06-26T19:44:04.677Z"
+last_activity: 2026-06-26 — v1.4.0 roadmap created
 progress:
   total_phases: 7
   completed_phases: 0
