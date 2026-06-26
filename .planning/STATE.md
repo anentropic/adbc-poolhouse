@@ -2,11 +2,11 @@
 gsd_state_version: 1.0
 milestone: v1.4.0
 milestone_name: Async API
-status: planning
-last_updated: "2026-06-25T21:53:03.979Z"
-last_activity: 2026-06-25
+status: roadmapped
+last_updated: "2026-06-26T00:00:00.000Z"
+last_activity: 2026-06-26
 progress:
-  total_phases: 0
+  total_phases: 7
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -17,17 +17,27 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-05-19)
+See: .planning/PROJECT.md (updated 2026-06-25)
 
 **Core value:** One config in, one pool out — `create_pool(SnowflakeConfig(...))` returns a ready-to-use SQLAlchemy QueuePool in a single call.
-**Current focus:** Phase 21.1 — adbc-dispatch-uri-positional-fix
+**Current focus:** Phase 22 — Feasibility Spike (GIL/concurrency validation, gates the milestone)
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: Not started (roadmap complete, awaiting planning)
 Plan: —
-Status: Defining requirements
-Last activity: 2026-06-25 — Milestone v1.4.0 started
+Status: Roadmapped — 7 phases (22–28), 63 requirements mapped
+Last activity: 2026-06-26 — v1.4.0 roadmap created
+
+Progress: [░░░░░░░░░░] 0% (0/7 phases)
+
+## Performance Metrics
+
+| Metric | Value |
+|--------|-------|
+| Phases planned | 7 (22–28) |
+| Requirements | 63 (100% mapped) |
+| Plans complete | 0 |
 
 ## Accumulated Context
 
@@ -35,22 +45,29 @@ Last activity: 2026-06-25 — Milestone v1.4.0 started
 
 All v1.0.0–v1.2.0 decisions recorded in PROJECT.md Key Decisions table.
 
-v1.3.0 roadmap decisions:
+v1.4.0 roadmap decisions:
 
-- Single combined Phase 21 (config + tests + docs) rather than splitting into separate implementation and documentation phases — follows v1.0.0 retrospective lesson "Every new backend should update all three doc surfaces in the same plan, not as a separate phase"
-- Phase numbering continues from v1.2.0's Phase 20 (monotonic across milestones, per v1.2.0 lesson)
-- Mirrors single-phase backend pattern of Phase 10 (SQLite) and Phase 12 (ClickHouse) from v1.0.0
+- **Phase numbering continues monotonically from v1.3.0's Phase 21.1 → starts at Phase 22** (established project convention: monotonic across milestones).
+- **Feasibility spike is Phase 22 and gates the milestone** (research SUMMARY strong recommendation): the GIL-release premise for pyarrow `fetch_arrow_table` materialization is MEDIUM-confidence and must be validated before the full surface is built. SPIKE-03 go/no-go explicitly gates Phase 24.
+- **Test-harness foundation pulled forward to Phase 23** (before the wrappers): TEST-05's `BlockingStubCursor` + event-gating/virtual-clock helpers + import-lint guard are prerequisites for the EDGE suites in Phases 24–25, so the harness lands before the code it exercises to avoid churn.
+- **Cancellation is its own Phase 25** (research SUMMARY: #1 correctness risk by a margin — every surveyed async DB library shipped a cancel-leak bug). Dedicated phase for focused design review and explicit no-leak assertions under asyncio + trio.
+- **Structural EDGE tests co-located with the behaviour they test**: limiter/reentrancy/exception/lifetime/hygiene EDGE (09,10,11,12,15,17,18,21,25,26) → Phase 24 (Core); cancellation EDGE (01–07,19,28,29) → Phase 25; meta/test-infra EDGE (27,30) → Phase 27 (Testing).
+- **EDGE-19 (ExceptionGroup/task-group) → Cancellation (Phase 25)** rather than Core, because it pins keeping cancellation distinguishable from real ADBC errors in a task group — a cancellation-correctness concern tied to CANCEL-04.
+- **Only the 22 P1 EDGE ids are in scope**; P2 EDGE (08,13,14,16,20,22,23,24,31,32) are deferred to v1.4.x per REQUIREMENTS.md Future Requirements.
+- **Async layer lives in a new `src/adbc_poolhouse/_async/` package and reuses the sync core unchanged** (`_create_pool_impl`, config dispatch, 13-backend Protocol, `_release_arrow_allocators` reset event).
+- **Documentation is Phase 28 (consolidation point)**, but per-phase docstrings are a completion requirement throughout (CLAUDE.md docs gate applies to all phases ≥ 7; every v1.4.0 phase is well past that — include the docs-author skill in `<execution_context>`).
 
 ### Roadmap Evolution
 
-- 20 phases completed across v1.0.0 and v1.2.0 milestones
-- v1.2.0 underwent architectural pivot: registry → self-describing configs
-- v1.3.0 follows established phase-per-backend pattern — single combined phase for the small Quack surface
-- Phase 21.1 inserted after Phase 21: ADBC dispatch URI-positional fix (URGENT) — /ultrareview surfaced a `TypeError` in `_driver_api.create_adbc_connection` that breaks `create_pool(QuackConfig(...))` and latently also `create_pool(PostgreSQLConfig(...))` and `create_pool(FlightSQLConfig(...))` when their PyPI drivers are installed; closes the Phase 21 QUACK-08 verification gap and fixes pre-existing bugs from v1.0.0
+- 22 phases completed across v1.0.0, v1.2.0, and v1.3.0 milestones (1–21, plus inserted 17.5 and 21.1).
+- v1.4.0 adds 7 phases (22–28) for the optional async API behind an `[async]` extra.
+- Phase ordering: Spike (22, gates) → Harness (23) → Core wrapper (24) → Cancellation (25) → Packaging (26) → Test matrix (27) → Docs (28).
 
 ### Blockers/Concerns
 
-None — adbc-driver-quack is alpha (v0.1.0-alpha.1); document alpha status and pin lower bound carefully.
+- **GIL / pyarrow materialization (MEDIUM confidence):** whether `fetch_arrow_table` / `fetchall` release the GIL during pyarrow object construction is unvalidated per-method. Phase 22 must resolve this before Phase 24 begins. If materialization serializes, document the limit honestly rather than re-architecting.
+- **Cancellation connection leak (highest industry-wide risk):** Phase 24 must never return a possibly-busy connection on any path even before the full `adbc_cancel` join lands in Phase 25.
+- **40-token global limiter:** the dedicated per-pool `CapacityLimiter` is a first-class Phase 24 requirement (CORE-02), not a Phase 27 load-test fix.
 
 ### Quick Tasks Completed
 
@@ -61,6 +78,7 @@ None — adbc-driver-quack is alpha (v0.1.0-alpha.1); document alpha status and 
 
 ## Session Continuity
 
-Last session: 2026-06-24
-Stopped at: v1.3.0 shipped; Databricks catalog/schema fix landed on branch gsd/quick-260624-databricks-catalog-schema — preparing v1.3.1 patch release
-Next step: finalize v1.3.1 (version bump + changelog), then open PR / tag
+Last session: 2026-06-26
+Stopped at: v1.4.0 roadmap created — 7 phases (22–28), 63 requirements mapped at 100% coverage; ROADMAP.md, STATE.md, and REQUIREMENTS.md traceability updated.
+Next step: `/gsd-plan-phase 22` — plan the feasibility spike (no external research needed; empirical DuckDB benchmarking).
+</content>
