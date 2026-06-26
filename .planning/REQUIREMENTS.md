@@ -18,7 +18,7 @@ Scope decisions for this milestone:
 
 - [x] **SPIKE-01**: A DuckDB benchmark measures wall-clock of N concurrent slow (I/O-bound) queries against ideal-parallel, demonstrating real GIL release during `execute`
 - [x] **SPIKE-02**: A DuckDB benchmark measures N concurrent large `fetch_arrow_table` calls against ideal-parallel, quantifying whether pyarrow materialization parallelizes or serializes on the GIL
-- [ ] **SPIKE-03**: A written go/no-go records which concurrency wins the async layer can honestly claim (and what to disclaim), feeding offload-granularity and documentation decisions
+- [x] **SPIKE-03**: A written go/no-go records which concurrency wins the async layer can honestly claim (and what to disclaim), feeding offload-granularity and documentation decisions
 
 ### Concurrency Foundation
 
@@ -174,7 +174,7 @@ Explicit exclusions for the async layer (with reasoning):
 |-------------|-------|--------|
 | SPIKE-01 | Phase 22 | Complete |
 | SPIKE-02 | Phase 22 | Complete |
-| SPIKE-03 | Phase 22 | Pending |
+| SPIKE-03 | Phase 22 | Complete |
 | TEST-05 | Phase 23 | Pending |
 | CORE-01 | Phase 24 | Pending |
 | CORE-02 | Phase 24 | Pending |

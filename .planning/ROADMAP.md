@@ -80,7 +80,7 @@
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-  - [ ] 22-02-PLAN.md — SPIKE-03 go/no-go doc (8-point contract, gates Phase 24) + wheel-exclusion verification
+  - [x] 22-02-PLAN.md — SPIKE-03 go/no-go doc (8-point contract, gates Phase 24) + wheel-exclusion verification
 
 **UI hint**: no
 
@@ -223,7 +223,7 @@
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
-| 22. Feasibility Spike | v1.4.0 | 1/2 | In Progress|  |
+| 22. Feasibility Spike | v1.4.0 | 2/2 | Complete   | 2026-06-26 |
 | 23. Test Harness Foundation | v1.4.0 | 0/0 | Not started | - |
 | 24. Core Async Wrapper | v1.4.0 | 0/0 | Not started | - |
 | 25. Cancellation | v1.4.0 | 0/0 | Not started | - |

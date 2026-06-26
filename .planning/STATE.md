@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.4.0
 milestone_name: Async API
-status: executing
+status: verifying
 stopped_at: Completed 22-01-PLAN.md
-last_updated: "2026-06-26T20:54:22.425Z"
+last_updated: "2026-06-26T20:59:36.780Z"
 last_activity: 2026-06-26 -- Phase 22 execution started
 progress:
   total_phases: 9
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 2
-  completed_plans: 1
-  percent: 0
+  completed_plans: 2
+  percent: 11
 ---
 
 # Project State
@@ -27,7 +27,7 @@ See: .planning/PROJECT.md (updated 2026-06-25)
 
 Phase: 22 (feasibility-spike) — EXECUTING
 Plan: 2 of 2
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-06-26 -- Phase 22 execution started
 
 Progress: [░░░░░░░░░░] 0% (0/7 phases)
@@ -40,6 +40,7 @@ Progress: [░░░░░░░░░░] 0% (0/7 phases)
 | Requirements | 63 (100% mapped) |
 | Plans complete | 0 |
 | Phase 22 P01 | 35min | 3 tasks | 5 files |
+| Phase 22 P02 | ~20min | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -60,6 +61,9 @@ v1.4.0 roadmap decisions:
 - **Documentation is Phase 28 (consolidation point)**, but per-phase docstrings are a completion requirement throughout (CLAUDE.md docs gate applies to all phases ≥ 7; every v1.4.0 phase is well past that — include the docs-author skill in `<execution_context>`).
 - [Phase ?]: GIL spike measured: execute parallelizes (2.77x@N=4, eff 0.69); fetch_arrow_table partially serializes (1.67x@N=4, eff 0.42) — confirms execute>>fetch asymmetry, GO with materialization caveat
 - [Phase ?]: Benchmark uses raw threads only (Barrier+ThreadPoolExecutor), file-backed temp DuckDB, real create_pool checkout path; benchmarks/ stays outside src/
+- [Phase ?]: Phase 22 SPIKE-03 go/no-go: GO with a named fetch_arrow_table materialization caveat; gates Phase 24
+- [Phase ?]: Phase 24 offload granularity: whole-operation (one to_thread per execute, one per fetch); CapacityLimiter(pool_size+max_overflow) governs cross-query concurrency where the I/O-bound win is real
+- [Phase ?]: Spike proves GIL release / CPU parallelism but INFERS I/O concurrency (in-proc DuckDB has no network wait); Phase 27 dual-backend matrix exercises real backends
 
 ### Roadmap Evolution
 
@@ -82,7 +86,7 @@ v1.4.0 roadmap decisions:
 
 ## Session Continuity
 
-Last session: 2026-06-26T20:54:22.421Z
+Last session: 2026-06-26T20:59:31.257Z
 Stopped at: Completed 22-01-PLAN.md
 Next step: `/gsd-plan-phase 22` — plan the feasibility spike (no external research needed; empirical DuckDB benchmarking).
 </content>
