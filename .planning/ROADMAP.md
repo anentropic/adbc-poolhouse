@@ -76,7 +76,7 @@
 
 **Wave 1**
 
-  - [ ] 22-01-PLAN.md — Kept benchmark harness + execute (SPIKE-01) and fetch_arrow_table (SPIKE-02) measurements via the real create_pool checkout path, plus a pure-function harness unit test
+  - [x] 22-01-PLAN.md — Kept benchmark harness + execute (SPIKE-01) and fetch_arrow_table (SPIKE-02) measurements via the real create_pool checkout path, plus a pure-function harness unit test
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -223,7 +223,7 @@
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
-| 22. Feasibility Spike | v1.4.0 | 0/0 | Not started | - |
+| 22. Feasibility Spike | v1.4.0 | 1/2 | In Progress|  |
 | 23. Test Harness Foundation | v1.4.0 | 0/0 | Not started | - |
 | 24. Core Async Wrapper | v1.4.0 | 0/0 | Not started | - |
 | 25. Cancellation | v1.4.0 | 0/0 | Not started | - |

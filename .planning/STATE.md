@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.4.0
 milestone_name: Async API
-status: Roadmapped — 7 phases (22–28), 63 requirements mapped
-stopped_at: v1.4.0 roadmap created — 7 phases (22–28), 63 requirements mapped at 100% coverage; ROADMAP.md, STATE.md, and REQUIREMENTS.md traceability updated.
-last_updated: "2026-06-26T19:44:04.677Z"
-last_activity: 2026-06-26 — v1.4.0 roadmap created
+status: executing
+stopped_at: Completed 22-01-PLAN.md
+last_updated: "2026-06-26T20:54:22.425Z"
+last_activity: 2026-06-26 -- Phase 22 execution started
 progress:
-  total_phases: 7
+  total_phases: 9
   completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
+  total_plans: 2
+  completed_plans: 1
   percent: 0
 ---
 
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-25)
 
 **Core value:** One config in, one pool out — `create_pool(SnowflakeConfig(...))` returns a ready-to-use SQLAlchemy QueuePool in a single call.
-**Current focus:** Phase 22 — Feasibility Spike (GIL/concurrency validation, gates the milestone)
+**Current focus:** Phase 22 — feasibility-spike
 
 ## Current Position
 
-Phase: Not started (roadmap complete, awaiting planning)
-Plan: —
-Status: Roadmapped — 7 phases (22–28), 63 requirements mapped
-Last activity: 2026-06-26 — v1.4.0 roadmap created
+Phase: 22 (feasibility-spike) — EXECUTING
+Plan: 2 of 2
+Status: Ready to execute
+Last activity: 2026-06-26 -- Phase 22 execution started
 
 Progress: [░░░░░░░░░░] 0% (0/7 phases)
 
@@ -39,6 +39,7 @@ Progress: [░░░░░░░░░░] 0% (0/7 phases)
 | Phases planned | 7 (22–28) |
 | Requirements | 63 (100% mapped) |
 | Plans complete | 0 |
+| Phase 22 P01 | 35min | 3 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -57,6 +58,8 @@ v1.4.0 roadmap decisions:
 - **Only the 22 P1 EDGE ids are in scope**; P2 EDGE (08,13,14,16,20,22,23,24,31,32) are deferred to v1.4.x per REQUIREMENTS.md Future Requirements.
 - **Async layer lives in a new `src/adbc_poolhouse/_async/` package and reuses the sync core unchanged** (`_create_pool_impl`, config dispatch, 13-backend Protocol, `_release_arrow_allocators` reset event).
 - **Documentation is Phase 28 (consolidation point)**, but per-phase docstrings are a completion requirement throughout (CLAUDE.md docs gate applies to all phases ≥ 7; every v1.4.0 phase is well past that — include the docs-author skill in `<execution_context>`).
+- [Phase ?]: GIL spike measured: execute parallelizes (2.77x@N=4, eff 0.69); fetch_arrow_table partially serializes (1.67x@N=4, eff 0.42) — confirms execute>>fetch asymmetry, GO with materialization caveat
+- [Phase ?]: Benchmark uses raw threads only (Barrier+ThreadPoolExecutor), file-backed temp DuckDB, real create_pool checkout path; benchmarks/ stays outside src/
 
 ### Roadmap Evolution
 
@@ -79,7 +82,7 @@ v1.4.0 roadmap decisions:
 
 ## Session Continuity
 
-Last session: 2026-06-26
-Stopped at: v1.4.0 roadmap created — 7 phases (22–28), 63 requirements mapped at 100% coverage; ROADMAP.md, STATE.md, and REQUIREMENTS.md traceability updated.
+Last session: 2026-06-26T20:54:22.421Z
+Stopped at: Completed 22-01-PLAN.md
 Next step: `/gsd-plan-phase 22` — plan the feasibility spike (no external research needed; empirical DuckDB benchmarking).
 </content>

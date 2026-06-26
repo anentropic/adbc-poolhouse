@@ -9,14 +9,15 @@
 Add an **optional** async API surface behind an `[async]` extra. Every blocking ADBC / SQLAlchemy `QueuePool` call is dispatched to a worker thread via `anyio.to_thread.run_sync` — real I/O concurrency because the ADBC C drivers release the GIL during query execution. The async layer wraps the existing sync core (`_create_pool_impl`, config dispatch, the 13-backend `WarehouseConfig` Protocol, the `_release_arrow_allocators` reset event) **without modifying it**, in a new `src/adbc_poolhouse/_async/` package. anyio is chosen for asyncio + trio neutrality. The sync API is shipped and unchanged.
 
 Scope decisions for this milestone:
+
 - **Feasibility spike gates the milestone** — validate the GIL-release premise for pyarrow materialization before building the full surface.
 - **P2 differentiators deferred to v1.4.x** — `fetch_record_batch` streaming, `adbc_ingest`, `fetch_df`/`fetch_polars` are out of scope here (see Future Requirements).
 - **Dedicated async edge-case test coverage** — a curated `EDGE-NN` suite (cancellation depth, limiter/backpressure, contextvars, reentrancy, exceptions, resource lifetime, event-loop hygiene, trio-vs-asyncio, timing) hardens the layer against the silent-leak failure modes endemic to async DB wrappers. Designs in `.planning/research/ASYNC-EDGE-CASES.md`.
 
 ### Feasibility Spike
 
-- [ ] **SPIKE-01**: A DuckDB benchmark measures wall-clock of N concurrent slow (I/O-bound) queries against ideal-parallel, demonstrating real GIL release during `execute`
-- [ ] **SPIKE-02**: A DuckDB benchmark measures N concurrent large `fetch_arrow_table` calls against ideal-parallel, quantifying whether pyarrow materialization parallelizes or serializes on the GIL
+- [x] **SPIKE-01**: A DuckDB benchmark measures wall-clock of N concurrent slow (I/O-bound) queries against ideal-parallel, demonstrating real GIL release during `execute`
+- [x] **SPIKE-02**: A DuckDB benchmark measures N concurrent large `fetch_arrow_table` calls against ideal-parallel, quantifying whether pyarrow materialization parallelizes or serializes on the GIL
 - [ ] **SPIKE-03**: A written go/no-go records which concurrency wins the async layer can honestly claim (and what to disclaim), feeding offload-granularity and documentation decisions
 
 ### Concurrency Foundation
@@ -171,8 +172,8 @@ Explicit exclusions for the async layer (with reasoning):
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| SPIKE-01 | Phase 22 | Pending |
-| SPIKE-02 | Phase 22 | Pending |
+| SPIKE-01 | Phase 22 | Complete |
+| SPIKE-02 | Phase 22 | Complete |
 | SPIKE-03 | Phase 22 | Pending |
 | TEST-05 | Phase 23 | Pending |
 | CORE-01 | Phase 24 | Pending |
