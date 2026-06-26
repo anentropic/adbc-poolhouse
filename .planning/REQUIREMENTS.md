@@ -1,127 +1,174 @@
-# Requirements: adbc-poolhouse v1.3.0
+# Requirements: adbc-poolhouse v1.4.0
 
-**Milestone:** v1.3.0 — Quack Backend
-**Defined:** 2026-05-19
+**Milestone:** v1.4.0 — Async API
+**Defined:** 2026-06-26
 **Core Value:** One config in, one pool out — `create_pool(SnowflakeConfig(...))` returns a ready-to-use SQLAlchemy QueuePool in a single call.
 
-## v1.3 Requirements
+## v1.4.0 Requirements
 
-Add `QuackConfig` warehouse backend for `adbc-driver-quack` (DuckDB Quack remote protocol). Follows established Protocol-based, self-describing config pattern from v1.2.0.
+Add an **optional** async API surface behind an `[async]` extra. Every blocking ADBC / SQLAlchemy `QueuePool` call is dispatched to a worker thread via `anyio.to_thread.run_sync` — real I/O concurrency because the ADBC C drivers release the GIL during query execution. The async layer wraps the existing sync core (`_create_pool_impl`, config dispatch, the 13-backend `WarehouseConfig` Protocol, the `_release_arrow_allocators` reset event) **without modifying it**, in a new `src/adbc_poolhouse/_async/` package. anyio is chosen for asyncio + trio neutrality. The sync API is shipped and unchanged.
 
-### Config Class
+Scope decisions for this milestone:
+- **Feasibility spike gates the milestone** — validate the GIL-release premise for pyarrow materialization before building the full surface.
+- **P2 differentiators deferred to v1.4.x** — `fetch_record_batch` streaming, `adbc_ingest`, `fetch_df`/`fetch_polars` are out of scope here (see Future Requirements).
+- **Dedicated async edge-case test coverage** — a curated `EDGE-NN` suite (cancellation depth, limiter/backpressure, contextvars, reentrancy, exceptions, resource lifetime, event-loop hygiene, trio-vs-asyncio, timing) hardens the layer against the silent-leak failure modes endemic to async DB wrappers. Designs in `.planning/research/ASYNC-EDGE-CASES.md`.
 
-- [ ] **QUACK-01**: `QuackConfig` class exists in `src/adbc_poolhouse/_quack_config.py`, inheriting `BaseWarehouseConfig`
-- [ ] **QUACK-02**: `QuackConfig` exposes `uri: str | None`, `host: str | None`, `port: int | None`, `token: SecretStr | None`, `tls: bool = False` (URI-first with decomposed host/port fallback, matching Databricks/MySQL pattern)
-- [ ] **QUACK-03**: `QuackConfig` validates that either `uri` is set OR (`host` is set, port optional) — never both, never neither (model_validator)
-- [ ] **QUACK-04**: `QuackConfig.to_adbc_kwargs()` returns `{"uri": "quack://...", "adbc.quack.token": ..., "adbc.quack.tls": ...}` with `token`/`tls` keys omitted when not set
-- [ ] **QUACK-05**: `QuackConfig._driver_path()` returns `"adbc_driver_quack"` (PyPI module name for `find_spec` detection)
-- [ ] **QUACK-06**: `QuackConfig._dbapi_module()` returns `adbc_driver_quack.dbapi` module
+### Feasibility Spike
 
-### Public API
+- [ ] **SPIKE-01**: A DuckDB benchmark measures wall-clock of N concurrent slow (I/O-bound) queries against ideal-parallel, demonstrating real GIL release during `execute`
+- [ ] **SPIKE-02**: A DuckDB benchmark measures N concurrent large `fetch_arrow_table` calls against ideal-parallel, quantifying whether pyarrow materialization parallelizes or serializes on the GIL
+- [ ] **SPIKE-03**: A written go/no-go records which concurrency wins the async layer can honestly claim (and what to disclaim), feeding offload-granularity and documentation decisions
 
-- [ ] **QUACK-07**: `QuackConfig` exported from `adbc_poolhouse.__init__`
-- [ ] **QUACK-08**: `create_pool(QuackConfig(...))` returns a working `QueuePool` via the existing self-describing dispatch (no changes to `_pool_factory` required)
+### Concurrency Foundation
 
-### Packaging
+- [ ] **CORE-01**: A single internal offload helper routes every blocking ADBC / `QueuePool` call through `anyio.to_thread.run_sync` with an explicit limiter argument — no bare `to_thread` calls anywhere in the async package
+- [ ] **CORE-02**: Each async pool owns a dedicated `anyio.CapacityLimiter` sized to `pool_size + max_overflow`; the shared process-global 40-token default limiter is never used
+- [ ] **CORE-03**: The async package uses anyio primitives only — `import asyncio` is banned there and enforced by a lint/import rule
+- [ ] **CORE-04**: The async layer is generic over all 13 backends via the existing `WarehouseConfig` Protocol — no per-backend async code
 
-- [ ] **QUACK-09**: `pyproject.toml` adds `quack` optional dependency group: `adbc-driver-quack>=0.1.0a1` (alpha lower bound, no upper cap — matches house style)
+### Async Pool Lifecycle
 
-### Tests
+- [ ] **APOOL-01**: User can call `create_async_pool(config, ...)` to obtain an async pool; the signature mirrors `create_pool` (same keyword defaults `pool_size=5`, `max_overflow=3`, `timeout=30`, `recycle=3600`, `pre_ping=False`) and the same `config` / `driver_path=` / `dbapi_module=` overloads
+- [ ] **APOOL-02**: User can call `await close_async_pool(pool)` to dispose the pool and release driver resources, offloaded so it never blocks the event loop
+- [ ] **APOOL-03**: User can use `async with managed_async_pool(config, ...) as pool:` to create-and-auto-close a pool, with the close path shielded from cancellation
 
-- [ ] **QUACK-10**: Unit tests for `QuackConfig` validation (URI-only, host-only, host+port, mutual exclusion, token/tls passthrough) in `tests/test_quack_config.py`
-- [ ] **QUACK-11**: Semi-integration test verifies `create_pool(QuackConfig(...))` returns a pool with conditional mock target (matches pattern for other Foundry/PyPI backends)
-- [ ] **QUACK-12**: All existing 241 tests continue to pass
+### Async Connection
+
+- [ ] **ACONN-01**: User can `await pool.connect()` to check out an `AsyncConnection`; the blocking checkout is offloaded through the pool's dedicated limiter
+- [ ] **ACONN-02**: `AsyncConnection` is an async context manager; exiting returns the connection to the pool, and checkin is shielded so it always completes even under cancellation
+- [ ] **ACONN-03**: `AsyncConnection.cursor()` returns an `AsyncCursor` synchronously (no I/O, no `await`), matching the ADBC / psycopg3 convention
+- [ ] **ACONN-04**: User can `await conn.commit()` and `await conn.rollback()` for transaction control (offloaded)
+- [ ] **ACONN-05**: User can `await conn.close()` to release the connection explicitly (offloaded, shielded)
+- [ ] **ACONN-06**: Async checkin routes through the existing reset path so `_release_arrow_allocators` fires symmetrically with the sync API — no Arrow allocator leak
+
+### Async Cursor
+
+- [ ] **ACUR-01**: User can `await cursor.execute(operation, parameters=None)` (offloaded)
+- [ ] **ACUR-02**: User can `await cursor.executemany(operation, seq_of_parameters)` (offloaded)
+- [ ] **ACUR-03**: User can `await cursor.fetchone()`, `await cursor.fetchmany(size=None)`, and `await cursor.fetchall()` (offloaded)
+- [ ] **ACUR-04**: User can `await cursor.fetch_arrow_table()` returning a `pyarrow.Table` (offloaded) — the headline Arrow-native path
+- [ ] **ACUR-05**: `AsyncCursor` is an async context manager; `await cursor.close()` runs offloaded and shielded, freeing Arrow readers
+- [ ] **ACUR-06**: ADBC `Error` subclasses raised in the worker thread propagate to the awaiting task unchanged (no swallowing, correct type)
+- [ ] **ACUR-07**: Sync no-I/O cursor properties (`description`, `rowcount`, `arraysize`) pass through without `await`
+
+### Cancellation
+
+- [ ] **CANCEL-01**: When an awaited `execute` / `fetch_arrow_table` is cancelled or times out, `cursor.adbc_cancel()` is invoked from the event-loop thread to abort the in-flight C call
+- [ ] **CANCEL-02**: A connection whose in-flight operation was cancelled is invalidated rather than returned busy, so the pool is never poisoned (`pool.checkedout() == 0` after a cancelled scope)
+- [ ] **CANCEL-03**: `__aexit__` cleanup is wrapped in `CancelScope(shield=True)` so the connection always returns or invalidates even when the surrounding task is cancelled mid-cleanup
+- [ ] **CANCEL-04**: Deterministic cancellation tests prove no-leak behaviour under both asyncio and trio
+
+### Packaging & Type Safety
+
+- [ ] **PKG-01**: An `[async]` optional-dependency extra adds `anyio>=4.0.0` and nothing else; `[all]` includes it
+- [ ] **PKG-02**: `import adbc_poolhouse` succeeds with anyio not installed; async names are guarded by a PEP 562 `__getattr__` lazy import so the sync path stays zero-cost
+- [ ] **PKG-03**: Accessing an async symbol without anyio installed raises a clear `ImportError` naming the `[async]` extra
+- [ ] **PKG-04**: The existing sync test suite passes with anyio uninstalled (a CI job proves there is no hard async dependency)
+- [ ] **PKG-05**: All async public API is fully typed under basedpyright strict, using `ParamSpec`/`Concatenate` to mirror the sync overloads
+
+### Testing
+
+- [ ] **TEST-01**: The async suite runs parametrized over asyncio and trio via the anyio pytest plugin (`@pytest.mark.anyio`)
+- [ ] **TEST-02**: The async layer is exercised against DuckDB (in-proc) and Snowflake (pytest-adbc-replay cassette) to prove backend-generic coverage
+- [ ] **TEST-03**: An Arrow memory-stability test confirms no allocator growth across many async cursor lifecycles
+- [ ] **TEST-04**: A limiter-sizing stress test confirms no deadlock or starvation when concurrency exceeds `pool_size`
+- [ ] **TEST-05**: A shared deterministic test harness exists — a `BlockingStubCursor` (blocks on a `threading.Event` released only by the test or by `adbc_cancel`; records thread-id, call counts, max-concurrent-in-execute) plus event-gating/virtual-clock helpers and a source-scan/import-lint guard — so edge-case tests need no real sleeps
+
+### Async Edge-Case Test Coverage
+
+Deterministic tests (arrange/trigger/assert) for the failure modes specific to a thread-offload anyio wrapper. Each runs under **both** asyncio and trio unless noted. Full designs in `.planning/research/ASYNC-EDGE-CASES.md`. Note: `anyio.to_thread.run_sync` is cancellation-shielded by default, so every cancellation test asserts the worker was *actually* unblocked (e.g. `adbc_cancel` fired), never merely that the `await` returned.
+
+_Cancellation depth_
+
+- [ ] **EDGE-01**: Cancel delivered *before* the offload starts — driver `execute` is never called, no `adbc_cancel`, the connection stays clean, and the cancel exception propagates
+- [ ] **EDGE-02**: Cancel *during* the blocked worker — `adbc_cancel` is called exactly once (shielded), the worker is joined, the connection is invalidated, `checkedout() == 0`, and the cancel exception propagates
+- [ ] **EDGE-03**: The framework cancel class is never swallowed by the offload/try-except — the exact `get_cancelled_exc_class()` instance escapes and there is no hang under trio
+- [ ] **EDGE-04**: A double-cancel during shielded cleanup is idempotent — one `adbc_cancel`, one invalidate, one cancel exception
+- [ ] **EDGE-05**: Cancel during `__aexit__`/checkin still completes checkin under shield — `checkedout() == 0` for both connection and cursor
+- [ ] **EDGE-06**: `fail_after` timeout and explicit `scope.cancel()` are handled identically (both → `adbc_cancel` + invalidate); only the surfaced exception type differs
+- [ ] **EDGE-07**: `move_on_after` on an already-finished op does nothing — `cancelled_caught` is False, no `adbc_cancel`, no invalidate
+
+_Limiter / backpressure_
+
+- [ ] **EDGE-09**: A limiter token is borrowed-then-released exactly once across success, error, and cancel paths (×50 loop, `borrowed_tokens == 0` after)
+- [ ] **EDGE-10**: A limiter token is not leaked when acquire itself is cancelled while queued on a saturated limiter; concurrency fully recovers
+- [ ] **EDGE-11**: Holding a connection while awaiting a second offload does not self-deadlock at the bound (serialized on the held token or a clear error; a watchdog never trips)
+- [ ] **EDGE-12**: In-flight concurrency is strictly bounded — observed running-max `== pool_size + max_overflow` under a 4× flood
+
+_Reentrancy_
+
+- [ ] **EDGE-15**: Two tasks sharing one `AsyncConnection`/`AsyncCursor` are serialized (max-concurrent-in-execute `== 1`) or raise a clear typed error — never a concurrent-access violation
+
+_Exceptions_
+
+- [ ] **EDGE-17**: An ADBC error from the worker propagates with exact type and original traceback intact across the thread boundary
+- [ ] **EDGE-18**: An exception in `__aenter__`/post-checkout leaks no connection (`checkedout() == 0`, no cumulative leak over N iterations)
+- [ ] **EDGE-19**: An `ExceptionGroup`/`except*` from a task group preserves the original ADBC errors and keeps cancellation distinguishable; `checkedout() == 0` after
+
+_Resource lifetime_
+
+- [ ] **EDGE-21**: A materialized `fetch_arrow_table` result is valid after checkin (no use-after-checkin) — the result is a `pyarrow.Table`, not a live reader bound to the connection
+
+_Event-loop hygiene_
+
+- [ ] **EDGE-25**: Every blocking DB call runs off the loop thread (captured worker thread-id ≠ loop thread-id), with a lint asserting no `asyncio` import and no bare `to_thread` without the limiter in `_async/`
+- [ ] **EDGE-26**: A long blocked offload does not starve the loop — a concurrent coroutine advances across `sleep(0)` checkpoints while the offload blocks
+
+_trio-vs-asyncio_
+
+- [ ] **EDGE-27**: Every async test is parametrized over asyncio AND trio — no `@pytest.mark.asyncio`, no `asyncio` import in the async test package
+- [ ] **EDGE-28**: Cancellation handling uses `get_cancelled_exc_class()` only — a trio cancel of a blocked execute *does* run `adbc_cancel` + invalidate; no `asyncio.CancelledError` in `_async/`
+- [ ] **EDGE-29**: Cancel-scope behaviour is identical across backends — the `(adbc_cancel_count, invalidate_count, checkedout_after)` tuple is equal under asyncio and trio
+
+_Timing_
+
+- [ ] **EDGE-30**: Timeout/cancel tests use a virtual clock or event gating — no positive-duration `sleep` in timeout tests (enforced by a source scan)
 
 ### Documentation
 
-- [ ] **QUACK-13**: `docs/src/guides/quack.md` per-warehouse guide page — covers config fields, URI scheme, token + tls usage, install instructions
-- [ ] **QUACK-14**: `docs/src/guides/quack.md` includes alpha-status warning admonition and external link to https://github.com/gizmodata/adbc-driver-quack
-- [ ] **QUACK-15**: `docs/src/guides/configuration.md` table updated with Quack row
-- [ ] **QUACK-16**: `docs/src/index.md` backend listing updated to include Quack (listing only, no example)
-- [ ] **QUACK-17**: `mkdocs.yml` nav adds `guides/quack.md` entry
-- [ ] **QUACK-18**: `uv run mkdocs build --strict` passes; humanizer pass applied to new prose
+- [ ] **DOCS-01**: An async usage guide shows `create_async_pool` → `connect` → `execute` → `fetch_arrow_table` → checkin, honest about I/O-bound vs materialization-bound concurrency (per SPIKE findings)
+- [ ] **DOCS-02**: API reference documents `AsyncPool`, `AsyncConnection`, `AsyncCursor`, and the three entry-point functions with Google-style docstrings (Args/Returns/Raises + Example)
+- [ ] **DOCS-03**: Configuration / index pages list the `[async]` extra and the async entry points
+- [ ] **DOCS-04**: `uv run mkdocs build --strict` passes; humanizer pass applied to all new or substantially rewritten prose
 
-## v1.3.1 Requirements (Phase 21.1 — ADBC dispatch URI-positional fix)
+## Future Requirements (deferred)
 
-Surfaced by `/ultrareview` of Phase 21: `create_pool()` raises `TypeError: connect() missing 1 required positional argument: 'uri'` for any PyPI driver whose `connect()` declares `uri` as a required positional AND has `db_kwargs` in its signature. Affects Quack (Phase 21), Postgres (latent since v1.0.0), and FlightSQL (latent since v1.0.0). Closes the Phase 21 QUACK-08 verification gap.
+Deferred to v1.4.x once the P1 core is validated:
 
-### Dispatch fix
+- **Arrow streaming** — `await cursor.fetch_record_batch()` + `async for batch in ...` (`RecordBatchReader` lifetime vs reset-event checkin needs dedicated design)
+- **Async bulk write** — `await cursor.adbc_ingest(table, data, mode=...)`
+- **DataFrame convenience** — `await cursor.fetch_df()` / `await cursor.fetch_polars()`
 
-- [ ] **DISP-01**: `_driver_api.create_adbc_connection` detects when the target `connect()` signature has a required-positional `uri` parameter (no default) AND `db_kwargs` in parameters, and in that case pops `"uri"` from kwargs to pass positionally: `mod.connect(uri_val, db_kwargs=kwargs)`
-- [ ] **DISP-02**: All other signature shapes continue to work unchanged (Snowflake optional-uri, BigQuery no-uri, SQLite no-db_kwargs)
+Deferred to v2+:
 
-### Verified happy paths
+- **Async ADBC metadata** — `adbc_get_table_schema`, `adbc_get_objects`, `adbc_get_info`
+- **Async prepared statements** — `adbc_prepare`, `adbc_execute_schema`
+- **anyio-native checkout limiter** — replacing offloaded `QueuePool.connect()`, only if offloaded checkout proves a measured bottleneck
 
-- [ ] **DISP-03**: `create_pool(QuackConfig(uri="quack://h:p"))` returns a working `QueuePool` when `adbc-driver-quack` is installed
-- [ ] **DISP-04**: `create_pool(PostgreSQLConfig(uri="postgresql://..."))` returns a working `QueuePool` when `adbc-driver-postgresql` is installed
-- [ ] **DISP-05**: `create_pool(FlightSQLConfig(uri="grpc://..."))` returns a working `QueuePool` when `adbc-driver-flightsql` is installed
+P2 async edge-case tests (designs in `.planning/research/ASYNC-EDGE-CASES.md`), folded into v1.4.x hardening once the P1 suite is green:
 
-### Test hardening
-
-- [ ] **DISP-06**: `TestQuackImports`, `TestPostgreSQLImports`, and `TestFlightSQLImports` patch `dbapi.connect` with a signature-preserving stub (not bare `MagicMock`) so future regressions of this class are caught
-- [ ] **DISP-07**: Add a dispatch-level unit test in `tests/test_driver_api.py` exercising the new uri-positional branch against a faked module with the affected signature shape
-- [ ] **DISP-08**: Delete the duplicate `test_quack_returns_short_name` at `tests/test_drivers.py` (identical to the in-class `TestPyPIDriverPath::test_quack_missing_returns_package_name`) — `/ultrareview` bug_005
-- [ ] **DISP-09**: All existing tests continue to pass (current count: 265, post-21)
-
-### Documentation
-
-- [ ] **DISP-10**: `docs/src/guides/custom-backends.md` updated with a brief note explaining the `_dbapi_module()` dispatch contract — when to return a module path vs `None` — so third-party backend authors don't hit the same trap
-- [ ] **DISP-11**: `uv run mkdocs build --strict` passes; humanizer pass on any new prose
-
-## Future Requirements
-
-None deferred for this milestone — Quack surface is small and fully addressed.
+- **EDGE-08** — trio checkpoint delivery at the offload boundary with no intervening checkpoint
+- **EDGE-13 / EDGE-14** — contextvars copied into the worker; worker mutations do not leak back
+- **EDGE-16** — `adbc_cancel` bypasses a held per-connection lock (only if the EDGE-15 lock is adopted)
+- **EDGE-20** — an exception during cleanup does not mask the body error (chained via `__context__`); connection still released
+- **EDGE-22 / EDGE-23** — `__del__` of an un-closed cursor/connection emits `ResourceWarning`, never "coroutine never awaited"; happy path emits no `RuntimeWarning`
+- **EDGE-24** — open pool / pending offload at loop shutdown raises no library-attributable exception
+- **EDGE-31 / EDGE-32** — `move_on_after(0)` still cancels a blocked execute cleanly; an op completing at deadline−ε is not over-cancelled
 
 ## Out of Scope
 
-| Feature | Reason |
-|---------|--------|
-| Live integration test against real Quack server | No public test server; cassette replay not warranted for a single-protocol driver |
-| Decomposed authentication fields (username/password) | Quack uses single token, not split credentials |
-| Quack-specific connection pooling tuning | Standard `QueuePool` parameters suffice; no Quack-unique knobs identified |
-| Quickstart example for Quack | User confirmed not needed on index.md |
+Explicit exclusions for the async layer (with reasoning):
+
+- **Async ORM / query builder** — out of scope by charter; the sync lib is pool-only. Consumers (Semantic ORM, dbt-open-sl) build their own query layers on top
+- **Native async ADBC driver shim** — no native async ADBC driver exists; thread-offload over the GIL-releasing C calls already yields real concurrency. A native shim is enormous and unnecessary
+- **Built-in retry / reconnect** — retry policy is consumer-specific (idempotency, backoff, budget); baking it in hides failures. `recycle` stays the only health mechanism
+- **Multi-pool routing / async registry** — out of scope in sync too; consumers call `create_async_pool()` per warehouse and own the mapping
+- **Implicit transactions / unit-of-work** — ADBC defaults to autocommit; implicit `begin()` surprises users and differs per backend. Only explicit `commit()` / `rollback()` are exposed
+- **asyncio-only fast path** — would discard the trio differentiator and pull in asyncio-specific leak patterns. anyio everywhere
+- **`AsyncAdaptedQueuePool` / `sqlalchemy[asyncio]` / `greenlet` as foundation** — asyncio-bound, does not replace the execute offload, breaks trio neutrality. Reference only
 
 ## Traceability
 
-v1.3 requirements consolidated into Phase 21 (Quack Backend) per v1.0.0 retrospective lesson — single backend addition with config + tests + docs in one phase. DISP-* requirements added in Phase 21.1 to close the QUACK-08 verification gap (signature-shape regression).
-
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| QUACK-01 | Phase 21 | Pending |
-| QUACK-02 | Phase 21 | Pending |
-| QUACK-03 | Phase 21 | Pending |
-| QUACK-04 | Phase 21 | Pending |
-| QUACK-05 | Phase 21 | Pending |
-| QUACK-06 | Phase 21 | Pending |
-| QUACK-07 | Phase 21 | Pending |
-| QUACK-08 | Phase 21 | Pending |
-| QUACK-09 | Phase 21 | Pending |
-| QUACK-10 | Phase 21 | Pending |
-| QUACK-11 | Phase 21 | Pending |
-| QUACK-12 | Phase 21 | Pending |
-| QUACK-13 | Phase 21 | Pending |
-| QUACK-14 | Phase 21 | Pending |
-| QUACK-15 | Phase 21 | Pending |
-| QUACK-16 | Phase 21 | Pending |
-| QUACK-17 | Phase 21 | Pending |
-| QUACK-18 | Phase 21 | Pending |
-| DISP-01 | Phase 21.1 | Pending |
-| DISP-02 | Phase 21.1 | Pending |
-| DISP-03 | Phase 21.1 | Pending |
-| DISP-04 | Phase 21.1 | Pending |
-| DISP-05 | Phase 21.1 | Pending |
-| DISP-06 | Phase 21.1 | Pending |
-| DISP-07 | Phase 21.1 | Pending |
-| DISP-08 | Phase 21.1 | Pending |
-| DISP-09 | Phase 21.1 | Pending |
-| DISP-10 | Phase 21.1 | Pending |
-| DISP-11 | Phase 21.1 | Pending |
-
-**Coverage:**
-- v1.3 requirements: 29 total (18 QUACK + 11 DISP)
-- Mapped to phases: 29 ✓
-- Unmapped: 0
-
----
-*Requirements defined: 2026-05-19*
-*Traceability populated: 2026-05-19*
+| _(filled by roadmap)_ | | |
