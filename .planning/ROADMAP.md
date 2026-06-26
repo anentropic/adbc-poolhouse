@@ -71,7 +71,9 @@
   1. A reproducible DuckDB benchmark runs N concurrent slow (I/O-bound) `execute` calls from threads and reports wall-clock against ideal-parallel, demonstrating real GIL release during `execute` (SPIKE-01)
   2. A reproducible DuckDB benchmark runs N concurrent large `fetch_arrow_table` calls and reports wall-clock against ideal-parallel, quantifying whether pyarrow materialization parallelizes or serializes on the GIL (SPIKE-02)
   3. A written go/no-go document records which concurrency wins the async layer can honestly claim, what must be disclaimed, and any resulting offload-granularity guidance — and explicitly gates Phase 24 (SPIKE-03)
-**Plans**: TBD
+**Plans**: 2 plans
+  - [ ] 22-01-PLAN.md — Kept benchmark harness + execute (SPIKE-01) and fetch_arrow_table (SPIKE-02) measurements via the real create_pool checkout path, plus a pure-function harness unit test
+  - [ ] 22-02-PLAN.md — SPIKE-03 go/no-go doc (8-point contract, gates Phase 24) + wheel-exclusion verification
 **UI hint**: no
 
 ### Phase 23: Test Harness Foundation
