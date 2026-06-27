@@ -98,7 +98,7 @@ _Limiter / backpressure_
 
 _Reentrancy_
 
-- [ ] **EDGE-15**: Two tasks sharing one `AsyncConnection`/`AsyncCursor` are serialized (max-concurrent-in-execute `== 1`) or raise a clear typed error — never a concurrent-access violation
+- [ ] **EDGE-15**: Two tasks sharing one `AsyncConnection`/`AsyncCursor` raise a clear typed error (`ConnectionBusyError`) — never silently serialized, never a concurrent-access violation; `checkedout()` stays correct (Phase 24 decision D-24-03: reject, no per-connection lock)
 
 _Exceptions_
 
@@ -150,7 +150,7 @@ P2 async edge-case tests (designs in `.planning/research/ASYNC-EDGE-CASES.md`), 
 
 - **EDGE-08** — trio checkpoint delivery at the offload boundary with no intervening checkpoint
 - **EDGE-13 / EDGE-14** — contextvars copied into the worker; worker mutations do not leak back
-- **EDGE-16** — `adbc_cancel` bypasses a held per-connection lock (only if the EDGE-15 lock is adopted)
+- **EDGE-16** — ~~`adbc_cancel` bypasses a held per-connection lock~~ — **N/A / DROPPED** (Phase 24 decision D-24-03 rejects aliasing with `ConnectionBusyError` instead of locking; no per-connection lock ships, so this conditional requirement no longer applies)
 - **EDGE-20** — an exception during cleanup does not mask the body error (chained via `__context__`); connection still released
 - **EDGE-22 / EDGE-23** — `__del__` of an un-closed cursor/connection emits `ResourceWarning`, never "coroutine never awaited"; happy path emits no `RuntimeWarning`
 - **EDGE-24** — open pool / pending offload at loop shutdown raises no library-attributable exception

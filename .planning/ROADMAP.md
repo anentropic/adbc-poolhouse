@@ -131,7 +131,7 @@ Plans:
 Plans:
 **Wave 1**
 
-- [ ] 24-01-PLAN.md — Wave-0 harness prerequisite: re-armable cursor gate + entered-after-block redesign (TEST-05 carry-forward)
+- [x] 24-01-PLAN.md — Wave-0 harness prerequisite: re-armable cursor gate + entered-after-block redesign (TEST-05 carry-forward)
 - [ ] 24-02-PLAN.md — Async foundation: offload chokepoint, ConnectionBusyError, AsyncPool + dedicated limiter, create/managed/close_async_pool, PEP 562 lazy import
 
 **Wave 2** *(blocked on Wave 1)*
@@ -257,7 +257,7 @@ Plans:
 |-------|-----------|----------------|--------|-----------|
 | 22. Feasibility Spike | v1.4.0 | 2/2 | Complete    | 2026-06-27 |
 | 23. Test Harness Foundation | v1.4.0 | 4/4 | Complete    | 2026-06-27 |
-| 24. Core Async Wrapper | v1.4.0 | 0/0 | Not started | - |
+| 24. Core Async Wrapper | v1.4.0 | 1/5 | In Progress|  |
 | 25. Cancellation | v1.4.0 | 0/0 | Not started | - |
 | 26. Packaging & Extra Scoping | v1.4.0 | 0/0 | Not started | - |
 | 27. Dual-Backend Test Matrix | v1.4.0 | 0/0 | Not started | - |

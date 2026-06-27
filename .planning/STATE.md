@@ -4,13 +4,13 @@ milestone: v1.4.0
 milestone_name: Async API
 status: executing
 stopped_at: Completed 23-01-PLAN.md
-last_updated: "2026-06-27T22:27:08.854Z"
-last_activity: 2026-06-27 -- Phase 24 planning complete
+last_updated: "2026-06-27T22:46:00.806Z"
+last_activity: 2026-06-27 -- Phase 24 execution started
 progress:
   total_phases: 9
   completed_phases: 2
-  total_plans: 6
-  completed_plans: 6
+  total_plans: 11
+  completed_plans: 7
   percent: 22
 ---
 
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-25)
 
 **Core value:** One config in, one pool out — `create_pool(SnowflakeConfig(...))` returns a ready-to-use SQLAlchemy QueuePool in a single call.
-**Current focus:** Phase 23 — test-harness-foundation
+**Current focus:** Phase 24 — core-async-wrapper
 
 ## Current Position
 
-Phase: 24
-Plan: Not started
+Phase: 24 (core-async-wrapper) — EXECUTING
+Plan: 2 of 5
 Status: Ready to execute
-Last activity: 2026-06-27 -- Phase 24 planning complete
+Last activity: 2026-06-27 -- Phase 24 execution started
 
 Progress: [░░░░░░░░░░] 0% (0/7 phases)
 
@@ -45,6 +45,7 @@ Progress: [░░░░░░░░░░] 0% (0/7 phases)
 | Phase 23 P02 | 4min | 3 tasks | 4 files |
 | Phase 23 P03 | 25m | 2 tasks | 2 files |
 | Phase 23 P04 | 10min | 3 tasks | 1 files |
+| Phase 24 P01 | 30min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -76,6 +77,9 @@ v1.4.0 roadmap decisions:
 - [Phase ?]: D-05 guard shipped as scan_async_package(root)->list[Finding]; aliased run_sync re-import is an accepted, test-locked limitation
 - [Phase 23]: A1 RESOLVED (positive): anyio asyncio move_on_after honours aiotools VirtualClock().patch_loop(); asyncio virtual-clock leg passes — no event-gating fallback needed for the asyncio timeout leg
 - [Phase 23]: Dual-backend harness self-tests live INSIDE tests/_async_harness/ (anyio_backend propagates downward); tg.start_soon binds entered=/limiter= via functools.partial; virtual-clock proofs use a real time.monotonic() watchdog (a nested virtual fail_after autojumps to its own deadline first under MockClock)
+- [Phase ?]: [Phase 24]: entered bridged via the stub's on_enter hook fired INSIDE _block (D-CF-01) — fixes the WR-01 re-arm deadlock at the root, making await entered a true 'inside the block' signal
+- [Phase ?]: [Phase 24]: on_enter is a single-worker attribute PLUS a per-thread register_on_enter registry — a single shared attribute deadlocked test_max_concurrent (two workers on one cursor, last-writer-wins clobber)
+- [Phase ?]: [Phase 24]: re-arm watchdog is a real time.monotonic() side thread that close()s the stub, NOT anyio.fail_after (a virtual fail_after autojumps under the trio MockClock the instant the worker blocks off-loop)
 
 ### Roadmap Evolution
 
@@ -98,7 +102,7 @@ v1.4.0 roadmap decisions:
 
 ## Session Continuity
 
-Last session: 2026-06-27T09:49:28.854Z
+Last session: 2026-06-27T22:45:42.125Z
 Stopped at: Completed 23-01-PLAN.md
 Next step: Execute 23-02 (next Phase 23 plan — async harness modules / self-tests).
 </content>
