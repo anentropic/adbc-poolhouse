@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import shutil
 import tempfile
 import time
 from contextlib import contextmanager
@@ -106,7 +107,8 @@ def _pool(n: int) -> Iterator[object]:
     `pool_size > 1`). Pairs `pool.dispose()` with `pool._adbc_source.close()` in a
     `finally` -- the verbatim teardown idiom from `tests/test_pool_factory.py` --
     and asserts `pool.checkedout() == 0` afterward to prove the checkout path is
-    leak-free.
+    leak-free. The temp directory (and its `bench.db`) is removed last, after the
+    pool and ADBC source are closed, so no temp dir leaks under `$TMPDIR` per run.
 
     Args:
         n: Pool size (and number of concurrent connections to be checked out).
@@ -114,7 +116,8 @@ def _pool(n: int) -> Iterator[object]:
     Yields:
         The configured pool object.
     """
-    db = os.path.join(tempfile.mkdtemp(), "bench.db")
+    tmpdir = tempfile.mkdtemp()
+    db = os.path.join(tmpdir, "bench.db")
     pool = create_pool(DuckDBConfig(database=db, pool_size=n, max_overflow=0))
     try:
         yield pool
@@ -122,6 +125,9 @@ def _pool(n: int) -> Iterator[object]:
         assert pool.checkedout() == 0, "connections leaked from the pool"  # noqa: S101
         pool.dispose()
         pool._adbc_source.close()  # type: ignore[attr-defined]
+        # Remove the temp DB dir last, after the pool and ADBC source are
+        # closed, so the (potentially multi-GB) bench.db is no longer held open.
+        shutil.rmtree(tmpdir, ignore_errors=True)
 
 
 def measure(
