@@ -136,7 +136,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1)*
 
-- [ ] 24-03-PLAN.md — AsyncConnection + AsyncCursor: _in_use aliasing rejection, sync cursor()/props, offloaded DBAPI surface, shielded checkin, materialized fetch_arrow_table
+- [x] 24-03-PLAN.md — AsyncConnection + AsyncCursor: _in_use aliasing rejection, sync cursor()/props, offloaded DBAPI surface, shielded checkin, materialized fetch_arrow_table
 
 **Wave 3** *(blocked on Waves 1 + 2)*
 

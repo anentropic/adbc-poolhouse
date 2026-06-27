@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v1.4.0
 milestone_name: Async API
 status: executing
-stopped_at: Completed 23-01-PLAN.md
-last_updated: "2026-06-27T22:56:21.694Z"
-last_activity: 2026-06-27 -- Phase 24 execution started
+stopped_at: Completed 24-03-PLAN.md
+last_updated: "2026-06-28T00:00:00.000Z"
+last_activity: 2026-06-28 -- Completed 24-03 (AsyncConnection/AsyncCursor bodies)
 progress:
   total_phases: 9
   completed_phases: 2
@@ -26,9 +26,9 @@ See: .planning/PROJECT.md (updated 2026-06-25)
 ## Current Position
 
 Phase: 24 (core-async-wrapper) — EXECUTING
-Plan: 3 of 5
+Plan: 4 of 5
 Status: Ready to execute
-Last activity: 2026-06-27 -- Phase 24 execution started
+Last activity: 2026-06-28 -- Completed 24-03 (AsyncConnection/AsyncCursor bodies)
 
 Progress: [░░░░░░░░░░] 0% (0/7 phases)
 
@@ -47,6 +47,7 @@ Progress: [░░░░░░░░░░] 0% (0/7 phases)
 | Phase 23 P04 | 10min | 3 tasks | 1 files |
 | Phase 24 P01 | 30min | 2 tasks | 3 files |
 | Phase 24 P02 | 7min | 2 tasks | 7 files |
+| Phase 24 P03 | 6min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -84,6 +85,9 @@ v1.4.0 roadmap decisions:
 - [Phase ?]: [Phase 24]: PEP 695 generic syntax rejected for a TypeVar — project pins pythonVersion=3.11; PEP 695 needs 3.12+
 - [Phase ?]: [Phase 24]: backend config names appear only in docstring Example: blocks; zero in executable _async/ code (D-24-04 verified by AST identifier scan)
 - [Phase ?]: [Phase 24]: AsyncConnection/AsyncCursor shipped as typed contracts (raise NotImplementedError) so connect() is typeable; Plan 03 fills bodies against the frozen interface
+- [Phase 24]: Plan 03 settled Open Q1/A3 — the SQLAlchemy _ConnectionFairy proxies commit/rollback/cursor/close straight to the dbapi connection (probed on DuckDB); no driver_connection unwrap needed
+- [Phase 24]: AsyncCursor lives in its own module src/adbc_poolhouse/_async/_cursor.py (split out of _connection.py); _SyncCursor structural Protocol types the driver-agnostic dbapi cursor surface, with a single cast at AsyncConnection.cursor() to bridge SQLAlchemy's narrower DBAPICursor type
+- [Phase 24]: _in_use is a plain bool check-and-set (no await between read and write), never a lock — 2nd concurrent caller is rejected with ConnectionBusyError, not queued (D-24-03 implemented); EDGE-15/18/21 behavioral proofs deferred to Plan 04
 
 ### Roadmap Evolution
 
@@ -106,7 +110,7 @@ v1.4.0 roadmap decisions:
 
 ## Session Continuity
 
-Last session: 2026-06-27T22:55:53.765Z
-Stopped at: Completed 23-01-PLAN.md
-Next step: Execute 23-02 (next Phase 23 plan — async harness modules / self-tests).
+Last session: 2026-06-28T00:00:00.000Z
+Stopped at: Completed 24-03-PLAN.md
+Next step: Execute 24-04 (Lifecycle + EDGE suite: EDGE-09/10/11/12/15/17/18/21/25/26, both backends, loop-stable; guard extension).
 </content>

@@ -36,21 +36,21 @@ Scope decisions for this milestone:
 ### Async Connection
 
 - [x] **ACONN-01**: User can `await pool.connect()` to check out an `AsyncConnection`; the blocking checkout is offloaded through the pool's dedicated limiter
-- [ ] **ACONN-02**: `AsyncConnection` is an async context manager; exiting returns the connection to the pool, and checkin is shielded so it always completes even under cancellation
-- [ ] **ACONN-03**: `AsyncConnection.cursor()` returns an `AsyncCursor` synchronously (no I/O, no `await`), matching the ADBC / psycopg3 convention
-- [ ] **ACONN-04**: User can `await conn.commit()` and `await conn.rollback()` for transaction control (offloaded)
-- [ ] **ACONN-05**: User can `await conn.close()` to release the connection explicitly (offloaded, shielded)
-- [ ] **ACONN-06**: Async checkin routes through the existing reset path so `_release_arrow_allocators` fires symmetrically with the sync API — no Arrow allocator leak
+- [x] **ACONN-02**: `AsyncConnection` is an async context manager; exiting returns the connection to the pool, and checkin is shielded so it always completes even under cancellation
+- [x] **ACONN-03**: `AsyncConnection.cursor()` returns an `AsyncCursor` synchronously (no I/O, no `await`), matching the ADBC / psycopg3 convention
+- [x] **ACONN-04**: User can `await conn.commit()` and `await conn.rollback()` for transaction control (offloaded)
+- [x] **ACONN-05**: User can `await conn.close()` to release the connection explicitly (offloaded, shielded)
+- [x] **ACONN-06**: Async checkin routes through the existing reset path so `_release_arrow_allocators` fires symmetrically with the sync API — no Arrow allocator leak
 
 ### Async Cursor
 
-- [ ] **ACUR-01**: User can `await cursor.execute(operation, parameters=None)` (offloaded)
-- [ ] **ACUR-02**: User can `await cursor.executemany(operation, seq_of_parameters)` (offloaded)
-- [ ] **ACUR-03**: User can `await cursor.fetchone()`, `await cursor.fetchmany(size=None)`, and `await cursor.fetchall()` (offloaded)
-- [ ] **ACUR-04**: User can `await cursor.fetch_arrow_table()` returning a `pyarrow.Table` (offloaded) — the headline Arrow-native path
-- [ ] **ACUR-05**: `AsyncCursor` is an async context manager; `await cursor.close()` runs offloaded and shielded, freeing Arrow readers
-- [ ] **ACUR-06**: ADBC `Error` subclasses raised in the worker thread propagate to the awaiting task unchanged (no swallowing, correct type)
-- [ ] **ACUR-07**: Sync no-I/O cursor properties (`description`, `rowcount`, `arraysize`) pass through without `await`
+- [x] **ACUR-01**: User can `await cursor.execute(operation, parameters=None)` (offloaded)
+- [x] **ACUR-02**: User can `await cursor.executemany(operation, seq_of_parameters)` (offloaded)
+- [x] **ACUR-03**: User can `await cursor.fetchone()`, `await cursor.fetchmany(size=None)`, and `await cursor.fetchall()` (offloaded)
+- [x] **ACUR-04**: User can `await cursor.fetch_arrow_table()` returning a `pyarrow.Table` (offloaded) — the headline Arrow-native path
+- [x] **ACUR-05**: `AsyncCursor` is an async context manager; `await cursor.close()` runs offloaded and shielded, freeing Arrow readers
+- [x] **ACUR-06**: ADBC `Error` subclasses raised in the worker thread propagate to the awaiting task unchanged (no swallowing, correct type)
+- [x] **ACUR-07**: Sync no-I/O cursor properties (`description`, `rowcount`, `arraysize`) pass through without `await`
 
 ### Cancellation
 
@@ -184,18 +184,18 @@ Explicit exclusions for the async layer (with reasoning):
 | APOOL-02 | Phase 24 | Complete |
 | APOOL-03 | Phase 24 | Complete |
 | ACONN-01 | Phase 24 | Complete |
-| ACONN-02 | Phase 24 | Pending |
-| ACONN-03 | Phase 24 | Pending |
-| ACONN-04 | Phase 24 | Pending |
-| ACONN-05 | Phase 24 | Pending |
-| ACONN-06 | Phase 24 | Pending |
-| ACUR-01 | Phase 24 | Pending |
-| ACUR-02 | Phase 24 | Pending |
-| ACUR-03 | Phase 24 | Pending |
-| ACUR-04 | Phase 24 | Pending |
-| ACUR-05 | Phase 24 | Pending |
-| ACUR-06 | Phase 24 | Pending |
-| ACUR-07 | Phase 24 | Pending |
+| ACONN-02 | Phase 24 | Complete |
+| ACONN-03 | Phase 24 | Complete |
+| ACONN-04 | Phase 24 | Complete |
+| ACONN-05 | Phase 24 | Complete |
+| ACONN-06 | Phase 24 | Complete |
+| ACUR-01 | Phase 24 | Complete |
+| ACUR-02 | Phase 24 | Complete |
+| ACUR-03 | Phase 24 | Complete |
+| ACUR-04 | Phase 24 | Complete |
+| ACUR-05 | Phase 24 | Complete |
+| ACUR-06 | Phase 24 | Complete |
+| ACUR-07 | Phase 24 | Complete |
 | EDGE-09 | Phase 24 | Pending |
 | EDGE-10 | Phase 24 | Pending |
 | EDGE-11 | Phase 24 | Pending |
