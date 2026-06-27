@@ -236,6 +236,16 @@ class BlockingStubConnection:
     unambiguous for the connection-level EDGE cases (EDGE-09..12/15/18) in Phases
     24/25.
 
+    Connection methods are recording-only by default (WR-02): `close` /
+    `adbc_cancel` bump their counters (and `adbc_cancel` flips `observed_cancel`)
+    but do NOT, by default, touch the cursors in `self.cursors`. A worker blocked
+    inside a handed-out cursor is therefore NOT released by a bare `conn.close()`
+    -- consumers modelling connection teardown that must unblock cursor workers
+    pass `propagate=True` to fan the call out to every handed-out cursor. This
+    keeps the default count-only contract (the Plan-02 spec) intact while making
+    the connection-cancels-cursors semantics available for the EDGE cases that
+    need them (EDGE-09..12/15/18).
+
     Attributes:
         cursors: Every `BlockingStubCursor` handed out by `cursor`, in creation
             order.
@@ -277,13 +287,43 @@ class BlockingStubConnection:
             self.cursors.append(cursor)
         return cursor
 
-    def close(self) -> None:
-        """Increment `close_call_count`."""
+    def close(self, *, propagate: bool = False) -> None:
+        """
+        Increment `close_call_count`.
+
+        Recording-only by default (WR-02). Pass `propagate=True` to also `close`
+        every handed-out cursor, which is the only way a `BlockingStubConnection`
+        unblocks a worker stranded inside one of its cursors.
+
+        Args:
+            propagate: When `True`, call `close()` on every cursor in `cursors`
+                after recording, releasing any blocked cursor workers. Defaults to
+                `False`, preserving the count-only contract.
+        """
         with self._lock:
             self.close_call_count += 1
+            cursors = list(self.cursors)
+        if propagate:
+            for cursor in cursors:
+                cursor.close()
 
-    def adbc_cancel(self) -> None:
-        """Increment `adbc_cancel_call_count` and set `observed_cancel` to `True`."""
+    def adbc_cancel(self, *, propagate: bool = False) -> None:
+        """
+        Increment `adbc_cancel_call_count` and set `observed_cancel` to `True`.
+
+        Recording-only by default (WR-02). Pass `propagate=True` to also
+        `adbc_cancel` every handed-out cursor, releasing blocked cursor workers
+        and flipping each cursor's own `observed_cancel`.
+
+        Args:
+            propagate: When `True`, call `adbc_cancel()` on every cursor in
+                `cursors` after recording. Defaults to `False`, preserving the
+                count-only contract.
+        """
         with self._lock:
             self.adbc_cancel_call_count += 1
+            cursors = list(self.cursors)
         self.observed_cancel = True
+        if propagate:
+            for cursor in cursors:
+                cursor.adbc_cancel()

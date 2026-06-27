@@ -194,3 +194,42 @@ class TestBlockingStubConnection:
         conn.adbc_cancel()
         assert conn.adbc_cancel_call_count == 1
         assert conn.observed_cancel is True
+
+    def test_close_is_recording_only_by_default(self) -> None:
+        """Bare conn.close() records but does NOT release blocked cursor workers (WR-02)."""
+        conn = BlockingStubConnection()
+        cursor = conn.cursor()
+        _, done = _run_blocked(lambda: cursor.execute("SELECT 1"))
+        assert cursor.entered.wait(timeout=5)
+
+        conn.close()  # default: recording-only
+        assert conn.close_call_count == 1
+        assert done.wait(timeout=0.05) is False, "default close should NOT release cursor worker"
+
+        cursor.release()  # consumer must release explicitly
+        assert done.wait(timeout=5)
+
+    def test_close_propagate_releases_cursor_workers(self) -> None:
+        """conn.close(propagate=True) closes every handed-out cursor (WR-02)."""
+        conn = BlockingStubConnection()
+        cursor = conn.cursor()
+        _, done = _run_blocked(lambda: cursor.execute("SELECT 1"))
+        assert cursor.entered.wait(timeout=5)
+
+        conn.close(propagate=True)
+        assert done.wait(timeout=5), "propagate=True did not release the cursor worker"
+        assert conn.close_call_count == 1
+        assert cursor.close_call_count == 1
+
+    def test_adbc_cancel_propagate_cancels_cursor_workers(self) -> None:
+        """conn.adbc_cancel(propagate=True) cancels every handed-out cursor (WR-02)."""
+        conn = BlockingStubConnection()
+        cursor = conn.cursor()
+        _, done = _run_blocked(lambda: cursor.execute("SELECT 1"))
+        assert cursor.entered.wait(timeout=5)
+
+        conn.adbc_cancel(propagate=True)
+        assert done.wait(timeout=5), "propagate=True did not release the cursor worker"
+        assert conn.observed_cancel is True
+        assert cursor.observed_cancel is True
+        assert cursor.adbc_cancel_call_count == 1
