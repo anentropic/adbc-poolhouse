@@ -92,6 +92,11 @@ class TestConcurrentWall:
         wall = concurrent_wall(lambda _c: 0.0, conns, n=len(conns), trials=2)
         assert wall >= 0.0
 
+    def test_single_thread_wall_nonnegative(self) -> None:
+        """The n == 1 single-thread path returns a finite, non-negative wall time."""
+        wall = concurrent_wall(lambda _c: 0.0, [object()], n=1, trials=1)
+        assert wall >= 0.0
+
     def test_conns_length_mismatch_raises(self) -> None:
         """A len(conns) != n mismatch fails loudly instead of deadlocking."""
         conns = list(range(2))
