@@ -12,7 +12,7 @@
 ### v1.4.0 Async API
 
 - [x] **Phase 22: Feasibility Spike** — Benchmark GIL release for concurrent execute vs `fetch_arrow_table`; written go/no-go gating the milestone (completed 2026-06-27)
-- [ ] **Phase 23: Test Harness Foundation** — Build the `BlockingStubCursor` harness, event-gating/virtual-clock helpers, and the import-lint guard the EDGE suite rides on
+- [x] **Phase 23: Test Harness Foundation** — Build the `BlockingStubCursor` harness, event-gating/virtual-clock helpers, and the import-lint guard the EDGE suite rides on (completed 2026-06-27)
 - [ ] **Phase 24: Core Async Wrapper** — Offload helper, per-pool `CapacityLimiter`, `AsyncPool`/`AsyncConnection`/`AsyncCursor`, full DBAPI surface incl. `fetch_arrow_table`, plus structural EDGE coverage
 - [ ] **Phase 25: Cancellation** — `adbc_cancel` wiring, shielded checkin, invalidate-on-cancel, no-leak under asyncio + trio, plus cancellation EDGE coverage
 - [ ] **Phase 26: Packaging & Extra Scoping** — `[async]` extra, PEP 562 lazy import, zero-cost sync path, basedpyright-strict async typing
@@ -238,7 +238,7 @@ Plans:
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
 | 22. Feasibility Spike | v1.4.0 | 2/2 | Complete    | 2026-06-27 |
-| 23. Test Harness Foundation | v1.4.0 | 4/4 | Complete   | 2026-06-27 |
+| 23. Test Harness Foundation | v1.4.0 | 4/4 | Complete    | 2026-06-27 |
 | 24. Core Async Wrapper | v1.4.0 | 0/0 | Not started | - |
 | 25. Cancellation | v1.4.0 | 0/0 | Not started | - |
 | 26. Packaging & Extra Scoping | v1.4.0 | 0/0 | Not started | - |
