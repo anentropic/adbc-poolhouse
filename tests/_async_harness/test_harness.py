@@ -31,6 +31,7 @@ from __future__ import annotations
 import functools
 import threading
 import time
+from typing import TYPE_CHECKING
 
 import anyio
 import pytest
@@ -39,6 +40,9 @@ from tests._async_harness.clock import virtual_clock
 from tests._async_harness.gating import run_blocking
 from tests._async_harness.stubs import BlockingStubCursor
 
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
 # Real wall-clock budget for the virtual-clock watchdog: a virtual 3600s deadline
 # must fire in far less than this many real seconds, else it rode wall-clock.
 _WALL_CLOCK_BUDGET_S = 5.0
@@ -46,6 +50,30 @@ _WALL_CLOCK_BUDGET_S = 5.0
 # Tests parametrized over the anyio_backend fixture (asyncio + trio); the
 # collection-level check below asserts both ids are present.
 _BACKEND_IDS = frozenset({"asyncio", "trio"})
+
+# Bound for the "worker is inside the blocked section" poll below. Each iteration
+# is a single `anyio.sleep(0)` checkpoint (no wall-clock), so this is just a
+# generous ceiling on scheduler hand-offs, not a timeout.
+_ENTRY_POLL_TRIES = 100_000
+
+
+async def _await_inside(predicate: Callable[[], bool]) -> bool:
+    """
+    Yield (`sleep(0)` only) until `predicate()` holds or the bound is exhausted.
+
+    The loop-facing `entered` event signals when a worker STARTS (before it runs
+    the stub call and enters the lock-guarded blocked section), so a test that
+    asserts a stub invariant the instant `entered` fires races the worker. This
+    closes that gap deterministically without a wall-clock sleep: it spins on
+    `anyio.sleep(0)` checkpoints until the worker has provably reached the state
+    the test is about to assert on. Returns the final `predicate()` value so the
+    caller can assert on a settled observation.
+    """
+    for _ in range(_ENTRY_POLL_TRIES):
+        if predicate():
+            return True
+        await anyio.sleep(0)
+    return predicate()
 
 
 class TestEventGating:
@@ -61,9 +89,16 @@ class TestEventGating:
         gated = functools.partial(run_blocking, entered=entered, limiter=limiter)
         async with anyio.create_task_group() as tg:
             tg.start_soon(gated, stub.execute, "SELECT 1")
-            await entered.wait()  # deterministic -- worker is inside execute, no sleep
-            assert stub.execute_call_count == 1
-            stub.release()  # unblock the worker -- no sleep
+            try:
+                await entered.wait()
+                # `entered` fires as the worker starts, before `execute` records;
+                # poll until it has, then release. ALWAYS release in `finally` so
+                # a missed observation cannot strand the non-cancellable worker
+                # and deadlock the group at exit.
+                await _await_inside(lambda: stub.execute_call_count == 1)
+            finally:
+                stub.release()  # unblock the worker -- no sleep
+        assert stub.execute_call_count == 1
         assert stub.observed_cancel is False
 
     @pytest.mark.anyio
@@ -89,11 +124,20 @@ class TestEventGating:
         limiter = anyio.CapacityLimiter(1)
         entered = anyio.Event()
         gated = functools.partial(run_blocking, entered=entered, limiter=limiter)
+        worker_tid = -1
         async with anyio.create_task_group() as tg:
             tg.start_soon(gated, stub.execute, "SELECT 1")
-            await entered.wait()
-            assert stub.execute_thread_ids[0] != threading.get_ident()
-            stub.release()
+            try:
+                await entered.wait()
+                # `entered` fires before `execute` appends its thread id, so poll
+                # until it has, capture it, and ALWAYS release in `finally` -- an
+                # `IndexError` from reading [0] too early would otherwise unwind
+                # the group while the non-cancellable worker is still blocked.
+                await _await_inside(lambda: bool(stub.execute_thread_ids))
+                worker_tid = stub.execute_thread_ids[0]
+            finally:
+                stub.release()
+        assert worker_tid != threading.get_ident()
 
     @pytest.mark.anyio
     async def test_max_concurrent(self, anyio_backend_name: str) -> None:
@@ -105,13 +149,24 @@ class TestEventGating:
         entered_b = anyio.Event()
         gated_a = functools.partial(run_blocking, entered=entered_a, limiter=limiter)
         gated_b = functools.partial(run_blocking, entered=entered_b, limiter=limiter)
+        observed_max = 0
         async with anyio.create_task_group() as tg:
             tg.start_soon(gated_a, stub.execute, "SELECT 1")
             tg.start_soon(gated_b, stub.execute, "SELECT 2")
-            await entered_a.wait()  # both workers must be inside execute before asserting
-            await entered_b.wait()
-            assert stub.max_concurrent_in_execute == 2
-            stub.release()  # release both blocked calls; let the group finish
+            try:
+                await entered_a.wait()
+                await entered_b.wait()
+                # `entered` fires as each worker STARTS, before it enters the
+                # stub's lock-guarded blocked section, so poll the high-water mark
+                # until both workers are provably inside. Asserting on the bare
+                # `entered` events races the count and, on a miss, would unwind the
+                # group while the non-cancellable workers are still blocked ->
+                # deadlock. ALWAYS release in `finally` so that can never happen.
+                await _await_inside(lambda: stub.max_concurrent_in_execute == 2)
+                observed_max = stub.max_concurrent_in_execute
+            finally:
+                stub.release()  # release both blocked calls; let the group finish
+        assert observed_max == 2
 
 
 class TestVirtualClock:
