@@ -28,6 +28,7 @@ different objects; never await the stub's `threading.Event` on the loop.
 
 from __future__ import annotations
 
+import contextlib
 import functools
 import threading
 import time
@@ -41,7 +42,7 @@ from tests._async_harness.gating import run_blocking
 from tests._async_harness.stubs import BlockingStubCursor
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Callable, Generator
 
 # Real wall-clock budget for the virtual-clock watchdog: a virtual 3600s deadline
 # must fire in far less than this many real seconds, else it rode wall-clock.
@@ -55,6 +56,53 @@ _BACKEND_IDS = frozenset({"asyncio", "trio"})
 # is a single `anyio.sleep(0)` checkpoint (no wall-clock), so this is just a
 # generous ceiling on scheduler hand-offs, not a timeout.
 _ENTRY_POLL_TRIES = 100_000
+
+# Real wall-clock watchdog (seconds) for the re-arm self-test. The gated calls are
+# released almost immediately, so a re-arm regression that strands the
+# non-cancellable worker is broken open here instead of hanging the task group /
+# CI. It MUST be a real `time.monotonic()` watchdog on a side thread, not an
+# `anyio.fail_after`: under the trio leg's `MockClock(autojump_threshold=0)` a
+# virtual `fail_after` autojumps to its OWN deadline the instant the worker blocks
+# off-loop (all trio tasks idle) and would trip spuriously every run.
+_REARM_WATCHDOG_S = 5.0
+
+
+@contextlib.contextmanager
+def _real_clock_watchdog(stub: BlockingStubCursor, budget_s: float) -> Generator[list[bool]]:
+    """
+    Break a stranded non-cancellable worker open after `budget_s` REAL seconds.
+
+    A side thread sleeps `budget_s` on the wall clock; if the body has not exited
+    by then it `close()`s the stub, which releases any worker still blocked in
+    `_block`, so a re-arm regression FAILS FAST (the released worker lets the task
+    group exit and the post-body assertion below trips) instead of hanging CI.
+    This is the real-clock watchdog the re-arm proof needs because a virtual
+    `anyio.fail_after` would autojump to its own deadline under the trio
+    `MockClock` the instant the worker blocks off-loop.
+
+    Args:
+        stub: The cursor whose blocked worker must be released on a timeout.
+        budget_s: Real wall-clock seconds to wait before forcing the stub open.
+
+    Yields:
+        A one-element list whose single `bool` is `True` iff the watchdog fired
+        (the body overran its budget); assert it is `False` after the body.
+    """
+    tripped = [False]
+    done = threading.Event()
+
+    def _watch() -> None:
+        if not done.wait(timeout=budget_s):
+            tripped[0] = True
+            stub.close()  # release any stranded worker so the group can exit
+
+    watcher = threading.Thread(target=_watch, daemon=True)
+    watcher.start()
+    try:
+        yield tripped
+    finally:
+        done.set()
+        watcher.join(timeout=budget_s)
 
 
 async def _await_inside(predicate: Callable[[], bool]) -> bool:
@@ -138,6 +186,59 @@ class TestEventGating:
             finally:
                 stub.release()
         assert worker_tid != threading.get_ident()
+
+    @pytest.mark.anyio
+    async def test_rearm_execute_then_fetch_same_cursor(self, anyio_backend_name: str) -> None:
+        """
+        One cursor blocks on `execute`, is released, then blocks AGAIN on `fetch`.
+
+        Proves the gate is re-armable per blocking call (WR-01) and that the
+        loop-facing `entered` re-fires from INSIDE the second blocked section
+        (D-CF-01): a FRESH `anyio.Event` gates each offload, so the second
+        `await entered.wait()` can only return once the worker is genuinely inside
+        `fetch_arrow_table`. The whole body runs under a REAL-clock watchdog
+        (`_real_clock_watchdog`, NOT `anyio.fail_after` -- a virtual `fail_after`
+        autojumps under the trio `MockClock` the instant the worker blocks
+        off-loop) so a re-arm regression that strands the non-cancellable worker
+        is broken open and fails fast instead of hanging. Every gated call is also
+        released in a `finally` -- a missed release would deadlock the group at
+        scope exit.
+        """
+        del anyio_backend_name
+        stub = BlockingStubCursor()
+        limiter = anyio.CapacityLimiter(1)
+        with _real_clock_watchdog(stub, _REARM_WATCHDOG_S) as watchdog:
+            # Phase 1: block on execute, release, drain.
+            entered_exec = anyio.Event()
+            gated_exec = functools.partial(run_blocking, entered=entered_exec, limiter=limiter)
+            async with anyio.create_task_group() as tg:
+                tg.start_soon(gated_exec, stub.execute, "SELECT 1")
+                try:
+                    await entered_exec.wait()
+                    # entered now fires from INSIDE _block, so the worker is
+                    # provably inside execute; the poll is a belt-and-suspenders
+                    # settle on the lock-guarded counter.
+                    assert await _await_inside(lambda: stub.execute_call_count == 1)
+                finally:
+                    stub.release()  # let the blocked execute return -- no sleep
+            assert stub.execute_call_count == 1
+            assert stub.fetch_call_count == 0
+
+            # Phase 2: REUSE the same cursor -- the gate must have re-armed, and a
+            # FRESH entered event must re-fire from inside the second block.
+            entered_fetch = anyio.Event()
+            gated_fetch = functools.partial(run_blocking, entered=entered_fetch, limiter=limiter)
+            async with anyio.create_task_group() as tg:
+                tg.start_soon(gated_fetch, stub.fetch_arrow_table)
+                try:
+                    await entered_fetch.wait()
+                    assert await _await_inside(lambda: stub.fetch_call_count == 1)
+                finally:
+                    stub.release()
+        assert watchdog[0] is False, "re-arm watchdog tripped: a worker hung on a stale gate"
+        assert stub.execute_call_count == 1
+        assert stub.fetch_call_count == 1
+        assert stub.observed_cancel is False
 
     @pytest.mark.anyio
     async def test_max_concurrent(self, anyio_backend_name: str) -> None:
