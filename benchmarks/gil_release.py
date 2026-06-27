@@ -134,10 +134,11 @@ def measure(
     """
     Measure one operation through the real `create_pool` checkout path.
 
-    Checks out `n` connections from a file-backed pool, warms up once (seeding
-    live connections), records the median single-call baseline (1 thread), then
-    the median concurrent wall-clock (`n` barrier-gated threads), and returns the
-    six-key `report` dict.
+    Checks out `n` connections from a file-backed pool, warms *every* connection
+    once (seeding live connections and priming per-connection caches so the timed
+    concurrent phase pays no cold-start cost), records the median single-call
+    baseline (1 thread), then the median concurrent wall-clock (`n` barrier-gated
+    threads), and returns the six-key `report` dict.
 
     Args:
         name: Label for the measurement (`"execute"` or `"fetch"`).
@@ -153,7 +154,13 @@ def measure(
     with _pool(n) as pool:
         conns = [pool.connect() for _ in range(n)]  # type: ignore[attr-defined]
         try:
-            call(conns[0], rows)  # warm up: seed live connections, prime caches
+            # Warm *every* connection (not just conns[0]) before the timed phase:
+            # cold per-connection costs (connection-local caches, lazy ADBC
+            # statement setup) would otherwise inflate the concurrent wall time on
+            # conns[1:], deflating speedup_x toward the "GIL not released" verdict.
+            # Kept outside the timed region below.
+            for c in conns:
+                call(c, rows)  # warm all connections: seed live conns, prime caches
             single = median(call(conns[0], rows) for _ in range(trials))
             wall = concurrent_wall(lambda c: call(c, rows), conns, n, trials)
             result = report(single, wall, n)
