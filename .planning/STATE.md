@@ -4,8 +4,8 @@ milestone: v1.4.0
 milestone_name: Async API
 status: verifying
 stopped_at: Completed 24-03-PLAN.md
-last_updated: "2026-06-27T23:26:48.560Z"
-last_activity: 2026-06-28 -- Completed 24-03 (AsyncConnection/AsyncCursor bodies)
+last_updated: "2026-06-27T23:41:51.349Z"
+last_activity: 2026-06-27
 progress:
   total_phases: 9
   completed_phases: 3
@@ -25,10 +25,10 @@ See: .planning/PROJECT.md (updated 2026-06-25)
 
 ## Current Position
 
-Phase: 24 (core-async-wrapper) — EXECUTING
-Plan: 5 of 5
+Phase: 25
+Plan: Not started
 Status: Phase complete — ready for verification
-Last activity: 2026-06-28 -- Completed 24-03 (AsyncConnection/AsyncCursor bodies)
+Last activity: 2026-06-27
 
 Progress: [░░░░░░░░░░] 0% (0/7 phases)
 
