@@ -93,6 +93,7 @@ nav:
   - Getting Started: index.md
   - Guides:
     - Pool Lifecycle: guides/pool-lifecycle.md
+    - Async Pool: guides/async.md
     - Consumer Patterns: guides/consumer-patterns.md
     - Configuration Reference: guides/configuration.md
     - Custom Backends: guides/custom-backends.md

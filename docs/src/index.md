@@ -64,9 +64,34 @@ close_pool(pool)
 
 `pool.connect()` checks out a connection from the pool and returns it when the `with` block exits. `close_pool(pool)` drains the pool and closes the underlying ADBC source connection.
 
+## Async
+
+For asyncio or trio code, `create_async_pool`, `managed_async_pool`, and `close_async_pool` mirror the sync entry points and run each blocking ADBC call on a worker thread. Install the `[async]` extra (`pip install adbc-poolhouse[async]`) and see the [async pool guide](guides/async.md).
+
+```python
+import anyio
+from adbc_poolhouse import DuckDBConfig, create_async_pool, close_async_pool
+
+
+async def main():
+    pool = create_async_pool(DuckDBConfig(database="/tmp/warehouse.db"))
+    try:
+        async with await pool.connect() as conn:
+            cur = conn.cursor()  # synchronous, no await
+            await cur.execute("SELECT 42 AS answer")
+            table = await cur.fetch_arrow_table()
+            print(table.column("answer")[0].as_py())  # 42
+    finally:
+        await close_async_pool(pool)
+
+
+anyio.run(main)
+```
+
 ## What's next
 
 - [Pool lifecycle](guides/pool-lifecycle.md) — how to dispose correctly, pytest fixture patterns, and common mistakes
+- [Async pool](guides/async.md) — the asyncio/trio wrapper, honest concurrency limits, and the one connection per task rule
 - [Consumer patterns](guides/consumer-patterns.md) — wiring a pool into FastAPI and reading credentials from a dbt profiles file
 - [Configuration reference](guides/configuration.md) — environment variable prefixes, pool tuning, and secret handling
 - [Snowflake guide](guides/snowflake.md) — supported auth methods and private key variants
