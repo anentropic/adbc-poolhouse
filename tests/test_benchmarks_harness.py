@@ -11,7 +11,13 @@ from __future__ import annotations
 import statistics
 
 import pytest
-from benchmarks._harness import median, parallel_efficiency, report, speedup
+from benchmarks._harness import (
+    concurrent_wall,
+    median,
+    parallel_efficiency,
+    report,
+    speedup,
+)
 
 
 class TestHarnessArithmetic:
@@ -75,3 +81,19 @@ class TestHarnessArithmetic:
         """report() flows through speedup, so it also rejects wall == 0.0."""
         with pytest.raises(ValueError, match="wall must be > 0"):
             report(1.0, 0.0, 4)
+
+
+class TestConcurrentWall:
+    """The barrier-gated concurrent_wall driver, exercised with a synthetic call."""
+
+    def test_returns_nonnegative_wall(self) -> None:
+        """A no-op call over n connections yields a finite, non-negative wall time."""
+        conns = list(range(4))
+        wall = concurrent_wall(lambda _c: 0.0, conns, n=len(conns), trials=2)
+        assert wall >= 0.0
+
+    def test_conns_length_mismatch_raises(self) -> None:
+        """A len(conns) != n mismatch fails loudly instead of deadlocking."""
+        conns = list(range(2))
+        with pytest.raises(ValueError, match=r"len\(conns\)=2 must equal n=4"):
+            concurrent_wall(lambda _c: 0.0, conns, n=4, trials=1)

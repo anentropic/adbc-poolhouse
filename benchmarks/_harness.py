@@ -136,15 +136,27 @@ def concurrent_wall(
             per-call elapsed time (ignored here; only the batch wall-clock is timed).
         conns: The `n` per-thread connections (each thread uses its own; ADBC
             forbids sharing a connection across threads).
-        n: Number of concurrent threads/connections.
+        n: Number of concurrent threads/connections. Must equal `len(conns)`.
         trials: Number of trials to run; the median wall-clock is returned.
 
     Returns:
         The median batch wall-clock time in seconds across `trials`.
+
+    Raises:
+        ValueError: If `len(conns) != n`. The barrier is sized for `n` parties but
+            one task is spawned per connection; a mismatch would leave the barrier
+            permanently un-tripped and hang on the executor's exit, so it is
+            rejected up front instead.
     """
+    if len(conns) != n:
+        msg = f"len(conns)={len(conns)} must equal n={n}"
+        raise ValueError(msg)
 
     def trial() -> float:
-        barrier = threading.Barrier(n)
+        # Barrier timeout: a defence-in-depth guard so any future caller that
+        # slips past the length check still fails loudly (BrokenBarrierError)
+        # rather than blocking the executor forever.
+        barrier = threading.Barrier(n, timeout=60)
 
         def task(conn: _Conn) -> float:
             barrier.wait()  # release all threads together
