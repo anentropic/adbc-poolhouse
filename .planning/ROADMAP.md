@@ -123,11 +123,29 @@ Plans:
 
   1. User can `create_async_pool(config, ...)` / `await close_async_pool(pool)` / `async with managed_async_pool(config, ...) as pool:` with the sync signature and overloads mirrored, and `await pool.connect()` yields an `AsyncConnection` whose `cursor()` returns an `AsyncCursor` synchronously (APOOL-01/02/03, ACONN-01/03)
   2. User can `await` the full DBAPI surface — `execute`, `executemany`, `fetchone`/`fetchmany`/`fetchall`, `fetch_arrow_table` (returning a `pyarrow.Table`), `commit`/`rollback`, `close` — while sync no-I/O properties (`description`/`rowcount`/`arraysize`) pass through without `await` (ACUR-01..07, ACONN-04/05)
-  3. Every blocking call routes through one offload helper using each pool's dedicated `CapacityLimiter(pool_size + max_overflow)` — never the global 40-token default — with observed in-flight concurrency strictly bounded to that size under a 4× flood, tokens borrowed-then-released exactly once across success/error/cancel paths, and worker thread-ids proven off-loop (CORE-01/02, EDGE-09/10/11/12/25/26)
-  4. Async checkin routes through the existing reset path so `_release_arrow_allocators` fires symmetrically; a materialized `fetch_arrow_table` result is valid after checkin; an error in `__aenter__`/post-checkout and two tasks aliasing one connection both leave `checkedout() == 0` / serialize cleanly; ADBC errors cross the thread boundary with exact type and traceback (ACONN-06, EDGE-21/18/15/17)
+  3. Every blocking call routes through one offload helper using each pool's dedicated `CapacityLimiter(pool_size + max_overflow)` — never the global 40-token default — with observed in-flight concurrency strictly bounded to that size under a 4× flood, tokens borrowed-then-released exactly once across success and error paths plus the queued-acquire-cancel path (EDGE-10); the cancel-mid-block leg of EDGE-09 defers to Phase 25 (see CONTEXT D-24-02); and worker thread-ids proven off-loop (CORE-01/02, EDGE-09/10/11/12/25/26)
+  4. Async checkin routes through the existing reset path so `_release_arrow_allocators` fires symmetrically; a materialized `fetch_arrow_table` result is valid after checkin; an error in `__aenter__`/post-checkout leaves `checkedout() == 0`, and two tasks aliasing one connection are rejected with a clear typed error (`ConnectionBusyError`) — never silently serialized — leaving `checkedout()` correct; ADBC errors cross the thread boundary with exact type and traceback (ACONN-06, EDGE-21/18/15/17)
   5. The async layer is generic over all 13 backends via the existing `WarehouseConfig` Protocol with no per-backend async code, `import asyncio` is banned and lint-enforced in `_async/`, and basedpyright strict passes on the module (CORE-03/04)
 
-**Plans**: TBD
+**Plans**: 5 plans
+Plans:
+**Wave 1**
+
+- [ ] 24-01-PLAN.md — Wave-0 harness prerequisite: re-armable cursor gate + entered-after-block redesign (TEST-05 carry-forward)
+- [ ] 24-02-PLAN.md — Async foundation: offload chokepoint, ConnectionBusyError, AsyncPool + dedicated limiter, create/managed/close_async_pool, PEP 562 lazy import
+
+**Wave 2** *(blocked on Wave 1)*
+
+- [ ] 24-03-PLAN.md — AsyncConnection + AsyncCursor: _in_use aliasing rejection, sync cursor()/props, offloaded DBAPI surface, shielded checkin, materialized fetch_arrow_table
+
+**Wave 3** *(blocked on Waves 1 + 2)*
+
+- [ ] 24-04-PLAN.md — Lifecycle + EDGE suite (09 success/error, 10/11/12/15/17/18/21/25/26) both backends, loop-stable; guard extension (no-asyncio/no-bare-to_thread/no-backend-names)
+
+**Wave 4** *(blocked on Wave 3)*
+
+- [ ] 24-05-PLAN.md — Docs gate: async usage guide + forbidden-aliasing antipattern + Google-style docstrings + mkdocs --strict
+
 **UI hint**: no
 
 ### Phase 25: Cancellation
