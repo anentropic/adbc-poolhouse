@@ -136,4 +136,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-06-25 after starting v1.4.0 milestone*
+*Last updated: 2026-06-28 — Phase 24 (Core Async Wrapper) complete; the full async surface (`create_async_pool`/`connect`/`execute`/`fetch_arrow_table`/checkin), dedicated per-pool limiter, and structural EDGE coverage ship. Cancellation (Phase 25) remains.*
