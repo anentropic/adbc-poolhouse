@@ -148,8 +148,25 @@ class TestBlockingStubCursor:
         assert cursor.closed is True
 
     def test_two_concurrent_executes_raise_max_concurrent(self) -> None:
-        """Two simultaneous executes lift max_concurrent_in_execute to 2."""
-        cursor = BlockingStubCursor()
+        """Two simultaneous executes lift max_concurrent_in_execute to 2 (IN-04, deterministic)."""
+        # Drive the shared cursor's `entered` signal through a counting Event so
+        # the test blocks until BOTH workers are inside _block -- no wall-clock
+        # poll. The counter ticks under the same set() the workers fire on entry,
+        # and `both_in` is set the instant the second worker enters, so when it
+        # fires both workers are provably blocked and the high-water mark is 2.
+        both_in = threading.Event()
+        enter_lock = threading.Lock()
+        entered_idents: set[int] = set()
+
+        class _CountingEntered(threading.Event):
+            def set(self) -> None:
+                with enter_lock:
+                    entered_idents.add(threading.get_ident())
+                    if len(entered_idents) >= 2:
+                        both_in.set()
+                super().set()
+
+        cursor = BlockingStubCursor(entered=_CountingEntered())
 
         def _watch() -> None:
             cursor.execute("SELECT 1")
@@ -157,12 +174,7 @@ class TestBlockingStubCursor:
         t1, d1 = _run_blocked(_watch)
         t2, d2 = _run_blocked(_watch)
 
-        # Both workers converge inside _block; the lock-guarded max reaches 2.
-        poll = threading.Event()
-        for _ in range(500):
-            if cursor.max_concurrent_in_execute >= 2:
-                break
-            poll.wait(timeout=0.01)
+        assert both_in.wait(timeout=5), "both workers never converged inside _block"
         assert cursor.max_concurrent_in_execute == 2
 
         cursor.release()
