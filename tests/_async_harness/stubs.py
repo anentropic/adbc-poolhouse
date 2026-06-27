@@ -193,7 +193,9 @@ class BlockingStubCursor:
         """
         with self._lock:
             self.adbc_cancel_call_count += 1
-        self.observed_cancel = True
+            # Flag bumped under the SAME lock as its counter (WR-03) so a reader
+            # synchronizing on one observes both, with no torn read.
+            self.observed_cancel = True
         self._release_all_waiters()
 
     def close(self) -> None:
@@ -208,7 +210,9 @@ class BlockingStubCursor:
         """
         with self._lock:
             self.close_call_count += 1
-        self._closed = True
+            # _closed set under the SAME lock as its counter (WR-03) so the
+            # terminal state and its count are observed together.
+            self._closed = True
         self._release_all_waiters()
 
     def release(self) -> None:
@@ -322,8 +326,9 @@ class BlockingStubConnection:
         """
         with self._lock:
             self.adbc_cancel_call_count += 1
+            # Flag bumped under the SAME lock as its counter (WR-03).
+            self.observed_cancel = True
             cursors = list(self.cursors)
-        self.observed_cancel = True
         if propagate:
             for cursor in cursors:
                 cursor.adbc_cancel()
