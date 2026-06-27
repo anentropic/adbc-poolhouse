@@ -73,7 +73,7 @@ Scope decisions for this milestone:
 - [ ] **TEST-02**: The async layer is exercised against DuckDB (in-proc) and Snowflake (pytest-adbc-replay cassette) to prove backend-generic coverage
 - [ ] **TEST-03**: An Arrow memory-stability test confirms no allocator growth across many async cursor lifecycles
 - [ ] **TEST-04**: A limiter-sizing stress test confirms no deadlock or starvation when concurrency exceeds `pool_size`
-- [ ] **TEST-05**: A shared deterministic test harness exists — a `BlockingStubCursor` (blocks on a `threading.Event` released only by the test or by `adbc_cancel`; records thread-id, call counts, max-concurrent-in-execute) plus event-gating/virtual-clock helpers and a source-scan/import-lint guard — so edge-case tests need no real sleeps
+- [x] **TEST-05**: A shared deterministic test harness exists — a `BlockingStubCursor` (blocks on a `threading.Event` released only by the test or by `adbc_cancel`; records thread-id, call counts, max-concurrent-in-execute) plus event-gating/virtual-clock helpers and a source-scan/import-lint guard — so edge-case tests need no real sleeps
 
 ### Async Edge-Case Test Coverage
 
@@ -175,7 +175,7 @@ Explicit exclusions for the async layer (with reasoning):
 | SPIKE-01 | Phase 22 | Complete |
 | SPIKE-02 | Phase 22 | Complete |
 | SPIKE-03 | Phase 22 | Complete |
-| TEST-05 | Phase 23 | Pending |
+| TEST-05 | Phase 23 | Complete |
 | CORE-01 | Phase 24 | Pending |
 | CORE-02 | Phase 24 | Pending |
 | CORE-03 | Phase 24 | Pending |
