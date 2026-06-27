@@ -31,8 +31,9 @@ class Finding:
     Attributes:
         path: The file in which the violation was found.
         lineno: The 1-based line number of the offending node.
-        rule: The rule id -- `"banned-asyncio-import"` or
-            `"to_thread-without-limiter"`.
+        rule: The rule id -- `"banned-asyncio-import"`,
+            `"to_thread-without-limiter"`, or `"unparseable-source"` (a file that
+            could not be parsed; see `scan_async_package`).
         message: A human-readable description of the violation.
     """
 
@@ -124,6 +125,11 @@ def scan_async_package(root: str | Path) -> list[Finding]:
     the real `src/adbc_poolhouse/_async/` package is not created until Phase 24,
     so this guard must tolerate its absence and stay green until then.
 
+    The scan is also tolerant of an individual unparseable file (IN-02): a
+    `SyntaxError` or `UnicodeDecodeError` from `ast.parse` is captured as an
+    `"unparseable-source"` Finding and the scan continues, so one bad file does
+    not abort the whole scan or mask violations in its siblings.
+
     `root` should point at the in-repo async package (e.g.
     `src/adbc_poolhouse/_async/`). It is read with `ast.parse`, never executed,
     so a repo-scoped path carries no code-execution risk; do not pass an
@@ -144,6 +150,15 @@ def scan_async_package(root: str | Path) -> list[Finding]:
         `anyio.to_thread.run_sync(...)` form IS caught. This gap is locked by a
         self-test as expected behaviour rather than treated as a bug.
 
+        The matcher is name-based, so the symmetric FALSE-POSITIVE also holds: any
+        `<x>.to_thread.run_sync(...)` attribute chain is flagged regardless of what
+        `to_thread` resolves to. An unrelated user object named `to_thread` with a
+        `run_sync` method (e.g. `my_executor.to_thread.run_sync(...)`) would be
+        flagged even though it has nothing to do with `anyio.to_thread`. This is
+        acceptable for the in-repo `_async/` target (no such names exist) but is
+        called out so a future maintainer is not surprised if the guard fires on a
+        non-anyio call.
+
     Example:
         ```python
         from tests._async_harness.guard import scan_async_package
@@ -157,7 +172,23 @@ def scan_async_package(root: str | Path) -> list[Finding]:
         return []
     findings: list[Finding] = []
     for py in sorted(root.rglob("*.py")):
-        tree = ast.parse(py.read_text(encoding="utf-8"), filename=str(py))
+        try:
+            source = py.read_text(encoding="utf-8")
+            tree = ast.parse(source, filename=str(py))
+        except (SyntaxError, UnicodeDecodeError) as exc:
+            # Tolerant scan (D-05 "graceful"): one malformed or non-UTF-8 file
+            # emits a Finding rather than aborting the whole scan with a
+            # traceback, so it cannot mask violations in sibling files (IN-02).
+            lineno = exc.lineno if isinstance(exc, SyntaxError) and exc.lineno else 0
+            findings.append(
+                Finding(
+                    str(py),
+                    lineno,
+                    "unparseable-source",
+                    f"could not parse source: {type(exc).__name__}: {exc}",
+                )
+            )
+            continue
         visitor = _GuardVisitor(str(py))
         visitor.visit(tree)
         findings.extend(visitor.findings)

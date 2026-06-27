@@ -58,3 +58,27 @@ class TestAsyncGuard:
         # Documented limitation: aliased re-import slips past the attribute-chain
         # match, so no `to_thread-without-limiter` finding is produced here.
         assert scan_async_package(tmp_path) == []
+
+    def test_name_based_false_positive_documented(self, tmp_path: Path) -> None:
+        """A non-anyio `*.to_thread.run_sync` chain is also flagged (IN-01, name-based)."""
+        (tmp_path / "unrelated.py").write_text(
+            "my_executor.to_thread.run_sync(fn)\n", encoding="utf-8"
+        )
+        # The matcher is name-based: any `<x>.to_thread.run_sync(...)` is flagged
+        # regardless of what `to_thread` resolves to. Documented, not a bug.
+        assert [f.rule for f in scan_async_package(tmp_path)] == ["to_thread-without-limiter"]
+
+    def test_unparseable_file_emits_finding_not_crash(self, tmp_path: Path) -> None:
+        """A malformed .py file yields an `unparseable-source` finding, not a crash (IN-02)."""
+        (tmp_path / "broken.py").write_text("def oops(:\n", encoding="utf-8")
+        (tmp_path / "ok.py").write_text("import asyncio\n", encoding="utf-8")
+        findings = scan_async_package(tmp_path)
+        rules = sorted(f.rule for f in findings)
+        # The broken file does not mask the asyncio ban in its sibling.
+        assert rules == ["banned-asyncio-import", "unparseable-source"]
+
+    def test_non_utf8_file_emits_finding_not_crash(self, tmp_path: Path) -> None:
+        """A non-UTF-8 .py file yields an `unparseable-source` finding, not a crash (IN-02)."""
+        (tmp_path / "latin1.py").write_bytes(b"x = '\xff\xfe'\n")
+        findings = scan_async_package(tmp_path)
+        assert [f.rule for f in findings] == ["unparseable-source"]
