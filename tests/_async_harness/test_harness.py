@@ -30,12 +30,22 @@ from __future__ import annotations
 
 import functools
 import threading
+import time
 
 import anyio
 import pytest
 
+from tests._async_harness.clock import virtual_clock
 from tests._async_harness.gating import run_blocking
 from tests._async_harness.stubs import BlockingStubCursor
+
+# Real wall-clock budget for the virtual-clock watchdog: a virtual 3600s deadline
+# must fire in far less than this many real seconds, else it rode wall-clock.
+_WALL_CLOCK_BUDGET_S = 5.0
+
+# Tests parametrized over the anyio_backend fixture (asyncio + trio); the
+# collection-level check below asserts both ids are present.
+_BACKEND_IDS = frozenset({"asyncio", "trio"})
 
 
 class TestEventGating:
@@ -102,3 +112,60 @@ class TestEventGating:
             await entered_b.wait()
             assert stub.max_concurrent_in_execute == 2
             stub.release()  # release both blocked calls; let the group finish
+
+
+class TestVirtualClock:
+    """`virtual_clock` makes anyio deadlines fire on virtual time, no wall-clock."""
+
+    @pytest.mark.anyio
+    async def test_trio_virtual_clock(self, anyio_backend_name: str) -> None:
+        """Trio leg: `move_on_after(3600)` fires on VIRTUAL time, no wall-clock spent."""
+        if anyio_backend_name != "trio":
+            pytest.skip("trio-leg virtual-clock assertion (MockClock injected at runner)")
+        # REAL wall-clock watchdog (T-23-08): a virtual 3600s deadline must fire
+        # in a tiny fraction of a real second. A nested virtual fail_after would
+        # autojump to ITS deadline first under MockClock, so the watchdog must be
+        # measured on the monotonic wall clock, not on anyio virtual time.
+        wall_start = time.monotonic()
+        with virtual_clock(anyio_backend_name):
+            with anyio.move_on_after(3600) as scope:
+                await anyio.Event().wait()  # never set -- only the deadline ends it
+        wall_elapsed = time.monotonic() - wall_start
+        assert scope.cancelled_caught  # the virtual 3600s deadline fired
+        assert wall_elapsed < _WALL_CLOCK_BUDGET_S  # but no real time was consumed
+
+    @pytest.mark.anyio
+    async def test_asyncio_virtual_clock(self, anyio_backend_name: str) -> None:
+        """Asyncio leg (A1): `move_on_after(3600)` fires under aiotools `patch_loop()`."""
+        if anyio_backend_name != "asyncio":
+            pytest.skip("asyncio-leg virtual-clock assertion (aiotools patch_loop)")
+        # Same real wall-clock watchdog shape; this RESOLVES open-question A1 --
+        # does anyio's asyncio move_on_after/fail_after honour the aiotools
+        # VirtualClock the facade installs via patch_loop()?
+        wall_start = time.monotonic()
+        with virtual_clock(anyio_backend_name):
+            with anyio.move_on_after(3600) as scope:
+                await anyio.Event().wait()
+        wall_elapsed = time.monotonic() - wall_start
+        assert scope.cancelled_caught
+        assert wall_elapsed < _WALL_CLOCK_BUDGET_S
+
+
+def test_dual_parametrization(request: pytest.FixtureRequest) -> None:
+    """
+    Every async self-test in this module is parametrized over both backend ids.
+
+    Inspects the collected node ids (typed strings) rather than each item's
+    `callspec` (untyped under basedpyright strict): a backend-parametrized item's
+    id ends in `[asyncio]` or `[trio]`, so the set of suffixes across this
+    module's async tests must equal both ids.
+    """
+    seen_ids: set[str] = set()
+    for item in request.session.items:
+        node_id = item.nodeid
+        if not node_id.startswith("tests/_async_harness/test_harness.py::"):
+            continue
+        for backend_id in _BACKEND_IDS:
+            if node_id.endswith(f"[{backend_id}]"):
+                seen_ids.add(backend_id)
+    assert seen_ids == _BACKEND_IDS
