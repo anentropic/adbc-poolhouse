@@ -96,7 +96,14 @@
   2. Event-gating and virtual-clock helpers usable under both asyncio and trio replace wall-clock sleeps in timeout/cancel tests (TEST-05)
   3. A source-scan / import-lint guard (asyncio-banned, bare-`to_thread`-without-limiter-banned in `_async/`) is exposed as a callable check the EDGE suite can assert against (TEST-05)
 
-**Plans**: TBD
+**Plans**: 4 plans
+
+Plans:
+- [ ] 23-01-PLAN.md — install anyio/trio/aiotools (dev) + nested anyio_backend conftest (foundation)
+- [ ] 23-02-PLAN.md — BlockingStubCursor/Connection + run_blocking offload glue + virtual_clock facade
+- [ ] 23-03-PLAN.md — scan_async_package AST import-lint guard + sync self-tests
+- [ ] 23-04-PLAN.md — dual-backend harness self-tests (block/cancel/clock) + docs gate
+
 **UI hint**: no
 
 ### Phase 24: Core Async Wrapper
