@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.4.0
 milestone_name: Async API
-status: executing
+status: verifying
 stopped_at: Completed 23-01-PLAN.md
-last_updated: "2026-06-27T09:35:27.875Z"
+last_updated: "2026-06-27T09:49:42.181Z"
 last_activity: 2026-06-27 -- Completed 23-01 (async harness foundation)
 progress:
   total_phases: 9
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 6
-  completed_plans: 5
-  percent: 11
+  completed_plans: 6
+  percent: 22
 ---
 
 # Project State
@@ -27,7 +27,7 @@ See: .planning/PROJECT.md (updated 2026-06-25)
 
 Phase: 23 (test-harness-foundation) — EXECUTING
 Plan: 4 of 4 (23-01 complete)
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-06-27 -- Completed 23-01 (async harness foundation)
 
 Progress: [░░░░░░░░░░] 0% (0/7 phases)
@@ -44,6 +44,7 @@ Progress: [░░░░░░░░░░] 0% (0/7 phases)
 | Phase 23 P01 | ~12min | 3 tasks | 4 files |
 | Phase 23 P02 | 4min | 3 tasks | 4 files |
 | Phase 23 P03 | 25m | 2 tasks | 2 files |
+| Phase 23 P04 | 10min | 3 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -73,6 +74,8 @@ v1.4.0 roadmap decisions:
 - [Phase ?]: stubs.py strictly anyio-free (D-03); anyio bridge lives only in gating.py (T-23-03)
 - [Phase ?]: Dual-entered documented: threading.Event sync signal (stub) vs anyio.Event loop gate (run_blocking) — T-23-07/Pitfall 2
 - [Phase ?]: D-05 guard shipped as scan_async_package(root)->list[Finding]; aliased run_sync re-import is an accepted, test-locked limitation
+- [Phase 23]: A1 RESOLVED (positive): anyio asyncio move_on_after honours aiotools VirtualClock().patch_loop(); asyncio virtual-clock leg passes — no event-gating fallback needed for the asyncio timeout leg
+- [Phase 23]: Dual-backend harness self-tests live INSIDE tests/_async_harness/ (anyio_backend propagates downward); tg.start_soon binds entered=/limiter= via functools.partial; virtual-clock proofs use a real time.monotonic() watchdog (a nested virtual fail_after autojumps to its own deadline first under MockClock)
 
 ### Roadmap Evolution
 
@@ -95,7 +98,7 @@ v1.4.0 roadmap decisions:
 
 ## Session Continuity
 
-Last session: 2026-06-27T09:35:24.643Z
+Last session: 2026-06-27T09:49:28.854Z
 Stopped at: Completed 23-01-PLAN.md
 Next step: Execute 23-02 (next Phase 23 plan — async harness modules / self-tests).
 </content>

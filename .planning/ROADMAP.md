@@ -109,7 +109,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 23-04-PLAN.md — dual-backend harness self-tests (block/cancel/clock) + docs gate
+- [x] 23-04-PLAN.md — dual-backend harness self-tests (block/cancel/clock) + docs gate
 
 **UI hint**: no
 
@@ -238,7 +238,7 @@ Plans:
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
 | 22. Feasibility Spike | v1.4.0 | 2/2 | Complete    | 2026-06-27 |
-| 23. Test Harness Foundation | v1.4.0 | 3/4 | In Progress|  |
+| 23. Test Harness Foundation | v1.4.0 | 4/4 | Complete   | 2026-06-27 |
 | 24. Core Async Wrapper | v1.4.0 | 0/0 | Not started | - |
 | 25. Cancellation | v1.4.0 | 0/0 | Not started | - |
 | 26. Packaging & Extra Scoping | v1.4.0 | 0/0 | Not started | - |
