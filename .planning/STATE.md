@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.4.0
 milestone_name: Async API
-status: executing
+status: verifying
 stopped_at: Completed 24-03-PLAN.md
-last_updated: "2026-06-27T23:20:42.173Z"
+last_updated: "2026-06-27T23:26:48.560Z"
 last_activity: 2026-06-28 -- Completed 24-03 (AsyncConnection/AsyncCursor bodies)
 progress:
   total_phases: 9
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 11
-  completed_plans: 10
-  percent: 22
+  completed_plans: 11
+  percent: 33
 ---
 
 # Project State
@@ -27,7 +27,7 @@ See: .planning/PROJECT.md (updated 2026-06-25)
 
 Phase: 24 (core-async-wrapper) — EXECUTING
 Plan: 5 of 5
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-06-28 -- Completed 24-03 (AsyncConnection/AsyncCursor bodies)
 
 Progress: [░░░░░░░░░░] 0% (0/7 phases)
@@ -49,6 +49,7 @@ Progress: [░░░░░░░░░░] 0% (0/7 phases)
 | Phase 24 P02 | 7min | 2 tasks | 7 files |
 | Phase 24 P03 | 6min | 2 tasks | 2 files |
 | Phase 24 P04 | ~25min | 3 tasks | 10 files |
+| Phase 24 P05 | ~12min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -91,6 +92,8 @@ v1.4.0 roadmap decisions:
 - [Phase 24]: _in_use is a plain bool check-and-set (no await between read and write), never a lock — 2nd concurrent caller is rejected with ConnectionBusyError, not queued (D-24-03 implemented); EDGE-15/18/21 behavioral proofs deferred to Plan 04
 - [Phase ?]: [Phase 24]: Plan 04 verification backbone — happy-path lifecycle (both backends + Snowflake cassette) + EDGE-09/10/11/12/15/17/18/21/25/26 all green and x20 loop-stable (0 hangs); EDGE-09 cancel-mid-block correctly absent (D-24-02)
 - [Phase ?]: [Phase 24]: tests/async cannot be imported by dotted path (async is a keyword) — sibling helpers loaded via importlib; real-clock watchdog (not anyio.fail_after) used for concurrency bodies per the MockClock autojump gotcha
+- [Phase ?]: [Phase 24]: Async docs gate closed — guide quotes Phase 22 SPIKE numbers honestly (execute ~2.77x@N=4, fetch_arrow_table ~1.67x@N=4, in-process DuckDB caveat); aliasing antipattern + ConnectionBusyError documented (D-24-03)
+- [Phase ?]: [Phase 24]: AsyncPool/AsyncConnection/AsyncCursor are NOT top-level exports — guide cross-refs only the exported factory fns + ConnectionBusyError; method-level mkdocstrings refs fail autorefs --strict, use inline code
 
 ### Roadmap Evolution
 
@@ -113,7 +116,7 @@ v1.4.0 roadmap decisions:
 
 ## Session Continuity
 
-Last session: 2026-06-27T23:20:22.989Z
+Last session: 2026-06-27T23:26:19.865Z
 Stopped at: Completed 24-03-PLAN.md
 Next step: Execute 24-04 (Lifecycle + EDGE suite: EDGE-09/10/11/12/15/17/18/21/25/26, both backends, loop-stable; guard extension).
 </content>
