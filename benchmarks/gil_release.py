@@ -29,7 +29,7 @@ import os
 import shutil
 import tempfile
 import time
-from contextlib import contextmanager
+from contextlib import contextmanager, suppress
 from typing import TYPE_CHECKING
 
 from adbc_poolhouse import DuckDBConfig, create_pool
@@ -171,8 +171,14 @@ def measure(
             wall = concurrent_wall(lambda c: call(c, rows), conns, n, trials)
             result = report(single, wall, n)
         finally:
+            # Isolate each close so one failing connection cannot abort the loop
+            # and leave the rest checked out -- a partial close would flip the
+            # `pool.checkedout() == 0` assertion in `_pool` and mask the real
+            # error (e.g. a warm-up or concurrent_wall failure surfacing here
+            # during unwind) behind a confusing leak assertion.
             for c in conns:
-                c.close()
+                with suppress(Exception):
+                    c.close()
     print(f"[{name}] N={n} rows={rows} trials={trials}: {result}")
     return result
 
