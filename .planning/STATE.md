@@ -4,13 +4,13 @@ milestone: v1.4.0
 milestone_name: Async API
 status: executing
 stopped_at: Completed 24-03-PLAN.md
-last_updated: "2026-06-28T00:00:00.000Z"
+last_updated: "2026-06-27T23:20:42.173Z"
 last_activity: 2026-06-28 -- Completed 24-03 (AsyncConnection/AsyncCursor bodies)
 progress:
   total_phases: 9
   completed_phases: 2
   total_plans: 11
-  completed_plans: 8
+  completed_plans: 10
   percent: 22
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-06-25)
 ## Current Position
 
 Phase: 24 (core-async-wrapper) — EXECUTING
-Plan: 4 of 5
+Plan: 5 of 5
 Status: Ready to execute
 Last activity: 2026-06-28 -- Completed 24-03 (AsyncConnection/AsyncCursor bodies)
 
@@ -48,6 +48,7 @@ Progress: [░░░░░░░░░░] 0% (0/7 phases)
 | Phase 24 P01 | 30min | 2 tasks | 3 files |
 | Phase 24 P02 | 7min | 2 tasks | 7 files |
 | Phase 24 P03 | 6min | 2 tasks | 2 files |
+| Phase 24 P04 | ~25min | 3 tasks | 10 files |
 
 ## Accumulated Context
 
@@ -88,6 +89,8 @@ v1.4.0 roadmap decisions:
 - [Phase 24]: Plan 03 settled Open Q1/A3 — the SQLAlchemy _ConnectionFairy proxies commit/rollback/cursor/close straight to the dbapi connection (probed on DuckDB); no driver_connection unwrap needed
 - [Phase 24]: AsyncCursor lives in its own module src/adbc_poolhouse/_async/_cursor.py (split out of _connection.py); _SyncCursor structural Protocol types the driver-agnostic dbapi cursor surface, with a single cast at AsyncConnection.cursor() to bridge SQLAlchemy's narrower DBAPICursor type
 - [Phase 24]: _in_use is a plain bool check-and-set (no await between read and write), never a lock — 2nd concurrent caller is rejected with ConnectionBusyError, not queued (D-24-03 implemented); EDGE-15/18/21 behavioral proofs deferred to Plan 04
+- [Phase ?]: [Phase 24]: Plan 04 verification backbone — happy-path lifecycle (both backends + Snowflake cassette) + EDGE-09/10/11/12/15/17/18/21/25/26 all green and x20 loop-stable (0 hangs); EDGE-09 cancel-mid-block correctly absent (D-24-02)
+- [Phase ?]: [Phase 24]: tests/async cannot be imported by dotted path (async is a keyword) — sibling helpers loaded via importlib; real-clock watchdog (not anyio.fail_after) used for concurrency bodies per the MockClock autojump gotcha
 
 ### Roadmap Evolution
 
@@ -110,7 +113,7 @@ v1.4.0 roadmap decisions:
 
 ## Session Continuity
 
-Last session: 2026-06-28T00:00:00.000Z
+Last session: 2026-06-27T23:20:22.989Z
 Stopped at: Completed 24-03-PLAN.md
 Next step: Execute 24-04 (Lifecycle + EDGE suite: EDGE-09/10/11/12/15/17/18/21/25/26, both backends, loop-stable; guard extension).
 </content>

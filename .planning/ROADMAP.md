@@ -140,7 +140,7 @@ Plans:
 
 **Wave 3** *(blocked on Waves 1 + 2)*
 
-- [ ] 24-04-PLAN.md — Lifecycle + EDGE suite (09 success/error, 10/11/12/15/17/18/21/25/26) both backends, loop-stable; guard extension (no-asyncio/no-bare-to_thread/no-backend-names)
+- [x] 24-04-PLAN.md — Lifecycle + EDGE suite (09 success/error, 10/11/12/15/17/18/21/25/26) both backends, loop-stable; guard extension (no-asyncio/no-bare-to_thread/no-backend-names)
 
 **Wave 4** *(blocked on Wave 3)*
 
@@ -257,7 +257,7 @@ Plans:
 |-------|-----------|----------------|--------|-----------|
 | 22. Feasibility Spike | v1.4.0 | 2/2 | Complete    | 2026-06-27 |
 | 23. Test Harness Foundation | v1.4.0 | 4/4 | Complete    | 2026-06-27 |
-| 24. Core Async Wrapper | v1.4.0 | 2/5 | In Progress|  |
+| 24. Core Async Wrapper | v1.4.0 | 4/5 | In Progress|  |
 | 25. Cancellation | v1.4.0 | 0/0 | Not started | - |
 | 26. Packaging & Extra Scoping | v1.4.0 | 0/0 | Not started | - |
 | 27. Dual-Backend Test Matrix | v1.4.0 | 0/0 | Not started | - |

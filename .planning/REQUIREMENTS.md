@@ -24,7 +24,7 @@ Scope decisions for this milestone:
 
 - [x] **CORE-01**: A single internal offload helper routes every blocking ADBC / `QueuePool` call through `anyio.to_thread.run_sync` with an explicit limiter argument — no bare `to_thread` calls anywhere in the async package
 - [x] **CORE-02**: Each async pool owns a dedicated `anyio.CapacityLimiter` sized to `pool_size + max_overflow`; the shared process-global 40-token default limiter is never used
-- [ ] **CORE-03**: The async package uses anyio primitives only — `import asyncio` is banned there and enforced by a lint/import rule
+- [x] **CORE-03**: The async package uses anyio primitives only — `import asyncio` is banned there and enforced by a lint/import rule
 - [x] **CORE-04**: The async layer is generic over all 13 backends via the existing `WarehouseConfig` Protocol — no per-backend async code
 
 ### Async Pool Lifecycle
@@ -91,29 +91,29 @@ _Cancellation depth_
 
 _Limiter / backpressure_
 
-- [ ] **EDGE-09**: A limiter token is borrowed-then-released exactly once across success, error, and cancel paths (×50 loop, `borrowed_tokens == 0` after)
-- [ ] **EDGE-10**: A limiter token is not leaked when acquire itself is cancelled while queued on a saturated limiter; concurrency fully recovers
-- [ ] **EDGE-11**: Holding a connection while awaiting a second offload does not self-deadlock at the bound (serialized on the held token or a clear error; a watchdog never trips)
-- [ ] **EDGE-12**: In-flight concurrency is strictly bounded — observed running-max `== pool_size + max_overflow` under a 4× flood
+- [x] **EDGE-09**: A limiter token is borrowed-then-released exactly once across success, error, and cancel paths (×50 loop, `borrowed_tokens == 0` after)
+- [x] **EDGE-10**: A limiter token is not leaked when acquire itself is cancelled while queued on a saturated limiter; concurrency fully recovers
+- [x] **EDGE-11**: Holding a connection while awaiting a second offload does not self-deadlock at the bound (serialized on the held token or a clear error; a watchdog never trips)
+- [x] **EDGE-12**: In-flight concurrency is strictly bounded — observed running-max `== pool_size + max_overflow` under a 4× flood
 
 _Reentrancy_
 
-- [ ] **EDGE-15**: Two tasks sharing one `AsyncConnection`/`AsyncCursor` raise a clear typed error (`ConnectionBusyError`) — never silently serialized, never a concurrent-access violation; `checkedout()` stays correct (Phase 24 decision D-24-03: reject, no per-connection lock)
+- [x] **EDGE-15**: Two tasks sharing one `AsyncConnection`/`AsyncCursor` raise a clear typed error (`ConnectionBusyError`) — never silently serialized, never a concurrent-access violation; `checkedout()` stays correct (Phase 24 decision D-24-03: reject, no per-connection lock)
 
 _Exceptions_
 
 - [x] **EDGE-17**: An ADBC error from the worker propagates with exact type and original traceback intact across the thread boundary
-- [ ] **EDGE-18**: An exception in `__aenter__`/post-checkout leaks no connection (`checkedout() == 0`, no cumulative leak over N iterations)
+- [x] **EDGE-18**: An exception in `__aenter__`/post-checkout leaks no connection (`checkedout() == 0`, no cumulative leak over N iterations)
 - [ ] **EDGE-19**: An `ExceptionGroup`/`except*` from a task group preserves the original ADBC errors and keeps cancellation distinguishable; `checkedout() == 0` after
 
 _Resource lifetime_
 
-- [ ] **EDGE-21**: A materialized `fetch_arrow_table` result is valid after checkin (no use-after-checkin) — the result is a `pyarrow.Table`, not a live reader bound to the connection
+- [x] **EDGE-21**: A materialized `fetch_arrow_table` result is valid after checkin (no use-after-checkin) — the result is a `pyarrow.Table`, not a live reader bound to the connection
 
 _Event-loop hygiene_
 
-- [ ] **EDGE-25**: Every blocking DB call runs off the loop thread (captured worker thread-id ≠ loop thread-id), with a lint asserting no `asyncio` import and no bare `to_thread` without the limiter in `_async/`
-- [ ] **EDGE-26**: A long blocked offload does not starve the loop — a concurrent coroutine advances across `sleep(0)` checkpoints while the offload blocks
+- [x] **EDGE-25**: Every blocking DB call runs off the loop thread (captured worker thread-id ≠ loop thread-id), with a lint asserting no `asyncio` import and no bare `to_thread` without the limiter in `_async/`
+- [x] **EDGE-26**: A long blocked offload does not starve the loop — a concurrent coroutine advances across `sleep(0)` checkpoints while the offload blocks
 
 _trio-vs-asyncio_
 
@@ -178,7 +178,7 @@ Explicit exclusions for the async layer (with reasoning):
 | TEST-05 | Phase 23 | Complete |
 | CORE-01 | Phase 24 | Complete |
 | CORE-02 | Phase 24 | Complete |
-| CORE-03 | Phase 24 | Pending |
+| CORE-03 | Phase 24 | Complete |
 | CORE-04 | Phase 24 | Complete |
 | APOOL-01 | Phase 24 | Complete |
 | APOOL-02 | Phase 24 | Complete |
@@ -196,16 +196,16 @@ Explicit exclusions for the async layer (with reasoning):
 | ACUR-05 | Phase 24 | Complete |
 | ACUR-06 | Phase 24 | Complete |
 | ACUR-07 | Phase 24 | Complete |
-| EDGE-09 | Phase 24 | Pending |
-| EDGE-10 | Phase 24 | Pending |
-| EDGE-11 | Phase 24 | Pending |
-| EDGE-12 | Phase 24 | Pending |
-| EDGE-15 | Phase 24 | Pending |
+| EDGE-09 | Phase 24 | Complete |
+| EDGE-10 | Phase 24 | Complete |
+| EDGE-11 | Phase 24 | Complete |
+| EDGE-12 | Phase 24 | Complete |
+| EDGE-15 | Phase 24 | Complete |
 | EDGE-17 | Phase 24 | Complete |
-| EDGE-18 | Phase 24 | Pending |
-| EDGE-21 | Phase 24 | Pending |
-| EDGE-25 | Phase 24 | Pending |
-| EDGE-26 | Phase 24 | Pending |
+| EDGE-18 | Phase 24 | Complete |
+| EDGE-21 | Phase 24 | Complete |
+| EDGE-25 | Phase 24 | Complete |
+| EDGE-26 | Phase 24 | Complete |
 | CANCEL-01 | Phase 25 | Pending |
 | CANCEL-02 | Phase 25 | Pending |
 | CANCEL-03 | Phase 25 | Pending |
