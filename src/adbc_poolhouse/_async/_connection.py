@@ -71,8 +71,9 @@ class AsyncConnection:
 
     Attributes:
         _in_use: True while an offloaded call on this connection (or one of its
-            cursors) is in flight. The single-task aliasing guard; never an
-            `anyio.Lock`, which would serialize rather than reject (D-24-03).
+            cursors) is in flight. The single-task aliasing guard; deliberately a
+            plain bool, never a serializing lock, so a second concurrent caller is
+            rejected rather than queued (D-24-03).
 
     Example:
         ```python
