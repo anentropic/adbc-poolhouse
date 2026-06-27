@@ -39,18 +39,10 @@ class BlockingStubCursor:
     Sync DBAPI-shaped cursor fake whose `execute` / `fetch` block until released.
 
     A pure-`threading` fake (no anyio): `execute` and `fetch_arrow_table` record
-    their call and then block until released, each on its OWN per-call
-    `threading.Event` latch. The test releases the worker via `release` (happy
-    path), `adbc_cancel` (cancel path, which also flips `observed_cancel`), or
-    `close`. Every counter and signal the EDGE table needs is recorded as a
-    public attribute (D-04, LOCKED names).
-
-    Re-armable gate (WR-01): because each blocking call waits on a fresh latch,
-    the gate re-arms after `release` / `adbc_cancel`, so a SECOND blocking call on
-    the same cursor blocks again. This makes the Phase 24 reuse shape -- `execute`
-    then `fetch_arrow_table` on ONE cursor -- gate on both calls. `close` is the
-    one terminal exception: after `close`, a subsequent blocking call returns
-    immediately (a closed cursor no longer gates).
+    their call and then block forever on an internal `threading.Event`. The test
+    releases the worker via `release` (happy path), `adbc_cancel` (cancel path,
+    which also flips `observed_cancel`), or `close`. Every counter and signal the
+    EDGE table needs is recorded as a public attribute (D-04, LOCKED names).
 
     Attributes:
         entered: A `threading.Event` set the instant a worker enters the blocked
@@ -70,10 +62,6 @@ class BlockingStubCursor:
             in call order -- lets EDGE-25 assert work ran off the loop thread.
         max_concurrent_in_execute: The high-water mark of workers simultaneously
             inside the blocked section (lock-guarded), backing EDGE-12/EDGE-15.
-        closed: `True` once `close` has run; `False` otherwise. Lets a consumer
-            observe the terminal close state from the public surface (IN-03);
-            after close, a subsequent blocking call returns immediately rather
-            than gating.
 
     Example:
         ```python
@@ -101,8 +89,8 @@ class BlockingStubCursor:
             entered: Optional pre-existing `threading.Event` to use as the
                 worker-entry signal. Defaults to a fresh, unset event.
         """
+        self._event = threading.Event()
         self._lock = threading.Lock()
-        self._waiters: list[threading.Event] = []
         self.entered: threading.Event = entered or threading.Event()
         self.observed_cancel: bool = False
         self.execute_call_count: int = 0
@@ -112,52 +100,26 @@ class BlockingStubCursor:
         self.execute_thread_ids: list[int] = []
         self._in_execute: int = 0
         self.max_concurrent_in_execute: int = 0
-        self.closed: bool = False
-
-    def _release_all_waiters(self) -> None:
-        """
-        Set every currently-registered per-call latch so blocked workers return.
-
-        Snapshots `self._waiters` under the lock, then sets each event outside the
-        lock. New per-call latches created by a SUBSEQUENT blocking call start
-        unset, so the gate re-arms: the next `execute` / `fetch_arrow_table`
-        blocks again rather than slipping through a permanently-set event
-        (WR-01).
-        """
-        with self._lock:
-            waiters = list(self._waiters)
-        for waiter in waiters:
-            waiter.set()
+        self._closed: bool = False
 
     def _block(self) -> None:
         """
         Record entry/concurrency, signal `entered`, then block until released.
 
         Lock-guards the `max_concurrent_in_execute` high-water mark on entry and
-        the decrement on exit, sets the `entered` sync signal, and waits on a
-        FRESH per-call `threading.Event` registered in `self._waiters`. Each
-        blocking call gets its own latch, so the gate re-arms per call: a worker
-        released by `release` / `adbc_cancel` / `close` is unblocked, while a
-        later call on the same cursor blocks again on a brand-new latch (WR-01,
-        supports Phase 24 `execute`->`fetch_arrow_table` reuse on one cursor).
+        the decrement on exit, sets the `entered` sync signal, and waits on the
+        internal event (which is released by `release`, `adbc_cancel`, or
+        `close`).
         """
-        waiter = threading.Event()
         with self._lock:
-            self._waiters.append(waiter)
             self._in_execute += 1
             self.max_concurrent_in_execute = max(self.max_concurrent_in_execute, self._in_execute)
-            # If a close already fired, honour it immediately so a call that races
-            # teardown returns at once rather than blocking on a fresh latch.
-            if self.closed:
-                waiter.set()
         try:
             self.entered.set()  # signal "worker is inside execute" (see gating.py)
-            waiter.wait()  # blocks until this call's latch is set
+            self._event.wait()  # blocks FOREVER until released
         finally:
             with self._lock:
                 self._in_execute -= 1
-                if waiter in self._waiters:
-                    self._waiters.remove(waiter)
 
     def execute(self, operation: str, parameters: object = None) -> None:
         """
@@ -191,46 +153,34 @@ class BlockingStubCursor:
         Flip `observed_cancel` and release any blocked `execute` / `fetch`.
 
         Models the driver-level cancel: increments `adbc_cancel_call_count`, sets
-        `observed_cancel` to `True`, and releases every blocked worker's per-call
-        latch so each returns. The gate re-arms, so a later blocking call on the
-        same cursor blocks again (WR-01).
+        `observed_cancel` to `True`, and releases the internal event so a blocked
+        worker returns.
         """
         with self._lock:
             self.adbc_cancel_call_count += 1
-            # Flag bumped under the SAME lock as its counter (WR-03) so a reader
-            # synchronizing on one observes both, with no torn read.
-            self.observed_cancel = True
-        self._release_all_waiters()
+        self.observed_cancel = True
+        self._event.set()
 
     def close(self) -> None:
         """
         Increment `close_call_count` and release any blocked worker.
 
-        Releasing every per-call latch on close guarantees no worker is ever
-        stranded in the blocked section (T-23-04). Unlike `release` /
-        `adbc_cancel`, close is terminal: once closed, a SUBSEQUENT blocking call
-        returns immediately rather than re-arming, modelling a closed cursor that
-        no longer gates.
+        Releasing the event on close guarantees no worker is ever stranded in the
+        blocked section (T-23-04).
         """
         with self._lock:
             self.close_call_count += 1
-            # `closed` (public, IN-03) set under the SAME lock as its counter
-            # (WR-03) so the terminal state and its count are observed together.
-            self.closed = True
-        self._release_all_waiters()
+        self._closed = True
+        self._event.set()
 
     def release(self) -> None:
         """
-        Test-only: unblock waiting workers WITHOUT cancelling (happy path).
+        Test-only: unblock a waiting worker WITHOUT cancelling (happy path).
 
-        Sets every blocked worker's per-call latch so each returns, leaving
-        `observed_cancel` `False` -- use this to model a query that completes
-        normally, as opposed to `adbc_cancel`. The gate re-arms: a later blocking
-        call on the same cursor blocks again on a fresh latch (WR-01), so an async
-        wrapper that does `execute` then `fetch_arrow_table` on one cursor gates
-        on BOTH calls.
+        Leaves `observed_cancel` `False` -- use this to model a query that
+        completes normally, as opposed to `adbc_cancel`.
         """
-        self._release_all_waiters()
+        self._event.set()
 
 
 class BlockingStubConnection:
@@ -243,16 +193,6 @@ class BlockingStubConnection:
     Its public attributes are made EXPLICIT so the D-04 hard contract is
     unambiguous for the connection-level EDGE cases (EDGE-09..12/15/18) in Phases
     24/25.
-
-    Connection methods are recording-only by default (WR-02): `close` /
-    `adbc_cancel` bump their counters (and `adbc_cancel` flips `observed_cancel`)
-    but do NOT, by default, touch the cursors in `self.cursors`. A worker blocked
-    inside a handed-out cursor is therefore NOT released by a bare `conn.close()`
-    -- consumers modelling connection teardown that must unblock cursor workers
-    pass `propagate=True` to fan the call out to every handed-out cursor. This
-    keeps the default count-only contract (the Plan-02 spec) intact while making
-    the connection-cancels-cursors semantics available for the EDGE cases that
-    need them (EDGE-09..12/15/18).
 
     Attributes:
         cursors: Every `BlockingStubCursor` handed out by `cursor`, in creation
@@ -295,44 +235,13 @@ class BlockingStubConnection:
             self.cursors.append(cursor)
         return cursor
 
-    def close(self, *, propagate: bool = False) -> None:
-        """
-        Increment `close_call_count`.
-
-        Recording-only by default (WR-02). Pass `propagate=True` to also `close`
-        every handed-out cursor, which is the only way a `BlockingStubConnection`
-        unblocks a worker stranded inside one of its cursors.
-
-        Args:
-            propagate: When `True`, call `close()` on every cursor in `cursors`
-                after recording, releasing any blocked cursor workers. Defaults to
-                `False`, preserving the count-only contract.
-        """
+    def close(self) -> None:
+        """Increment `close_call_count`."""
         with self._lock:
             self.close_call_count += 1
-            cursors = list(self.cursors)
-        if propagate:
-            for cursor in cursors:
-                cursor.close()
 
-    def adbc_cancel(self, *, propagate: bool = False) -> None:
-        """
-        Increment `adbc_cancel_call_count` and set `observed_cancel` to `True`.
-
-        Recording-only by default (WR-02). Pass `propagate=True` to also
-        `adbc_cancel` every handed-out cursor, releasing blocked cursor workers
-        and flipping each cursor's own `observed_cancel`.
-
-        Args:
-            propagate: When `True`, call `adbc_cancel()` on every cursor in
-                `cursors` after recording. Defaults to `False`, preserving the
-                count-only contract.
-        """
+    def adbc_cancel(self) -> None:
+        """Increment `adbc_cancel_call_count` and set `observed_cancel` to `True`."""
         with self._lock:
             self.adbc_cancel_call_count += 1
-            # Flag bumped under the SAME lock as its counter (WR-03).
-            self.observed_cancel = True
-            cursors = list(self.cursors)
-        if propagate:
-            for cursor in cursors:
-                cursor.adbc_cancel()
+        self.observed_cancel = True

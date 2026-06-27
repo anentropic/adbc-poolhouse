@@ -46,7 +46,6 @@ class TestBlockingStubCursor:
         assert cursor.execute_thread_ids == []
         assert cursor.max_concurrent_in_execute == 0
         assert cursor.observed_cancel is False
-        assert cursor.closed is False
         assert not cursor.entered.is_set()
 
     def test_execute_records_then_blocks_until_released(self) -> None:
@@ -95,78 +94,9 @@ class TestBlockingStubCursor:
         cursor.release()
         assert done.wait(timeout=5)
 
-    def test_gate_rearms_after_release_for_second_call(self) -> None:
-        """A second blocking call on the same cursor blocks again after release (WR-01)."""
-        cursor = BlockingStubCursor()
-
-        # First call: execute, gate, release.
-        _, done1 = _run_blocked(lambda: cursor.execute("SELECT 1"))
-        assert cursor.entered.wait(timeout=5), "first worker never entered execute"
-        assert done1.wait(timeout=0.05) is False, "first call returned before release"
-        cursor.entered.clear()  # re-arm the sync signal for the second call
-        cursor.release()
-        assert done1.wait(timeout=5), "first call did not return after release"
-
-        # Second call (reuse): fetch on the SAME cursor must block again.
-        _, done2 = _run_blocked(cursor.fetch_arrow_table)
-        assert cursor.entered.wait(timeout=5), "second worker never entered fetch"
-        assert done2.wait(timeout=0.05) is False, "second call did NOT re-block (gate stuck open)"
-        assert cursor.fetch_call_count == 1
-        cursor.release()
-        assert done2.wait(timeout=5), "second call did not return after release"
-
-    def test_gate_rearms_after_adbc_cancel_for_second_call(self) -> None:
-        """adbc_cancel unblocks the first call yet the gate re-arms for a second (WR-01)."""
-        cursor = BlockingStubCursor()
-
-        _, done1 = _run_blocked(lambda: cursor.execute("SELECT 1"))
-        assert cursor.entered.wait(timeout=5)
-        cursor.entered.clear()
-        cursor.adbc_cancel()
-        assert done1.wait(timeout=5), "adbc_cancel did not release the first worker"
-        assert cursor.observed_cancel is True
-
-        _, done2 = _run_blocked(lambda: cursor.execute("SELECT 2"))
-        assert cursor.entered.wait(timeout=5)
-        assert done2.wait(timeout=0.05) is False, "second call did NOT re-block after cancel"
-        cursor.release()
-        assert done2.wait(timeout=5)
-
-    def test_close_is_terminal_subsequent_call_does_not_block(self) -> None:
-        """After close, a subsequent blocking call returns immediately (WR-01)."""
-        cursor = BlockingStubCursor()
-        cursor.close()
-
-        _, done = _run_blocked(lambda: cursor.execute("SELECT 1"))
-        assert done.wait(timeout=5), "post-close call blocked instead of returning immediately"
-
-    def test_close_surfaces_closed_state(self) -> None:
-        """close() flips the public `closed` attribute True (IN-03)."""
-        cursor = BlockingStubCursor()
-        assert cursor.closed is False
-        cursor.close()
-        assert cursor.closed is True
-
     def test_two_concurrent_executes_raise_max_concurrent(self) -> None:
-        """Two simultaneous executes lift max_concurrent_in_execute to 2 (IN-04, deterministic)."""
-        # Drive the shared cursor's `entered` signal through a counting Event so
-        # the test blocks until BOTH workers are inside _block -- no wall-clock
-        # poll. The counter ticks under the same set() the workers fire on entry,
-        # and `both_in` is set the instant the second worker enters, so when it
-        # fires both workers are provably blocked and the high-water mark is 2.
-        both_in = threading.Event()
-        enter_lock = threading.Lock()
-        entered_idents: set[int] = set()
-
-        class _CountingEntered(threading.Event):
-            def set(self) -> None:
-                with enter_lock:
-                    entered_idents.add(threading.get_ident())
-                    if len(entered_idents) >= 2:
-                        both_in.set()
-                super().set()
-
-        cursor = BlockingStubCursor(entered=_CountingEntered())
+        """Two simultaneous executes lift max_concurrent_in_execute to 2."""
+        cursor = BlockingStubCursor()
 
         def _watch() -> None:
             cursor.execute("SELECT 1")
@@ -174,7 +104,12 @@ class TestBlockingStubCursor:
         t1, d1 = _run_blocked(_watch)
         t2, d2 = _run_blocked(_watch)
 
-        assert both_in.wait(timeout=5), "both workers never converged inside _block"
+        # Both workers converge inside _block; the lock-guarded max reaches 2.
+        poll = threading.Event()
+        for _ in range(500):
+            if cursor.max_concurrent_in_execute >= 2:
+                break
+            poll.wait(timeout=0.01)
         assert cursor.max_concurrent_in_execute == 2
 
         cursor.release()
@@ -214,42 +149,3 @@ class TestBlockingStubConnection:
         conn.adbc_cancel()
         assert conn.adbc_cancel_call_count == 1
         assert conn.observed_cancel is True
-
-    def test_close_is_recording_only_by_default(self) -> None:
-        """Bare conn.close() records but does NOT release blocked cursor workers (WR-02)."""
-        conn = BlockingStubConnection()
-        cursor = conn.cursor()
-        _, done = _run_blocked(lambda: cursor.execute("SELECT 1"))
-        assert cursor.entered.wait(timeout=5)
-
-        conn.close()  # default: recording-only
-        assert conn.close_call_count == 1
-        assert done.wait(timeout=0.05) is False, "default close should NOT release cursor worker"
-
-        cursor.release()  # consumer must release explicitly
-        assert done.wait(timeout=5)
-
-    def test_close_propagate_releases_cursor_workers(self) -> None:
-        """conn.close(propagate=True) closes every handed-out cursor (WR-02)."""
-        conn = BlockingStubConnection()
-        cursor = conn.cursor()
-        _, done = _run_blocked(lambda: cursor.execute("SELECT 1"))
-        assert cursor.entered.wait(timeout=5)
-
-        conn.close(propagate=True)
-        assert done.wait(timeout=5), "propagate=True did not release the cursor worker"
-        assert conn.close_call_count == 1
-        assert cursor.close_call_count == 1
-
-    def test_adbc_cancel_propagate_cancels_cursor_workers(self) -> None:
-        """conn.adbc_cancel(propagate=True) cancels every handed-out cursor (WR-02)."""
-        conn = BlockingStubConnection()
-        cursor = conn.cursor()
-        _, done = _run_blocked(lambda: cursor.execute("SELECT 1"))
-        assert cursor.entered.wait(timeout=5)
-
-        conn.adbc_cancel(propagate=True)
-        assert done.wait(timeout=5), "propagate=True did not release the cursor worker"
-        assert conn.observed_cancel is True
-        assert cursor.observed_cancel is True
-        assert cursor.adbc_cancel_call_count == 1
