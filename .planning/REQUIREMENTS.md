@@ -22,20 +22,20 @@ Scope decisions for this milestone:
 
 ### Concurrency Foundation
 
-- [ ] **CORE-01**: A single internal offload helper routes every blocking ADBC / `QueuePool` call through `anyio.to_thread.run_sync` with an explicit limiter argument — no bare `to_thread` calls anywhere in the async package
-- [ ] **CORE-02**: Each async pool owns a dedicated `anyio.CapacityLimiter` sized to `pool_size + max_overflow`; the shared process-global 40-token default limiter is never used
+- [x] **CORE-01**: A single internal offload helper routes every blocking ADBC / `QueuePool` call through `anyio.to_thread.run_sync` with an explicit limiter argument — no bare `to_thread` calls anywhere in the async package
+- [x] **CORE-02**: Each async pool owns a dedicated `anyio.CapacityLimiter` sized to `pool_size + max_overflow`; the shared process-global 40-token default limiter is never used
 - [ ] **CORE-03**: The async package uses anyio primitives only — `import asyncio` is banned there and enforced by a lint/import rule
-- [ ] **CORE-04**: The async layer is generic over all 13 backends via the existing `WarehouseConfig` Protocol — no per-backend async code
+- [x] **CORE-04**: The async layer is generic over all 13 backends via the existing `WarehouseConfig` Protocol — no per-backend async code
 
 ### Async Pool Lifecycle
 
-- [ ] **APOOL-01**: User can call `create_async_pool(config, ...)` to obtain an async pool; the signature mirrors `create_pool` (same keyword defaults `pool_size=5`, `max_overflow=3`, `timeout=30`, `recycle=3600`, `pre_ping=False`) and the same `config` / `driver_path=` / `dbapi_module=` overloads
-- [ ] **APOOL-02**: User can call `await close_async_pool(pool)` to dispose the pool and release driver resources, offloaded so it never blocks the event loop
-- [ ] **APOOL-03**: User can use `async with managed_async_pool(config, ...) as pool:` to create-and-auto-close a pool, with the close path shielded from cancellation
+- [x] **APOOL-01**: User can call `create_async_pool(config, ...)` to obtain an async pool; the signature mirrors `create_pool` (same keyword defaults `pool_size=5`, `max_overflow=3`, `timeout=30`, `recycle=3600`, `pre_ping=False`) and the same `config` / `driver_path=` / `dbapi_module=` overloads
+- [x] **APOOL-02**: User can call `await close_async_pool(pool)` to dispose the pool and release driver resources, offloaded so it never blocks the event loop
+- [x] **APOOL-03**: User can use `async with managed_async_pool(config, ...) as pool:` to create-and-auto-close a pool, with the close path shielded from cancellation
 
 ### Async Connection
 
-- [ ] **ACONN-01**: User can `await pool.connect()` to check out an `AsyncConnection`; the blocking checkout is offloaded through the pool's dedicated limiter
+- [x] **ACONN-01**: User can `await pool.connect()` to check out an `AsyncConnection`; the blocking checkout is offloaded through the pool's dedicated limiter
 - [ ] **ACONN-02**: `AsyncConnection` is an async context manager; exiting returns the connection to the pool, and checkin is shielded so it always completes even under cancellation
 - [ ] **ACONN-03**: `AsyncConnection.cursor()` returns an `AsyncCursor` synchronously (no I/O, no `await`), matching the ADBC / psycopg3 convention
 - [ ] **ACONN-04**: User can `await conn.commit()` and `await conn.rollback()` for transaction control (offloaded)
@@ -102,7 +102,7 @@ _Reentrancy_
 
 _Exceptions_
 
-- [ ] **EDGE-17**: An ADBC error from the worker propagates with exact type and original traceback intact across the thread boundary
+- [x] **EDGE-17**: An ADBC error from the worker propagates with exact type and original traceback intact across the thread boundary
 - [ ] **EDGE-18**: An exception in `__aenter__`/post-checkout leaks no connection (`checkedout() == 0`, no cumulative leak over N iterations)
 - [ ] **EDGE-19**: An `ExceptionGroup`/`except*` from a task group preserves the original ADBC errors and keeps cancellation distinguishable; `checkedout() == 0` after
 
@@ -176,14 +176,14 @@ Explicit exclusions for the async layer (with reasoning):
 | SPIKE-02 | Phase 22 | Complete |
 | SPIKE-03 | Phase 22 | Complete |
 | TEST-05 | Phase 23 | Complete |
-| CORE-01 | Phase 24 | Pending |
-| CORE-02 | Phase 24 | Pending |
+| CORE-01 | Phase 24 | Complete |
+| CORE-02 | Phase 24 | Complete |
 | CORE-03 | Phase 24 | Pending |
-| CORE-04 | Phase 24 | Pending |
-| APOOL-01 | Phase 24 | Pending |
-| APOOL-02 | Phase 24 | Pending |
-| APOOL-03 | Phase 24 | Pending |
-| ACONN-01 | Phase 24 | Pending |
+| CORE-04 | Phase 24 | Complete |
+| APOOL-01 | Phase 24 | Complete |
+| APOOL-02 | Phase 24 | Complete |
+| APOOL-03 | Phase 24 | Complete |
+| ACONN-01 | Phase 24 | Complete |
 | ACONN-02 | Phase 24 | Pending |
 | ACONN-03 | Phase 24 | Pending |
 | ACONN-04 | Phase 24 | Pending |
@@ -201,7 +201,7 @@ Explicit exclusions for the async layer (with reasoning):
 | EDGE-11 | Phase 24 | Pending |
 | EDGE-12 | Phase 24 | Pending |
 | EDGE-15 | Phase 24 | Pending |
-| EDGE-17 | Phase 24 | Pending |
+| EDGE-17 | Phase 24 | Complete |
 | EDGE-18 | Phase 24 | Pending |
 | EDGE-21 | Phase 24 | Pending |
 | EDGE-25 | Phase 24 | Pending |

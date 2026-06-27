@@ -4,13 +4,13 @@ milestone: v1.4.0
 milestone_name: Async API
 status: executing
 stopped_at: Completed 23-01-PLAN.md
-last_updated: "2026-06-27T22:46:00.806Z"
+last_updated: "2026-06-27T22:56:21.694Z"
 last_activity: 2026-06-27 -- Phase 24 execution started
 progress:
   total_phases: 9
   completed_phases: 2
   total_plans: 11
-  completed_plans: 7
+  completed_plans: 8
   percent: 22
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-06-25)
 ## Current Position
 
 Phase: 24 (core-async-wrapper) — EXECUTING
-Plan: 2 of 5
+Plan: 3 of 5
 Status: Ready to execute
 Last activity: 2026-06-27 -- Phase 24 execution started
 
@@ -46,6 +46,7 @@ Progress: [░░░░░░░░░░] 0% (0/7 phases)
 | Phase 23 P03 | 25m | 2 tasks | 2 files |
 | Phase 23 P04 | 10min | 3 tasks | 1 files |
 | Phase 24 P01 | 30min | 2 tasks | 3 files |
+| Phase 24 P02 | 7min | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -80,6 +81,9 @@ v1.4.0 roadmap decisions:
 - [Phase ?]: [Phase 24]: entered bridged via the stub's on_enter hook fired INSIDE _block (D-CF-01) — fixes the WR-01 re-arm deadlock at the root, making await entered a true 'inside the block' signal
 - [Phase ?]: [Phase 24]: on_enter is a single-worker attribute PLUS a per-thread register_on_enter registry — a single shared attribute deadlocked test_max_concurrent (two workers on one cursor, last-writer-wins clobber)
 - [Phase ?]: [Phase 24]: re-arm watchdog is a real time.monotonic() side thread that close()s the stub, NOT anyio.fail_after (a virtual fail_after autojumps under the trio MockClock the instant the worker blocks off-loop)
+- [Phase ?]: [Phase 24]: PEP 695 generic syntax rejected for a TypeVar — project pins pythonVersion=3.11; PEP 695 needs 3.12+
+- [Phase ?]: [Phase 24]: backend config names appear only in docstring Example: blocks; zero in executable _async/ code (D-24-04 verified by AST identifier scan)
+- [Phase ?]: [Phase 24]: AsyncConnection/AsyncCursor shipped as typed contracts (raise NotImplementedError) so connect() is typeable; Plan 03 fills bodies against the frozen interface
 
 ### Roadmap Evolution
 
@@ -102,7 +106,7 @@ v1.4.0 roadmap decisions:
 
 ## Session Continuity
 
-Last session: 2026-06-27T22:45:42.125Z
+Last session: 2026-06-27T22:55:53.765Z
 Stopped at: Completed 23-01-PLAN.md
 Next step: Execute 23-02 (next Phase 23 plan — async harness modules / self-tests).
 </content>
