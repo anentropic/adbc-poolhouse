@@ -94,6 +94,51 @@ class TestBlockingStubCursor:
         cursor.release()
         assert done.wait(timeout=5)
 
+    def test_gate_rearms_after_release_for_second_call(self) -> None:
+        """A second blocking call on the same cursor blocks again after release (WR-01)."""
+        cursor = BlockingStubCursor()
+
+        # First call: execute, gate, release.
+        _, done1 = _run_blocked(lambda: cursor.execute("SELECT 1"))
+        assert cursor.entered.wait(timeout=5), "first worker never entered execute"
+        assert done1.wait(timeout=0.05) is False, "first call returned before release"
+        cursor.entered.clear()  # re-arm the sync signal for the second call
+        cursor.release()
+        assert done1.wait(timeout=5), "first call did not return after release"
+
+        # Second call (reuse): fetch on the SAME cursor must block again.
+        _, done2 = _run_blocked(cursor.fetch_arrow_table)
+        assert cursor.entered.wait(timeout=5), "second worker never entered fetch"
+        assert done2.wait(timeout=0.05) is False, "second call did NOT re-block (gate stuck open)"
+        assert cursor.fetch_call_count == 1
+        cursor.release()
+        assert done2.wait(timeout=5), "second call did not return after release"
+
+    def test_gate_rearms_after_adbc_cancel_for_second_call(self) -> None:
+        """adbc_cancel unblocks the first call yet the gate re-arms for a second (WR-01)."""
+        cursor = BlockingStubCursor()
+
+        _, done1 = _run_blocked(lambda: cursor.execute("SELECT 1"))
+        assert cursor.entered.wait(timeout=5)
+        cursor.entered.clear()
+        cursor.adbc_cancel()
+        assert done1.wait(timeout=5), "adbc_cancel did not release the first worker"
+        assert cursor.observed_cancel is True
+
+        _, done2 = _run_blocked(lambda: cursor.execute("SELECT 2"))
+        assert cursor.entered.wait(timeout=5)
+        assert done2.wait(timeout=0.05) is False, "second call did NOT re-block after cancel"
+        cursor.release()
+        assert done2.wait(timeout=5)
+
+    def test_close_is_terminal_subsequent_call_does_not_block(self) -> None:
+        """After close, a subsequent blocking call returns immediately (WR-01)."""
+        cursor = BlockingStubCursor()
+        cursor.close()
+
+        _, done = _run_blocked(lambda: cursor.execute("SELECT 1"))
+        assert done.wait(timeout=5), "post-close call blocked instead of returning immediately"
+
     def test_two_concurrent_executes_raise_max_concurrent(self) -> None:
         """Two simultaneous executes lift max_concurrent_in_execute to 2."""
         cursor = BlockingStubCursor()
