@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import statistics
 
+import pytest
 from benchmarks._harness import median, parallel_efficiency, report, speedup
 
 
@@ -59,3 +60,18 @@ class TestHarnessArithmetic:
         """N == 1 edge: speedup == 1.0 and parallel_efficiency == 1.0."""
         assert speedup(1.0, 1.0, 1) == 1.0
         assert parallel_efficiency(1.0, 1.0, 1) == 1.0
+
+    def test_speedup_zero_wall_raises(self) -> None:
+        """A sub-resolution wall time (wall == 0.0) raises an actionable ValueError."""
+        with pytest.raises(ValueError, match="wall must be > 0"):
+            speedup(1.0, 0.0, 4)
+
+    def test_parallel_efficiency_zero_wall_raises(self) -> None:
+        """parallel_efficiency flows through speedup, so it also rejects wall == 0.0."""
+        with pytest.raises(ValueError, match="wall must be > 0"):
+            parallel_efficiency(1.0, 0.0, 4)
+
+    def test_report_zero_wall_raises(self) -> None:
+        """report() flows through speedup, so it also rejects wall == 0.0."""
+        with pytest.raises(ValueError, match="wall must be > 0"):
+            report(1.0, 0.0, 4)

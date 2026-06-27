@@ -61,7 +61,19 @@ def speedup(single: float, wall: float, n: int) -> float:
 
     Returns:
         The speedup ratio, bounded by `1.0` (serial) and `n` (ideal parallel).
+
+    Raises:
+        ValueError: If `wall <= 0.0`. A non-positive wall-clock means the query
+            finished below the timer's resolution, so the ratio is undefined; the
+            fix is to time more work (e.g. increase `--rows`) rather than report a
+            bogus number or crash with a bare `ZeroDivisionError`.
     """
+    if wall <= 0.0:
+        msg = (
+            f"wall must be > 0 (got {wall}); query finished below timer "
+            "resolution -- increase --rows so the concurrent phase is timeable"
+        )
+        raise ValueError(msg)
     return (n * single) / wall
 
 
