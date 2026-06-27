@@ -100,7 +100,7 @@
 Plans:
 **Wave 1**
 
-- [ ] 23-01-PLAN.md — install anyio/trio/aiotools (dev) + nested anyio_backend conftest (foundation)
+- [x] 23-01-PLAN.md — install anyio/trio/aiotools (dev) + nested anyio_backend conftest (foundation) — completed 2026-06-27
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -238,7 +238,7 @@ Plans:
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
 | 22. Feasibility Spike | v1.4.0 | 2/2 | Complete    | 2026-06-27 |
-| 23. Test Harness Foundation | v1.4.0 | 0/0 | Not started | - |
+| 23. Test Harness Foundation | v1.4.0 | 1/4 | In progress | - |
 | 24. Core Async Wrapper | v1.4.0 | 0/0 | Not started | - |
 | 25. Cancellation | v1.4.0 | 0/0 | Not started | - |
 | 26. Packaging & Extra Scoping | v1.4.0 | 0/0 | Not started | - |
