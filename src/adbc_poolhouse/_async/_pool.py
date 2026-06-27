@@ -41,6 +41,27 @@ class AsyncPool:
     Attributes:
         _limiter: The pool's dedicated `anyio.CapacityLimiter`. Exposed for tests
             that assert token accounting (e.g. `pool._limiter.borrowed_tokens`).
+
+    Example:
+        ```python
+        import anyio
+        from adbc_poolhouse import DuckDBConfig, create_async_pool, close_async_pool
+
+
+        async def main():
+            pool = create_async_pool(DuckDBConfig(database="/tmp/wh.db"))
+            try:
+                async with await pool.connect() as conn:
+                    cur = conn.cursor()  # synchronous, no await
+                    await cur.execute("SELECT 42")
+                    table = await cur.fetch_arrow_table()
+                    print(table.num_rows)
+            finally:
+                await close_async_pool(pool)
+
+
+        anyio.run(main)
+        ```
     """
 
     def __init__(
