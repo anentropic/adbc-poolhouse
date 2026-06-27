@@ -105,7 +105,7 @@ Plans:
 **Wave 2** *(blocked on Wave 1 completion)*
 
 - [x] 23-02-PLAN.md — BlockingStubCursor/Connection + run_blocking offload glue + virtual_clock facade
-- [ ] 23-03-PLAN.md — scan_async_package AST import-lint guard + sync self-tests
+- [x] 23-03-PLAN.md — scan_async_package AST import-lint guard + sync self-tests
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
@@ -238,7 +238,7 @@ Plans:
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
 | 22. Feasibility Spike | v1.4.0 | 2/2 | Complete    | 2026-06-27 |
-| 23. Test Harness Foundation | v1.4.0 | 2/4 | In Progress|  |
+| 23. Test Harness Foundation | v1.4.0 | 3/4 | In Progress|  |
 | 24. Core Async Wrapper | v1.4.0 | 0/0 | Not started | - |
 | 25. Cancellation | v1.4.0 | 0/0 | Not started | - |
 | 26. Packaging & Extra Scoping | v1.4.0 | 0/0 | Not started | - |

@@ -4,13 +4,13 @@ milestone: v1.4.0
 milestone_name: Async API
 status: executing
 stopped_at: Completed 23-01-PLAN.md
-last_updated: "2026-06-27T09:30:01.300Z"
+last_updated: "2026-06-27T09:35:27.875Z"
 last_activity: 2026-06-27 -- Completed 23-01 (async harness foundation)
 progress:
   total_phases: 9
   completed_phases: 1
   total_plans: 6
-  completed_plans: 4
+  completed_plans: 5
   percent: 11
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-06-25)
 ## Current Position
 
 Phase: 23 (test-harness-foundation) — EXECUTING
-Plan: 3 of 4 (23-01 complete)
+Plan: 4 of 4 (23-01 complete)
 Status: Ready to execute
 Last activity: 2026-06-27 -- Completed 23-01 (async harness foundation)
 
@@ -43,6 +43,7 @@ Progress: [░░░░░░░░░░] 0% (0/7 phases)
 | Phase 22 P02 | ~20min | 2 tasks | 1 files |
 | Phase 23 P01 | ~12min | 3 tasks | 4 files |
 | Phase 23 P02 | 4min | 3 tasks | 4 files |
+| Phase 23 P03 | 25m | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -71,6 +72,7 @@ v1.4.0 roadmap decisions:
 - [Phase 23]: anyio_backend is function-scoped — fresh trio MockClock(autojump_threshold=0) per test avoids virtual-clock state bleed
 - [Phase ?]: stubs.py strictly anyio-free (D-03); anyio bridge lives only in gating.py (T-23-03)
 - [Phase ?]: Dual-entered documented: threading.Event sync signal (stub) vs anyio.Event loop gate (run_blocking) — T-23-07/Pitfall 2
+- [Phase ?]: D-05 guard shipped as scan_async_package(root)->list[Finding]; aliased run_sync re-import is an accepted, test-locked limitation
 
 ### Roadmap Evolution
 
@@ -93,7 +95,7 @@ v1.4.0 roadmap decisions:
 
 ## Session Continuity
 
-Last session: 2026-06-27T09:29:41.982Z
+Last session: 2026-06-27T09:35:24.643Z
 Stopped at: Completed 23-01-PLAN.md
 Next step: Execute 23-02 (next Phase 23 plan — async harness modules / self-tests).
 </content>
