@@ -1,20 +1,85 @@
 """
-Sync self-tests for the D-05 AST source-scan guard.
+Sync self-tests for the D-05 AST source-scan guard + the real `_async/` scan.
 
-These exercise ``scan_async_package`` against *synthetic* source strings written
-into ``tmp_path`` -- they never scan the real ``src/adbc_poolhouse/_async/``
-package (which does not exist until Phase 24). The guard is pure stdlib and needs
-no event loop, so every test here is plain sync: no ``@pytest.mark.anyio``.
+The `TestAsyncGuard` class exercises ``scan_async_package`` against *synthetic*
+source strings written into ``tmp_path``. The `TestRealAsyncPackage` class
+(added in Phase 24, now that ``src/adbc_poolhouse/_async/`` exists) scans the REAL
+shipped package: it asserts the guard finds zero banned-asyncio / bare-to_thread
+violations AND --- via an AST identifier scan --- that none of the 13 backend
+config class names appear in executable code (D-24-04 structural genericity; names
+in docstring Example blocks are fine because the scan ignores string literals).
+The guard is pure stdlib and needs no event loop, so every test here is plain
+sync: no ``@pytest.mark.anyio``.
 """
 
 from __future__ import annotations
 
+import ast
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from tests._async_harness.guard import scan_async_package
 
 if TYPE_CHECKING:
-    from pathlib import Path
+    from collections.abc import Iterable
+
+# Repo-relative path to the shipped async package.
+_ASYNC_PKG = "src/adbc_poolhouse/_async"
+
+# The 13 backend config class names that must NOT appear in executable _async/
+# code (D-24-04). They may appear in docstring Example blocks --- those are string
+# literals, which the AST identifier scan below does not see.
+_BACKEND_CONFIG_NAMES = frozenset(
+    {
+        "DuckDBConfig",
+        "SnowflakeConfig",
+        "BigQueryConfig",
+        "ClickHouseConfig",
+        "DatabricksConfig",
+        "FlightSQLConfig",
+        "MSSQLConfig",
+        "MySQLConfig",
+        "PostgreSQLConfig",
+        "QuackConfig",
+        "RedshiftConfig",
+        "SQLiteConfig",
+        "TrinoConfig",
+    }
+)
+
+
+def _executable_identifiers(source: str) -> set[str]:
+    """
+    Return every identifier used in EXECUTABLE code (not in string literals).
+
+    Walks the AST and collects `ast.Name`/`ast.Attribute`/`ast.alias` identifiers.
+    Crucially, string literals (including docstrings) are `ast.Constant` nodes, so
+    a backend name mentioned only inside a docstring Example block is never
+    collected --- which is exactly the D-24-04 distinction (genericity in code,
+    examples allowed in prose).
+    """
+    names: set[str] = set()
+    for node in ast.walk(ast.parse(source)):
+        if isinstance(node, ast.Name):
+            names.add(node.id)
+        elif isinstance(node, ast.Attribute):
+            names.add(node.attr)
+        elif isinstance(node, ast.alias):
+            names.add(node.name.split(".")[0])
+            if node.asname:
+                names.add(node.asname)
+    return names
+
+
+def _backend_names_in_code(py_files: Iterable[Path]) -> dict[str, list[str]]:
+    """Map each scanned file to any backend config names found in its EXECUTABLE code."""
+    hits: dict[str, list[str]] = {}
+    for py in py_files:
+        identifiers = _executable_identifiers(py.read_text(encoding="utf-8"))
+        found = sorted(_BACKEND_CONFIG_NAMES & identifiers)
+        if found:
+            hits[str(py)] = found
+    return hits
 
 
 class TestAsyncGuard:
@@ -82,3 +147,29 @@ class TestAsyncGuard:
         (tmp_path / "latin1.py").write_bytes(b"x = '\xff\xfe'\n")
         findings = scan_async_package(tmp_path)
         assert [f.rule for f in findings] == ["unparseable-source"]
+
+
+class TestRealAsyncPackage:
+    """The guard scans the SHIPPED `_async/` package clean (EDGE-25 static + D-24-04)."""
+
+    def test_scan_real_async_package_is_clean(self) -> None:
+        """`scan_async_package("src/adbc_poolhouse/_async") == []` (no asyncio / bare to_thread)."""
+        # The guard tolerates an absent root, so this is only meaningful now that
+        # the package exists --- assert it does, then assert it is clean.
+        assert Path(_ASYNC_PKG).is_dir(), "the _async/ package must exist by Phase 24"
+        assert scan_async_package(_ASYNC_PKG) == []
+
+    def test_no_backend_config_names_in_executable_code(self) -> None:
+        """
+        None of the 13 backend config names appear in executable `_async/` code.
+
+        D-24-04 structural genericity: the async layer touches only the
+        `WarehouseConfig` Protocol and the sync `QueuePool`, never a concrete
+        backend config class. An AST identifier scan (which ignores string literals,
+        so docstring Example blocks naming `DuckDBConfig` are fine) must find zero
+        backend config names used as real code.
+        """
+        py_files = sorted(Path(_ASYNC_PKG).rglob("*.py"))
+        assert py_files, "expected .py files under the _async/ package"
+        hits = _backend_names_in_code(py_files)
+        assert hits == {}, f"backend config names leaked into _async/ executable code: {hits}"
