@@ -53,6 +53,9 @@ dev = [
     "pytest-cov>=6.0.0",
     "ruff>=0.15.1",
     "pytest-adbc-replay>=1.0.0a3",
+    "anyio>=4.13",
+    "trio>=0.31",
+    "aiotools>=2.2",
 ]
 docs = [
     "mkdocs>=1.6.0",
