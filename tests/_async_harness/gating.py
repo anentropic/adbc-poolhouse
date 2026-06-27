@@ -40,10 +40,20 @@ async def run_blocking(
 
     Runs `stub_call(*args)` -- which blocks on the stub's internal
     `threading.Event` -- on an anyio worker thread via `to_thread.run_sync`, and
-    signals `entered` on the event loop the instant the worker starts (before it
-    blocks). The async caller does `await entered.wait()` to know, with no poll
-    and no sleep, that the worker is inside the blocked call, and only then
-    triggers the release / cancel / timeout (Pattern 3, Pitfall 2).
+    signals `entered` on the event loop from INSIDE the stub's blocked section
+    via the stub's `on_enter` hook (NOT before the stub call runs). The async
+    caller does `await entered.wait()` to know, with no poll and no sleep, that
+    the worker is genuinely inside the blocked call, and only then triggers the
+    release / cancel / timeout (Pattern 3, Pitfall 2, D-CF-01).
+
+    Entered-after-block (D-CF-01): an earlier design fired `entered` before the
+    stub call ran, so `await entered.wait()` only meant "the worker started," not
+    "the worker is inside the block." With a re-armable gate that gap let a worker
+    register its wait AFTER the test's `release()`, then wait on a never-set event
+    forever (the WR-01 deadlock). Bridging `entered` through the stub's `on_enter`
+    -- which the stub invokes after recording concurrency and before waiting --
+    makes `await entered.wait()` a true "inside the block" signal, so a re-armable
+    cursor (`execute` then `fetch_arrow_table`) gates correctly with no race.
 
     NON-cancellable by design (WR-04): with the default `abandon_on_cancel=False`,
     `to_thread.run_sync` does NOT abandon the worker on cancellation. If the
@@ -57,20 +67,31 @@ async def run_blocking(
     EDGE cases, where the loop abandons the still-running worker on cancel
     instead of waiting to join it.
 
-    Because `_worker` already runs on an anyio worker thread,
-    `anyio.from_thread.run_sync(entered.set)` reaches the loop with NO `token=`
-    argument -- a token is only needed when calling in from a foreign
+    Because the `on_enter` hook runs on the same anyio worker thread as the stub
+    call, `anyio.from_thread.run_sync(entered.set)` reaches the loop with NO
+    `token=` argument -- a token is only needed when calling in from a foreign
     (non-anyio) thread.
+
+    The hook is registered per worker thread via `register_on_enter` from INSIDE
+    the offload, so two workers blocking on the SAME cursor at once (the
+    max-concurrent path) each bridge their OWN loop-facing event with no clobber,
+    and the registration is removed in a `finally` so a reused cursor is never
+    left with a dangling per-thread bridge. This requires the offloaded
+    `stub_call` be a bound method of a stub exposing `register_on_enter` (the
+    `BlockingStubCursor` contract).
 
     Args:
         stub_call: The blocking callable to offload, e.g. a
             [`BlockingStubCursor`][tests._async_harness.stubs.BlockingStubCursor]
-            `execute` / `fetch_arrow_table` bound method.
+            `execute` / `fetch_arrow_table` bound method. Its `__self__` must
+            expose `register_on_enter` (the worker-entry hook bridged to
+            `entered`).
         *args: Positional arguments forwarded to `stub_call`.
         entered: The loop-facing gate. This MUST be an `anyio.Event` -- it is
             what makes "wait until the worker is inside execute" deterministic on
             the loop: the test creates it, passes it here, and `await
-            entered.wait()`s it. This is DISTINCT from
+            entered.wait()`s it. It is set from inside the stub's blocked section
+            via the `on_enter` bridge. This is DISTINCT from
             [`BlockingStubCursor.entered`][tests._async_harness.stubs.BlockingStubCursor],
             which is a `threading.Event` (the SYNC signal for pure-threading
             self-tests). They share a name but are different objects: never pass
@@ -90,10 +111,23 @@ async def run_blocking(
         `execute`, or the fake's `fetch_arrow_table` result).
     """
 
+    def _on_enter() -> None:
+        # Runs INSIDE the stub's blocked section, on the anyio worker thread, so
+        # from_thread.run_sync needs no token. Bridges the loop-facing anyio.Event
+        # only once the worker is genuinely inside the block (D-CF-01).
+        anyio.from_thread.run_sync(entered.set)
+
+    stub = stub_call.__self__  # type: ignore[attr-defined]
+
     def _worker() -> object:
-        # On an anyio worker thread -> from_thread.run_sync needs no token.
-        anyio.from_thread.run_sync(entered.set)  # signal the loop BEFORE blocking
-        return stub_call(*args)  # blocks on the stub's threading.Event
+        # Register this worker thread's entry hook from INSIDE the offload so
+        # concurrent workers on one cursor each bridge their own event; clean up
+        # the per-thread registration on the way out.
+        cleanup = stub.register_on_enter(_on_enter)
+        try:
+            return stub_call(*args)  # blocks on the stub's threading.Event
+        finally:
+            cleanup()
 
     return await anyio.to_thread.run_sync(
         _worker, limiter=limiter, abandon_on_cancel=abandon_on_cancel

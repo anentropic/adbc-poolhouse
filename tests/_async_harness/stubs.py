@@ -32,6 +32,10 @@ objects -- never await the stub's `threading.Event` on the event loop.
 from __future__ import annotations
 
 import threading
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 
 class BlockingStubCursor:
@@ -39,20 +43,42 @@ class BlockingStubCursor:
     Sync DBAPI-shaped cursor fake whose `execute` / `fetch` block until released.
 
     A pure-`threading` fake (no anyio): `execute` and `fetch_arrow_table` record
-    their call and then block forever on an internal `threading.Event`. The test
-    releases the worker via `release` (happy path), `adbc_cancel` (cancel path,
-    which also flips `observed_cancel`), or `close`. Every counter and signal the
-    EDGE table needs is recorded as a public attribute (D-04, LOCKED names).
+    their call and then block on an internal `threading.Event`. The test releases
+    the worker via `release` (happy path), `adbc_cancel` (cancel path, which also
+    flips `observed_cancel`), or `close`. Every counter and signal the EDGE table
+    needs is recorded as a public attribute (D-04, LOCKED names).
+
+    The gate is RE-ARMABLE per blocking call: `_block` clears the internal event
+    before waiting, so one cursor can block on `execute`, be released, then block
+    AGAIN on `fetch_arrow_table` without the prior release pre-satisfying the
+    second wait. `close` is terminal -- a closed cursor releases immediately and
+    never re-arms.
 
     Attributes:
-        entered: A `threading.Event` set the instant a worker enters the blocked
-            section. This is the SYNC signal for pure-threading self-tests: poll
-            or `wait()` it from a thread, NEVER from the event loop. The
-            loop-facing gate is a DISTINCT `anyio.Event` you pass to
-            `run_blocking(..., entered=...)`; the two share a name but are
-            different objects. Awaiting this `threading.Event` directly on the
-            loop reintroduces the worker-entry race -- async consumers must await
-            the `anyio.Event` they handed to `run_blocking` instead.
+        entered: A `threading.Event` set the instant a worker is inside the
+            blocked section. This is the SYNC signal for pure-threading
+            self-tests: poll or `wait()` it from a thread, NEVER from the event
+            loop. The loop-facing gate is a DISTINCT `anyio.Event` bridged via the
+            `on_enter` hook by `run_blocking(..., entered=...)`; the two share a
+            name but are different objects. Awaiting this `threading.Event`
+            directly on the loop reintroduces the worker-entry race -- async
+            consumers must await the `anyio.Event` they handed to `run_blocking`
+            instead. Because the gate re-arms, `entered` is also re-armable: it is
+            cleared at the start of each `_block` so a second blocking call on the
+            same cursor re-fires it from inside the new blocked section.
+        on_enter: An optional zero-argument callback invoked INSIDE `_block`,
+            after concurrency is recorded and immediately before the worker waits.
+            It is the worker-entry hook `run_blocking` uses to bridge the
+            loop-facing `anyio.Event` so `await entered.wait()` becomes a true
+            "the worker is inside the blocked call" signal (D-CF-01). Stays a
+            plain `Callable` so this module remains anyio-free (D-03) -- the anyio
+            bridge lives only in `gating.py`. Defaults to `None` (no hook). This
+            is the SINGLE-worker fallback hook; for concurrent workers on ONE
+            cursor (e.g. `max_concurrent`), each worker registers its own hook via
+            `register_on_enter` keyed by its thread id, which takes precedence.
+        closed: `True` once `close` has run; `False` otherwise. Public terminal
+            close-state flag (read it to assert a cursor was closed). Written
+            under the lock so a loop-thread reader never sees a torn state.
         observed_cancel: `True` once `adbc_cancel` has run; `False` otherwise.
         execute_call_count: Number of `execute` calls.
         fetch_call_count: Number of `fetch_arrow_table` calls.
@@ -81,17 +107,27 @@ class BlockingStubCursor:
         ```
     """
 
-    def __init__(self, *, entered: threading.Event | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        entered: threading.Event | None = None,
+        on_enter: Callable[[], None] | None = None,
+    ) -> None:
         """
         Create a fresh cursor with all counters zeroed.
 
         Args:
             entered: Optional pre-existing `threading.Event` to use as the
                 worker-entry signal. Defaults to a fresh, unset event.
+            on_enter: Optional zero-argument callback invoked inside `_block`
+                before the worker waits (see the `on_enter` attribute). Defaults
+                to `None`; it can also be set later via the public attribute.
         """
         self._event = threading.Event()
         self._lock = threading.Lock()
         self.entered: threading.Event = entered or threading.Event()
+        self.on_enter: Callable[[], None] | None = on_enter
+        self._on_enter_by_thread: dict[int, Callable[[], None]] = {}
         self.observed_cancel: bool = False
         self.execute_call_count: int = 0
         self.fetch_call_count: int = 0
@@ -102,21 +138,79 @@ class BlockingStubCursor:
         self.max_concurrent_in_execute: int = 0
         self._closed: bool = False
 
+    @property
+    def closed(self) -> bool:
+        """Whether `close` has run (terminal). Backed by `_closed`, lock-written."""
+        with self._lock:
+            return self._closed
+
+    def register_on_enter(self, callback: Callable[[], None]) -> Callable[[], None]:
+        """
+        Register a worker-entry hook keyed by the CALLING thread's id.
+
+        Concurrency-safe alternative to the single `on_enter` attribute: when two
+        workers block on the SAME cursor at once (e.g. the max-concurrent EDGE
+        path), each must bridge its OWN loop-facing event, but a single shared
+        attribute would let the last writer clobber the first. Each worker thread
+        instead calls this from inside its own offload, so `_block` dispatches the
+        hook for the current thread (falling back to `on_enter` if none is
+        registered). The hook is removed by the returned cleanup callable.
+
+        Args:
+            callback: Zero-argument hook to invoke inside `_block` for the calling
+                thread, before it waits.
+
+        Returns:
+            A zero-argument cleanup callable that unregisters this thread's hook;
+            call it in a `finally` so a reused cursor is never left with a
+            dangling per-thread bridge.
+        """
+        thread_id = threading.get_ident()
+        with self._lock:
+            self._on_enter_by_thread[thread_id] = callback
+
+        def _cleanup() -> None:
+            with self._lock:
+                self._on_enter_by_thread.pop(thread_id, None)
+
+        return _cleanup
+
     def _block(self) -> None:
         """
-        Record entry/concurrency, signal `entered`, then block until released.
+        Re-arm the gate, record entry, fire `on_enter`/`entered`, then wait.
+
+        Clears the internal event at the START so a prior `release`/`adbc_cancel`
+        cannot pre-satisfy this call -- this is what makes the gate re-armable per
+        blocking call (one cursor can block on `execute`, be released, then block
+        again on `fetch_arrow_table`). A closed cursor short-circuits: it never
+        re-arms and returns immediately so no worker is stranded after teardown.
 
         Lock-guards the `max_concurrent_in_execute` high-water mark on entry and
-        the decrement on exit, sets the `entered` sync signal, and waits on the
-        internal event (which is released by `release`, `adbc_cancel`, or
-        `close`).
+        the decrement on exit. The `entered` sync signal and the optional
+        `on_enter` loop bridge fire from INSIDE the blocked section (after
+        concurrency is recorded, before the wait), so a consumer that awaits the
+        bridged event observes a worker that is genuinely inside the block
+        (D-CF-01) -- never a worker that merely started.
         """
         with self._lock:
+            if self._closed:
+                # Terminal: a closed cursor never blocks again.
+                self.entered.set()
+                return
+            # Re-arm: clear before waiting so a prior release/cancel/close from a
+            # FIRST blocking call cannot pre-satisfy this SECOND one.
+            self._event.clear()
+            self.entered.clear()
             self._in_execute += 1
             self.max_concurrent_in_execute = max(self.max_concurrent_in_execute, self._in_execute)
+            # Prefer this thread's registered hook (concurrent workers on one
+            # cursor); fall back to the shared single-worker attribute.
+            hook = self._on_enter_by_thread.get(threading.get_ident(), self.on_enter)
         try:
-            self.entered.set()  # signal "worker is inside execute" (see gating.py)
-            self._event.wait()  # blocks FOREVER until released
+            self.entered.set()  # signal "worker is inside the block" (see gating.py)
+            if hook is not None:
+                hook()  # bridge the loop-facing anyio.Event from inside
+            self._event.wait()  # blocks until released / cancelled / closed
         finally:
             with self._lock:
                 self._in_execute -= 1
@@ -154,23 +248,28 @@ class BlockingStubCursor:
 
         Models the driver-level cancel: increments `adbc_cancel_call_count`, sets
         `observed_cancel` to `True`, and releases the internal event so a blocked
-        worker returns.
+        worker returns. The counter and the flag are written together UNDER the
+        lock (WR-03) so a loop-thread reader of the cancel path never observes a
+        torn `(adbc_cancel_call_count, observed_cancel)` pair.
         """
         with self._lock:
             self.adbc_cancel_call_count += 1
-        self.observed_cancel = True
+            self.observed_cancel = True
         self._event.set()
 
     def close(self) -> None:
         """
-        Increment `close_call_count` and release any blocked worker.
+        Mark the cursor closed and release any blocked worker (terminal).
 
-        Releasing the event on close guarantees no worker is ever stranded in the
-        blocked section (T-23-04).
+        Increments `close_call_count` and sets the terminal `closed` flag, both
+        under the lock (WR-03) so a reader never sees a half-updated state, then
+        releases the internal event. A closed cursor is terminal: `_block`
+        short-circuits and never re-arms, so releasing on close guarantees no
+        worker is ever stranded in the blocked section (T-23-04).
         """
         with self._lock:
             self.close_call_count += 1
-        self._closed = True
+            self._closed = True
         self._event.set()
 
     def release(self) -> None:
