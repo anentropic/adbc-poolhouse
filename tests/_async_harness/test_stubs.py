@@ -46,6 +46,7 @@ class TestBlockingStubCursor:
         assert cursor.execute_thread_ids == []
         assert cursor.max_concurrent_in_execute == 0
         assert cursor.observed_cancel is False
+        assert cursor.closed is False
         assert not cursor.entered.is_set()
 
     def test_execute_records_then_blocks_until_released(self) -> None:
@@ -138,6 +139,13 @@ class TestBlockingStubCursor:
 
         _, done = _run_blocked(lambda: cursor.execute("SELECT 1"))
         assert done.wait(timeout=5), "post-close call blocked instead of returning immediately"
+
+    def test_close_surfaces_closed_state(self) -> None:
+        """close() flips the public `closed` attribute True (IN-03)."""
+        cursor = BlockingStubCursor()
+        assert cursor.closed is False
+        cursor.close()
+        assert cursor.closed is True
 
     def test_two_concurrent_executes_raise_max_concurrent(self) -> None:
         """Two simultaneous executes lift max_concurrent_in_execute to 2."""

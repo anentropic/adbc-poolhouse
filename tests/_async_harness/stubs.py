@@ -70,6 +70,10 @@ class BlockingStubCursor:
             in call order -- lets EDGE-25 assert work ran off the loop thread.
         max_concurrent_in_execute: The high-water mark of workers simultaneously
             inside the blocked section (lock-guarded), backing EDGE-12/EDGE-15.
+        closed: `True` once `close` has run; `False` otherwise. Lets a consumer
+            observe the terminal close state from the public surface (IN-03);
+            after close, a subsequent blocking call returns immediately rather
+            than gating.
 
     Example:
         ```python
@@ -108,7 +112,7 @@ class BlockingStubCursor:
         self.execute_thread_ids: list[int] = []
         self._in_execute: int = 0
         self.max_concurrent_in_execute: int = 0
-        self._closed: bool = False
+        self.closed: bool = False
 
     def _release_all_waiters(self) -> None:
         """
@@ -142,9 +146,9 @@ class BlockingStubCursor:
             self._waiters.append(waiter)
             self._in_execute += 1
             self.max_concurrent_in_execute = max(self.max_concurrent_in_execute, self._in_execute)
-            # If a release/cancel/close already fired, honour it immediately so a
-            # call that races teardown does not block forever on a fresh latch.
-            if self._closed:
+            # If a close already fired, honour it immediately so a call that races
+            # teardown returns at once rather than blocking on a fresh latch.
+            if self.closed:
                 waiter.set()
         try:
             self.entered.set()  # signal "worker is inside execute" (see gating.py)
@@ -210,9 +214,9 @@ class BlockingStubCursor:
         """
         with self._lock:
             self.close_call_count += 1
-            # _closed set under the SAME lock as its counter (WR-03) so the
-            # terminal state and its count are observed together.
-            self._closed = True
+            # `closed` (public, IN-03) set under the SAME lock as its counter
+            # (WR-03) so the terminal state and its count are observed together.
+            self.closed = True
         self._release_all_waiters()
 
     def release(self) -> None:
