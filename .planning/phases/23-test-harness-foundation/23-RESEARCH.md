@@ -536,10 +536,16 @@ async def test_block_then_adbc_cancel(anyio_backend_name):
 |----------|-------|
 | Framework | `pytest` 9.0.3 + anyio pytest plugin (`@pytest.mark.anyio`) |
 | Config file | `pyproject.toml` `[tool.pytest.ini_options]` (existing) |
-| Quick run command | `.venv/bin/pytest tests/test_async_harness.py -q` |
+| Quick run command | `.venv/bin/pytest tests/_async_harness/ tests/test_async_guard.py -q` |
 | Full suite command | `.venv/bin/pytest -q` |
 
 > Use `.venv/bin/pytest` (not `uv run pytest`) under the sandbox per project MEMORY (uv-sandbox-workarounds).
+>
+> **Final layout note (supersedes the single-file paths in the rows below):** the plan-checker moved the
+> anyio dual-backend self-tests into `tests/_async_harness/test_harness.py` (so they sit at/below the
+> `tests/_async_harness/conftest.py` that defines `anyio_backend`), and the sync guard self-tests live in
+> `tests/test_async_guard.py`. The `tests/test_async_harness.py` path used in the table rows and Wave-0
+> list below is the early single-file sketch — the `23-*-PLAN.md` files carry the authoritative paths.
 
 ### Phase Requirements → Test Map
 | Req ID | Behavior | Test Type | Automated Command | File Exists? |

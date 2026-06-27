@@ -97,11 +97,18 @@
   3. A source-scan / import-lint guard (asyncio-banned, bare-`to_thread`-without-limiter-banned in `_async/`) is exposed as a callable check the EDGE suite can assert against (TEST-05)
 
 **Plans**: 4 plans
-
 Plans:
+**Wave 1**
+
 - [ ] 23-01-PLAN.md — install anyio/trio/aiotools (dev) + nested anyio_backend conftest (foundation)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 23-02-PLAN.md — BlockingStubCursor/Connection + run_blocking offload glue + virtual_clock facade
 - [ ] 23-03-PLAN.md — scan_async_package AST import-lint guard + sync self-tests
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
 - [ ] 23-04-PLAN.md — dual-backend harness self-tests (block/cancel/clock) + docs gate
 
 **UI hint**: no
