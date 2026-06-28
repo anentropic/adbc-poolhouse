@@ -191,12 +191,23 @@ Plans:
 **Requirements**: PKG-01, PKG-02, PKG-03, PKG-04, PKG-05
 **Success Criteria** (what must be TRUE):
 
-  1. An `[async]` optional-dependency extra adds `anyio>=4.0.0` and nothing else, and `[all]` includes it (PKG-01)
+  1. An `[async]` optional-dependency extra adds `anyio>=4.13` and nothing else, and `[all]` includes it (PKG-01) — floor corrected from `>=4.0.0` per CONTEXT D-02
   2. `import adbc_poolhouse` succeeds with anyio not installed via a PEP 562 `__getattr__` lazy import, and accessing an async symbol without anyio raises a clear `ImportError` naming the `[async]` extra (PKG-02/03)
   3. A CI job runs the existing sync test suite with anyio uninstalled and passes, proving there is no hard async dependency (PKG-04)
-  4. All async public API is fully typed under basedpyright strict, using `ParamSpec`/`Concatenate` to mirror the sync overloads (PKG-05)
+  4. All async public API is fully typed under basedpyright strict; the offload boundary is tightened with `TypeVarTuple`/`Unpack` (PEP 646) — NOT `ParamSpec`/`Concatenate`, which does not compile with the helper's keyword-only params (RESEARCH-verified) (PKG-05)
 
-**Plans**: TBD
+**Plans**: 4 plans
+
+**Wave 1**
+
+- [ ] 26-01-PLAN.md — `[async]` extra (`anyio>=4.13`) + `[all]` aggregation + relock + metadata test (PKG-01)
+- [ ] 26-02-PLAN.md — TypeVarTuple/Unpack tightening of offload/cancellable_offload + expect-error fixture (PKG-05)
+- [ ] 26-03-PLAN.md — subprocess + meta-path-block import-guard regression (PKG-02/03)
+
+**Wave 2** *(blocked on Wave 1 — needs the relocked uv.lock from 26-01)*
+
+- [ ] 26-04-PLAN.md — `sync-no-anyio` CI job: no-dev install, anyio-absent assertion, sync suite green (PKG-04)
+
 **UI hint**: no
 
 ### Phase 27: Dual-Backend Test Matrix
@@ -277,7 +288,7 @@ Plans:
 | 23. Test Harness Foundation | v1.4.0 | 4/4 | Complete    | 2026-06-27 |
 | 24. Core Async Wrapper | v1.4.0 | 5/5 | Complete    | 2026-06-27 |
 | 25. Cancellation | v1.4.0 | 6/5 | Complete    | 2026-06-28 |
-| 26. Packaging & Extra Scoping | v1.4.0 | 0/0 | Not started | - |
+| 26. Packaging & Extra Scoping | v1.4.0 | 0/4 | Planned | - |
 | 27. Dual-Backend Test Matrix | v1.4.0 | 0/0 | Not started | - |
 | 28. Documentation | v1.4.0 | 0/0 | Not started | - |
 | 21.1. ADBC dispatch URI-positional fix | v1.3.0 | 3/3 | Complete | 2026-05-20 |
