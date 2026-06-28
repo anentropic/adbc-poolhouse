@@ -200,7 +200,7 @@ Plans:
 
 **Wave 1**
 
-- [ ] 26-01-PLAN.md — `[async]` extra (`anyio>=4.13`) + `[all]` aggregation + relock + metadata test (PKG-01)
+- [x] 26-01-PLAN.md — `[async]` extra (`anyio>=4.13`) + `[all]` aggregation + relock + metadata test (PKG-01)
 - [ ] 26-02-PLAN.md — TypeVarTuple/Unpack tightening of offload/cancellable_offload + expect-error fixture (PKG-05)
 - [ ] 26-03-PLAN.md — subprocess + meta-path-block import-guard regression (PKG-02/03)
 

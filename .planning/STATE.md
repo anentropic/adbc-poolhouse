@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.4.0
 milestone_name: Async API
-status: verifying
-stopped_at: Completed 25-05-PLAN.md (final Phase 25 plan)
-last_updated: "2026-06-28T08:26:41.910Z"
-last_activity: 2026-06-28 -- Phase 26 planning complete
+status: executing
+stopped_at: Completed 26-01-PLAN.md ([async] extra + relock + metadata test)
+last_updated: "2026-06-28T09:00:00.000Z"
+last_activity: 2026-06-28 -- Completed Phase 26 Plan 01 (PKG-01)
 progress:
   total_phases: 9
   completed_phases: 4
-  total_plans: 16
-  completed_plans: 17
+  total_plans: 20
+  completed_plans: 18
   percent: 44
 ---
 
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-25)
 
 **Core value:** One config in, one pool out — `create_pool(SnowflakeConfig(...))` returns a ready-to-use SQLAlchemy QueuePool in a single call.
-**Current focus:** Phase 25 — cancellation
+**Current focus:** Phase 26 — Packaging & Extra Scoping
 
 ## Current Position
 
-Phase: 26
-Plan: Not started
-Status: Phase 25 plans complete (25-01..25-05 done) — awaiting phase verification
-Last activity: 2026-06-28 -- Phase 26 planning complete
+Phase: 26 (Packaging & Extra Scoping) — EXECUTING
+Plan: 2 of 4
+Status: Executing Phase 26 (26-01 complete)
+Last activity: 2026-06-28 -- Completed Phase 26 Plan 01 (PKG-01)
 
 Progress: [░░░░░░░░░░] 0% (0/7 phases)
 
@@ -54,6 +54,7 @@ Progress: [░░░░░░░░░░] 0% (0/7 phases)
 | Phase 25 P02 | 15min | 2 tasks | 4 files |
 | Phase 25 P03 | ~95min | 2 tasks | 3 files |
 | Phase 25 P04 | ~7min | 2 tasks | 2 files |
+| Phase 26 P01 | ~10min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -109,6 +110,7 @@ v1.4.0 roadmap decisions:
 - [Phase 25]: DuckDB's adbc_cancel against an in-flight query is best-effort AND intermittently WEDGES the worker thread inside the C execute (~10-40% of cold runs, faulthandler-confirmed) — an unfixable driver-level hang. The real-driver EDGE-02 leg therefore proves the downstream invariant (AsyncConnection.invalidate drains checkedout() to 0) deterministically instead of racing the wedge-prone cancel; the cancel->abort->invalidate wiring is proven on the stub during leg, real cancel-during-checkin on the trio-stable checkin_duckdb leg
 - [Phase 25]: real-time-sensitive cancel/finish legs release the gated worker from a REAL thread (waiting on the stub's entered threading.Event), because a loop-side releaser is starved under the trio MockClock autojump (EDGE-07)
 - [Phase 25]: EDGE-19 pins the 25-02 single-member-EG unwrap on a real DuckDB pool — a genuine AdbcError escapes cancellable_offload BARE (pytest.raises(AdbcError) AND not isinstance(excinfo.value, BaseExceptionGroup)); after a NON-cancel error the connection returns via the reset path (_pool.checkedout()==0), NOT invalidated (invalidate-only-on-cancel, Pitfall 6 / EDGE-18)
+- [Phase 26]: [async] extra pins anyio>=4.13 (D-02, NOT >=4.0.0) matching the dev-group floor → resolves to 4.14.1; [all] gains adbc-poolhouse[async]; no new third-party package introduced (T-26-01 accept). uv.lock relocked so Plan 04's --locked no-anyio install stays coherent. Metadata test (tests/test_pkg_extra.py) is anyio-free (importlib.metadata only) so it collects under the no-anyio CI job
 - [Phase 25]: EDGE-09 cancel-mid-block leg (D-24-02 owed from Phase 24) lands — gate a stub worker inside execute, cancel the scope so the watcher fires adbc_cancel, assert adbc_cancel_call_count==1 + borrowed_tokens==0 after the cancelled offload (transient token released exactly once), x50, both backends, x20 loop-stable; a belt-and-braces finally release keeps the group fail-fast (never a hang) without changing the happy cancel path
 
 ### Roadmap Evolution
@@ -132,7 +134,7 @@ v1.4.0 roadmap decisions:
 
 ## Session Continuity
 
-Last session: 2026-06-28T03:30:00.000Z
-Stopped at: Completed 25-05-PLAN.md (final Phase 25 plan)
-Next step: Verify Phase 25 (/gsd-verify-work) — docs gate green, EDGE-28 clean, x20 loop clean.
+Last session: 2026-06-28T09:00:00.000Z
+Stopped at: Completed 26-01-PLAN.md ([async] extra + relock + metadata test)
+Next step: Execute Phase 26 Plan 02 (PKG-05 — TypeVarTuple/Unpack tightening of offload/cancellable_offload).
 </content>
