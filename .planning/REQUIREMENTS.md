@@ -104,7 +104,7 @@ _Exceptions_
 
 - [x] **EDGE-17**: An ADBC error from the worker propagates with exact type and original traceback intact across the thread boundary
 - [x] **EDGE-18**: An exception in `__aenter__`/post-checkout leaks no connection (`checkedout() == 0`, no cumulative leak over N iterations)
-- [ ] **EDGE-19**: An `ExceptionGroup`/`except*` from a task group preserves the original ADBC errors and keeps cancellation distinguishable; `checkedout() == 0` after
+- [x] **EDGE-19**: An `ExceptionGroup`/`except*` from a task group preserves the original ADBC errors and keeps cancellation distinguishable; `checkedout() == 0` after
 
 _Resource lifetime_
 
@@ -217,7 +217,7 @@ Explicit exclusions for the async layer (with reasoning):
 | EDGE-05 | Phase 25 | Complete (25-03) |
 | EDGE-06 | Phase 25 | Complete (25-03) |
 | EDGE-07 | Phase 25 | Complete (25-03) |
-| EDGE-19 | Phase 25 | Pending |
+| EDGE-19 | Phase 25 | Complete |
 | EDGE-28 | Phase 25 | Partial (25-01: AST guard rule banning asyncio.CancelledError; behavioral trio-cancel clause pending 25-02/03) |
 | EDGE-29 | Phase 25 | Complete (25-03) |
 | PKG-01 | Phase 26 | Pending |

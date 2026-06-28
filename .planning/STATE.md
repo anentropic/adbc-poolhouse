@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.4.0
 milestone_name: Async API
 status: executing
-stopped_at: Completed 25-03-PLAN.md
-last_updated: "2026-06-28T03:00:00.000Z"
-last_activity: 2026-06-28 -- Completed 25-03 (cancel-depth EDGE-01..07 + EDGE-29 backend parity; fixed real-cancel interrupt swallow in _cancel.py)
+stopped_at: Completed 25-04-PLAN.md
+last_updated: "2026-06-28T02:21:00.000Z"
+last_activity: 2026-06-28 -- Completed 25-04 (EDGE-19 bare-AdbcError unwrap + checkedout()==0; EDGE-09 cancel-mid-block token leg D-24-02, x50, loop-stable)
 progress:
   total_phases: 9
   completed_phases: 3
   total_plans: 16
-  completed_plans: 14
-  percent: 39
+  completed_plans: 15
+  percent: 42
 ---
 
 # Project State
@@ -26,9 +26,9 @@ See: .planning/PROJECT.md (updated 2026-06-25)
 ## Current Position
 
 Phase: 25 (cancellation) — EXECUTING
-Plan: 4 of 5
-Status: Executing Phase 25 (25-01, 25-02, 25-03 complete)
-Last activity: 2026-06-28 -- Completed 25-03 (cancel-depth EDGE-01..07 + EDGE-29 backend parity; fixed real-cancel interrupt swallow in _cancel.py)
+Plan: 5 of 5
+Status: Executing Phase 25 (25-01, 25-02, 25-03, 25-04 complete)
+Last activity: 2026-06-28 -- Completed 25-04 (EDGE-19 bare-AdbcError unwrap + checkedout()==0; EDGE-09 cancel-mid-block token leg D-24-02, x50, loop-stable)
 
 Progress: [░░░░░░░░░░] 0% (0/7 phases)
 
@@ -53,6 +53,7 @@ Progress: [░░░░░░░░░░] 0% (0/7 phases)
 | Phase 25 P01 | 9min | 2 tasks | 4 files |
 | Phase 25 P02 | 15min | 2 tasks | 4 files |
 | Phase 25 P03 | ~95min | 2 tasks | 3 files |
+| Phase 25 P04 | ~7min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -107,6 +108,8 @@ v1.4.0 roadmap decisions:
 - [Phase 25]: 25-02's cancellable_offload leaked the driver interrupt on the REAL cancel path — anyio does NOT collapse the bundle as research assumed; the aborted DuckDB worker RAISES ProgrammingError, surfaced as a single-member ExceptionGroup that escaped past fail_after. Fixed in 25-03 with a cancelled_by_us flag that swallows the interrupt and yields one cancellation checkpoint so the caller's TimeoutError/scope.cancel surfaces (D-25-02/05). Stub legs never hit this (stub adbc_cancel returns the worker cleanly)
 - [Phase 25]: DuckDB's adbc_cancel against an in-flight query is best-effort AND intermittently WEDGES the worker thread inside the C execute (~10-40% of cold runs, faulthandler-confirmed) — an unfixable driver-level hang. The real-driver EDGE-02 leg therefore proves the downstream invariant (AsyncConnection.invalidate drains checkedout() to 0) deterministically instead of racing the wedge-prone cancel; the cancel->abort->invalidate wiring is proven on the stub during leg, real cancel-during-checkin on the trio-stable checkin_duckdb leg
 - [Phase 25]: real-time-sensitive cancel/finish legs release the gated worker from a REAL thread (waiting on the stub's entered threading.Event), because a loop-side releaser is starved under the trio MockClock autojump (EDGE-07)
+- [Phase 25]: EDGE-19 pins the 25-02 single-member-EG unwrap on a real DuckDB pool — a genuine AdbcError escapes cancellable_offload BARE (pytest.raises(AdbcError) AND not isinstance(excinfo.value, BaseExceptionGroup)); after a NON-cancel error the connection returns via the reset path (_pool.checkedout()==0), NOT invalidated (invalidate-only-on-cancel, Pitfall 6 / EDGE-18)
+- [Phase 25]: EDGE-09 cancel-mid-block leg (D-24-02 owed from Phase 24) lands — gate a stub worker inside execute, cancel the scope so the watcher fires adbc_cancel, assert adbc_cancel_call_count==1 + borrowed_tokens==0 after the cancelled offload (transient token released exactly once), x50, both backends, x20 loop-stable; a belt-and-braces finally release keeps the group fail-fast (never a hang) without changing the happy cancel path
 
 ### Roadmap Evolution
 
@@ -129,7 +132,7 @@ v1.4.0 roadmap decisions:
 
 ## Session Continuity
 
-Last session: 2026-06-28T03:00:00.000Z
-Stopped at: Completed 25-03-PLAN.md
-Next step: Execute 25-04 (EDGE-19 bare-AdbcError unwrap + EDGE-09 cancel-mid-block token leg, D-24-02, x50).
+Last session: 2026-06-28T02:21:00.000Z
+Stopped at: Completed 25-04-PLAN.md
+Next step: Execute 25-05 (final Phase 25 plan).
 </content>
