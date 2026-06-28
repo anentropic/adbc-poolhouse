@@ -2,16 +2,20 @@
 Limiter EDGE coverage: token accounting + bound + no hold-and-wait (EDGE-09/10/11/12).
 
 Every test runs under BOTH asyncio and trio. The token-accounting legs (EDGE-09)
-drive the REAL DuckDB driver and assert `pool._limiter.borrowed_tokens` returns to
-0 after a normal return AND after an `AdbcError`, each across a x50 loop. The
+assert `pool._limiter.borrowed_tokens` returns to 0 on every exit path --- a
+normal return AND an `AdbcError` drive the REAL DuckDB driver, while the
+cancel-mid-block leg gates a stub-backed worker, cancels the scope, and proves the
+transient token still releases exactly once --- each across a x50 loop. The
 concurrency legs (EDGE-10/11/12) gate stub-backed workers that block inside
 `execute` to prove the limiter caps in-flight offloads at `pool_size +
 max_overflow`, that a token queued-waiting on a saturated limiter that is
 cancelled leaks nothing, and that a transient token never self-deadlocks.
 
-D-24-02: the EDGE-09 cancel-mid-block leg is Phase 25 (it needs the `adbc_cancel`
-join to unblock a non-cancellable worker honestly) --- there is deliberately NO
-cancel-mid-block test here, only the success and error legs.
+D-24-02: the EDGE-09 cancel-mid-block leg (`test_token_returns_after_cancel`) is
+owned by Phase 25 --- it needs the `adbc_cancel` join to unblock a
+non-cancellable worker honestly. The watcher fires the stub's `adbc_cancel` when
+the scope is cancelled, which releases the gated worker; the offload returns and
+the transient token is released exactly once even on the cancel path.
 
 Every concurrency body runs under a REAL-clock watchdog (`real_clock_watchdog`,
 the autojump-immune substitute for `anyio.fail_after` --- a virtual `fail_after`
@@ -76,6 +80,55 @@ class TestEdge09TokenAccounting:
             limiter = duckdb_async_pool._limiter
             assert limiter.borrowed_tokens == 0
             assert limiter.available_tokens == limiter.total_tokens
+
+    @pytest.mark.anyio
+    async def test_token_returns_after_cancel(self, anyio_backend_name: str) -> None:
+        """
+        After a CANCELLED offload, the transient token returns to 0 --- x50 (D-24-02).
+
+        The cancel-mid-block leg Phase 24 deferred (D-24-02). Each iteration gates a
+        stub-backed worker inside `execute` (it blocks on the stub's internal event),
+        confirms the limiter borrowed exactly one token, then cancels the surrounding
+        scope. `cancellable_offload`'s watcher receives the cancellation and fires the
+        stub cursor's `adbc_cancel`, which releases the gated worker; the offload
+        returns and the transient token is released exactly once even on the cancel
+        path (`abandon_on_cancel=False` guarantees the join, so the token is never
+        leaked). After the cancelled scope `borrowed_tokens == 0`.
+
+        Read identically to the success/error legs (the only difference is the
+        cancel) so the accounting comparison is apples-to-apples. Each iteration is
+        `real_clock_watchdog`-wrapped (the autojump-immune substitute for
+        `anyio.fail_after`) and releases the stub cursor in a `finally`, so a gating
+        regression that stranded the worker would fail fast rather than hang.
+        """
+        del anyio_backend_name
+        limiter = anyio.CapacityLimiter(8)
+        for _ in range(_ACCOUNTING_LOOPS):
+            conn, stub = _stub_conn_on(limiter)
+            cur = conn.cursor()
+            stub_cur = stub.cursors[0]
+            with real_clock_watchdog([stub_cur]) as watchdog:
+                async with anyio.create_task_group() as cancel_tg:
+                    cancel_tg.start_soon(functools.partial(cur.execute, "SELECT 1"))
+                    try:
+                        # Wait until the worker is provably inside the blocked stub
+                        # call (a token is genuinely borrowed), then cancel.
+                        await await_inside(lambda sc=stub_cur: sc.execute_call_count == 1)
+                        assert limiter.borrowed_tokens == 1
+                        # Cancel the scope: the watcher fires the stub's adbc_cancel,
+                        # which releases the gated worker so the offload can return.
+                        cancel_tg.cancel_scope.cancel()
+                    finally:
+                        # Belt-and-braces: if the cancel path ever failed to release
+                        # the worker, free it so the group can exit and the assertion
+                        # below trips (no hang). On the happy cancel path the worker
+                        # is already released by adbc_cancel.
+                        stub_cur.release()
+            assert watchdog[0] is False, "EDGE-09 cancel watchdog tripped: a worker hung"
+            # The driver-level cancel fired exactly once and the transient token
+            # returned: borrowed_tokens is back to 0 after the cancelled offload.
+            assert stub_cur.adbc_cancel_call_count == 1
+            assert limiter.borrowed_tokens == 0
 
 
 class TestEdge10CancelWhileQueued:
