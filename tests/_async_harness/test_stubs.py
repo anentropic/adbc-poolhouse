@@ -149,3 +149,21 @@ class TestBlockingStubConnection:
         conn.adbc_cancel()
         assert conn.adbc_cancel_call_count == 1
         assert conn.observed_cancel is True
+
+    def test_fresh_connection_has_zeroed_invalidate_count(self) -> None:
+        """A fresh connection starts with invalidate_call_count == 0."""
+        conn = BlockingStubConnection()
+        assert conn.invalidate_call_count == 0
+
+    def test_invalidate_increments_count(self) -> None:
+        """One invalidate() call lifts invalidate_call_count to 1."""
+        conn = BlockingStubConnection()
+        conn.invalidate()
+        assert conn.invalidate_call_count == 1
+
+    def test_invalidate_count_never_resets(self) -> None:
+        """Two invalidate() calls accumulate to 2 (the counter never resets)."""
+        conn = BlockingStubConnection()
+        conn.invalidate()
+        conn.invalidate()
+        assert conn.invalidate_call_count == 2

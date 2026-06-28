@@ -298,6 +298,10 @@ class BlockingStubConnection:
             order.
         close_call_count: Number of `close` calls.
         adbc_cancel_call_count: Number of `adbc_cancel` calls.
+        invalidate_call_count: Number of `invalidate` calls. The poison-recovery
+            signal the cancel EDGE cases (EDGE-02/04/05/29) read by name: it is
+            `1` after a cancelled scope drives `AsyncConnection.invalidate()` →
+            `self._fairy.invalidate()`, and `0` on the no-cancel paths.
         observed_cancel: `True` once `adbc_cancel` has run; `False` otherwise.
 
     Example:
@@ -319,6 +323,7 @@ class BlockingStubConnection:
         self.cursors: list[BlockingStubCursor] = []
         self.close_call_count: int = 0
         self.adbc_cancel_call_count: int = 0
+        self.invalidate_call_count: int = 0
         self.observed_cancel: bool = False
 
     def cursor(self) -> BlockingStubCursor:
@@ -338,6 +343,11 @@ class BlockingStubConnection:
         """Increment `close_call_count`."""
         with self._lock:
             self.close_call_count += 1
+
+    def invalidate(self) -> None:
+        """Increment `invalidate_call_count` (mirrors the fairy's poison-recovery)."""
+        with self._lock:
+            self.invalidate_call_count += 1
 
     def adbc_cancel(self) -> None:
         """Increment `adbc_cancel_call_count` and set `observed_cancel` to `True`."""
