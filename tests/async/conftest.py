@@ -26,6 +26,7 @@ The fixtures fall into two groups:
 
 from __future__ import annotations
 
+import os
 import tempfile
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -33,7 +34,12 @@ from typing import TYPE_CHECKING
 import pytest
 import trio.testing
 
-from adbc_poolhouse import DuckDBConfig, create_async_pool
+from adbc_poolhouse import (
+    DuckDBConfig,
+    SnowflakeConfig,
+    close_async_pool,
+    create_async_pool,
+)
 from adbc_poolhouse._async._connection import AsyncConnection
 from tests._async_harness.stubs import BlockingStubConnection
 
@@ -41,6 +47,12 @@ if TYPE_CHECKING:
     from collections.abc import AsyncIterator, Callable
 
     from adbc_poolhouse._async._pool import AsyncPool
+
+# Root of the Phase 25 pytest-adbc-replay cassette assets, mirroring
+# `tests/async/test_async_lifecycle.py`. The Snowflake fixture replays the
+# recorded `snowflake_arrow_round_trip` cassette from here --- never a live
+# warehouse.
+_CASSETTE_ROOT = Path(__file__).parent.parent / "cassettes"
 
 
 @pytest.fixture(params=["asyncio", "trio"])
@@ -92,6 +104,43 @@ async def duckdb_async_pool() -> AsyncIterator[AsyncPool]:
         yield pool
     finally:
         await pool.close()
+
+
+@pytest.fixture
+async def snowflake_async_pool() -> AsyncIterator[AsyncPool]:
+    """
+    A cassette-backed Snowflake `AsyncPool`, closed on teardown (D-27-04).
+
+    Mirrors `duckdb_async_pool` but drives the SAME async layer through a SECOND
+    backend without live credentials, backing the TEST-02 read-path matrix. The
+    pool replays the Phase 25 `snowflake_arrow_round_trip` cassette under
+    `_CASSETTE_ROOT` --- there is no live Snowflake connection. The fixture skips
+    cleanly when the Snowflake driver or its recorded cassette is absent, so the
+    suite stays green in a minimal environment.
+
+    The fixture does NOT mount the cassette itself: the consuming test carries the
+    `adbc_cassette` marker that activates replay. In replay mode real credentials
+    are absent, so `SNOWFLAKE_ACCOUNT=replay-account` is set via
+    `os.environ.setdefault` to satisfy the config validator --- a replay-mode dummy,
+    not a real secret; the cassette intercepts before any network call.
+
+    Yields:
+        A ready `AsyncPool` wrapping the Snowflake driver in cassette-replay mode.
+    """
+    pytest.importorskip(
+        "adbc_driver_snowflake.dbapi",
+        reason="Snowflake driver not installed; cassette fixture skipped",
+    )
+    if not (_CASSETTE_ROOT / "snowflake_arrow_round_trip").exists():
+        pytest.skip("snowflake_arrow_round_trip cassette absent")
+    # In replay mode real creds are absent; a dummy account satisfies the
+    # validator and the cassette intercepts before any real connection.
+    os.environ.setdefault("SNOWFLAKE_ACCOUNT", "replay-account")
+    pool = create_async_pool(SnowflakeConfig())  # type: ignore[call-arg]
+    try:
+        yield pool
+    finally:
+        await close_async_pool(pool)
 
 
 @pytest.fixture
