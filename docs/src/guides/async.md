@@ -34,7 +34,7 @@ from adbc_poolhouse import DuckDBConfig, create_async_pool, close_async_pool
 
 
 async def main():
-    pool = create_async_pool(DuckDBConfig(database="/tmp/warehouse.db"))
+    pool = create_async_pool(DuckDBConfig(database="/tmp/warehouse.db"))  # synchronous: no await
     try:
         async with await pool.connect() as conn:
             cur = conn.cursor()  # synchronous: no await
