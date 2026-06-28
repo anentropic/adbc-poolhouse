@@ -53,12 +53,16 @@ class Finding:
     message: str
 
 
-class _GuardVisitor(ast.NodeVisitor):
-    """Collects [`Finding`][tests._async_harness.guard.Finding]s for one file."""
+class _BaseVisitor(ast.NodeVisitor):
+    """A node visitor that accumulates [`Finding`][tests._async_harness.guard.Finding]s."""
 
     def __init__(self, path: str) -> None:
         self.path = path
         self.findings: list[Finding] = []
+
+
+class _GuardVisitor(_BaseVisitor):
+    """Collects [`Finding`][tests._async_harness.guard.Finding]s for one file."""
 
     def visit_Import(self, node: ast.Import) -> None:  # noqa: N802
         """Flag `import asyncio` and `import asyncio.<sub>`."""
@@ -197,32 +201,10 @@ def scan_async_package(root: str | Path) -> list[Finding]:
         assert findings == []  # the async package is clean
         ```
     """
-    root = Path(root)
-    if not root.exists():
-        return []
-    findings: list[Finding] = []
-    for py in sorted(root.rglob("*.py")):
-        try:
-            source = py.read_text(encoding="utf-8")
-            tree = ast.parse(source, filename=str(py))
-        except (SyntaxError, UnicodeDecodeError) as exc:
-            # Tolerant scan (D-05 "graceful"): one malformed or non-UTF-8 file
-            # emits a Finding rather than aborting the whole scan with a
-            # traceback, so it cannot mask violations in sibling files (IN-02).
-            lineno = exc.lineno if isinstance(exc, SyntaxError) and exc.lineno else 0
-            findings.append(
-                Finding(
-                    str(py),
-                    lineno,
-                    "unparseable-source",
-                    f"could not parse source: {type(exc).__name__}: {exc}",
-                )
-            )
-            continue
-        visitor = _GuardVisitor(str(py))
-        visitor.visit(tree)
-        findings.extend(visitor.findings)
-    return findings
+    # Delegates to the shared `_scan_with` machinery (IN-01): the tolerant
+    # `rglob` + `ast.parse` + absent-root loop lives in one place, so a future
+    # change to the tolerant-parse behaviour applies to every scanner at once.
+    return _scan_with(root, _GuardVisitor)
 
 
 def _scan_with(root: str | Path, visitor_factory: Callable[[str], _BaseVisitor]) -> list[Finding]:
@@ -267,14 +249,6 @@ def _scan_with(root: str | Path, visitor_factory: Callable[[str], _BaseVisitor])
         visitor.visit(tree)
         findings.extend(visitor.findings)
     return findings
-
-
-class _BaseVisitor(ast.NodeVisitor):
-    """A node visitor that accumulates [`Finding`][tests._async_harness.guard.Finding]s."""
-
-    def __init__(self, path: str) -> None:
-        self.path = path
-        self.findings: list[Finding] = []
 
 
 def _is_pytest_mark(decorator: ast.expr, mark: str) -> bool:
