@@ -107,7 +107,7 @@ async def duckdb_async_pool() -> AsyncIterator[AsyncPool]:
 
 
 @pytest.fixture
-async def snowflake_async_pool() -> AsyncIterator[AsyncPool]:
+async def snowflake_async_pool(monkeypatch: pytest.MonkeyPatch) -> AsyncIterator[AsyncPool]:
     """
     A cassette-backed Snowflake `AsyncPool`, closed on teardown (D-27-04).
 
@@ -120,9 +120,16 @@ async def snowflake_async_pool() -> AsyncIterator[AsyncPool]:
 
     The fixture does NOT mount the cassette itself: the consuming test carries the
     `adbc_cassette` marker that activates replay. In replay mode real credentials
-    are absent, so `SNOWFLAKE_ACCOUNT=replay-account` is set via
-    `os.environ.setdefault` to satisfy the config validator --- a replay-mode dummy,
-    not a real secret; the cassette intercepts before any network call.
+    are absent, so `SNOWFLAKE_ACCOUNT` is set via `monkeypatch.setenv` to satisfy
+    the config validator --- a replay-mode dummy, not a real secret; the cassette
+    intercepts before any network call. Using `monkeypatch` auto-restores the prior
+    value (or unsets it) on teardown, so the dummy never leaks into a later test or
+    fixture that reads `SNOWFLAKE_ACCOUNT`. A real value already in the environment
+    is preserved by reading it back through the default.
+
+    Args:
+        monkeypatch: pytest's environment patcher; scopes the `SNOWFLAKE_ACCOUNT`
+            mutation to this fixture's lifetime.
 
     Yields:
         A ready `AsyncPool` wrapping the Snowflake driver in cassette-replay mode.
@@ -133,9 +140,11 @@ async def snowflake_async_pool() -> AsyncIterator[AsyncPool]:
     )
     if not (_CASSETTE_ROOT / "snowflake_arrow_round_trip").exists():
         pytest.skip("snowflake_arrow_round_trip cassette absent")
-    # In replay mode real creds are absent; a dummy account satisfies the
-    # validator and the cassette intercepts before any real connection.
-    os.environ.setdefault("SNOWFLAKE_ACCOUNT", "replay-account")
+    # In replay mode real creds are absent; a dummy account satisfies the validator
+    # and the cassette intercepts before any real connection. monkeypatch restores
+    # the prior value (or removes ours) on teardown so it never leaks. Any real
+    # value already set is kept by reading it back as the default.
+    monkeypatch.setenv("SNOWFLAKE_ACCOUNT", os.environ.get("SNOWFLAKE_ACCOUNT", "replay-account"))
     pool = create_async_pool(SnowflakeConfig())  # type: ignore[call-arg]
     try:
         yield pool
