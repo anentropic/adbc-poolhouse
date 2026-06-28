@@ -68,14 +68,30 @@ def _col(table: pyarrow.Table, name: str) -> pyarrow.ChunkedArray:
     identifiers to uppercase (`N` / `S`). The matrix asserts on values, not on a
     backend's casing convention, so column access normalises the name.
 
+    An exact-case match is preferred when present; otherwise the lookup folds case.
+    The case-fold path guards against a silent collision (IN-03): if two columns
+    differ only in case (e.g. `n` and `N`), the case-folded map would keep just one
+    and quietly resolve to the wrong column, so the fold is only taken when the
+    lowercased names are unique. The current `SELECT 1 AS n, 'hello' AS s` shape
+    cannot collide; the guard keeps `_col` safe if reused for wider result shapes.
+
     Args:
         table: The fetched result table.
         name: The column alias from the SELECT, in any case.
 
     Returns:
         The matching column.
+
+    Raises:
+        KeyError: If `name` matches no column (exactly or case-insensitively), or if
+            two columns differ only in case so a case-insensitive match is ambiguous.
     """
-    by_lower = {n.lower(): n for n in table.column_names}
+    names = table.column_names
+    if name in names:
+        return table.column(name)
+    by_lower = {n.lower(): n for n in names}
+    if len(by_lower) != len(names):
+        raise KeyError(f"case-insensitive lookup of {name!r} is ambiguous in {names}")
     return table.column(by_lower[name.lower()])
 
 
