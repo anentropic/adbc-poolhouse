@@ -38,7 +38,10 @@ class TestStability03ArrowAllocator:
 
     @pytest.mark.anyio
     async def test_no_allocator_growth_and_one_reset_per_checkin(
-        self, duckdb_async_pool: AsyncPool, anyio_backend_name: str
+        self,
+        duckdb_async_pool: AsyncPool,
+        anyio_backend_name: str,
+        request: pytest.FixtureRequest,
     ) -> None:
         """
         Run N>=100 cursor lifecycles and prove no allocator growth + one reset each.
@@ -66,6 +69,10 @@ class TestStability03ArrowAllocator:
             reset_count += 1
 
         event.listen(duckdb_async_pool._pool, "reset", _on_reset)
+        # Explicit teardown (IN-02): the listener closes over the test-local
+        # `reset_count`, so remove it on finalize rather than relying on the pool's
+        # own disposal to drop it implicitly --- the intent is then unambiguous.
+        request.addfinalizer(lambda: event.remove(duckdb_async_pool._pool, "reset", _on_reset))
 
         # Primary signal (D-27-07): pyarrow allocator delta, NOT process RSS. Settle
         # any pending frees first so the baseline is the true post-GC floor.
