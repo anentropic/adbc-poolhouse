@@ -74,6 +74,10 @@ class AsyncConnection:
             cursors) is in flight. The single-task aliasing guard; deliberately a
             plain bool, never a serializing lock, so a second concurrent caller is
             rejected rather than queued (D-24-03).
+        _teardown_limiter: A dedicated 1-token `anyio.CapacityLimiter` the
+            poison-recovery `invalidate` offloads through, kept separate from the
+            shared pool `limiter` so recovery never contends for the pool token the
+            just-aborted worker is still releasing (WR-03).
 
     Example:
         ```python
@@ -107,6 +111,13 @@ class AsyncConnection:
         self._fairy = fairy
         self._limiter = limiter
         self._in_use = False
+        # Poison-recovery (`invalidate`) runs off a DEDICATED 1-token limiter, not
+        # the pool's shared `limiter` (WR-03). Teardown is not throughput-bounded,
+        # and on a `pool_size + max_overflow == 1` pool the just-aborted worker
+        # still holds the single pool token until its thread returns; borrowing the
+        # pool token here would make recovery wait on the very worker it just
+        # aborted. A private limiter sidesteps that ordering dependency entirely.
+        self._teardown_limiter: CapacityLimiter = anyio.CapacityLimiter(1)
 
     def _enter_offload(self) -> None:
         """
@@ -222,12 +233,19 @@ class AsyncConnection:
         drives this recovery still holds `_in_use` across its own `try`/`finally`,
         so a connection left marked busy by the cancelled call is still reclaimed.
 
+        It offloads through a DEDICATED 1-token teardown limiter, NOT the pool's
+        shared `limiter` (WR-03): on a single-token pool the just-aborted worker
+        still holds the only pool token until its thread returns, so borrowing the
+        pool token here would deadlock recovery behind the very worker it just
+        aborted. Teardown is not throughput-bounded, so giving it a private token
+        is correct and removes the unenforced scheduler-ordering dependency.
+
         It is the poison-recovery counterpart to `close`: invalidate is the cancel
         path, `close` the normal check-in. A `close()` after an `invalidate()` is a
         safe no-op (probe-confirmed).
         """
         with anyio.CancelScope(shield=True):
-            await offload(self._fairy.invalidate, limiter=self._limiter)
+            await offload(self._fairy.invalidate, limiter=self._teardown_limiter)
 
     async def __aenter__(self) -> AsyncConnection:
         """
