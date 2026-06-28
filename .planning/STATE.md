@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.4.0
 milestone_name: Async API
 status: executing
-stopped_at: Completed 25-01-PLAN.md
-last_updated: "2026-06-28T01:01:20.000Z"
-last_activity: 2026-06-28 -- Completed 25-01 (cancellation harness prerequisites)
+stopped_at: Completed 25-02-PLAN.md
+last_updated: "2026-06-28T01:20:07.000Z"
+last_activity: 2026-06-28 -- Completed 25-02 (cancellation machinery: cancellable_offload + invalidate)
 progress:
   total_phases: 9
   completed_phases: 3
   total_plans: 16
-  completed_plans: 12
-  percent: 33
+  completed_plans: 13
+  percent: 36
 ---
 
 # Project State
@@ -26,9 +26,9 @@ See: .planning/PROJECT.md (updated 2026-06-25)
 ## Current Position
 
 Phase: 25 (cancellation) — EXECUTING
-Plan: 2 of 5
-Status: Executing Phase 25 (25-01 complete)
-Last activity: 2026-06-28 -- Completed 25-01 (cancellation harness prerequisites)
+Plan: 3 of 5
+Status: Executing Phase 25 (25-01, 25-02 complete)
+Last activity: 2026-06-28 -- Completed 25-02 (cancellation machinery: cancellable_offload + invalidate)
 
 Progress: [░░░░░░░░░░] 0% (0/7 phases)
 
@@ -51,6 +51,7 @@ Progress: [░░░░░░░░░░] 0% (0/7 phases)
 | Phase 24 P04 | ~25min | 3 tasks | 10 files |
 | Phase 24 P05 | ~12min | 2 tasks | 4 files |
 | Phase 25 P01 | 9min | 2 tasks | 4 files |
+| Phase 25 P02 | 15min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -98,6 +99,10 @@ v1.4.0 roadmap decisions:
 - [Phase 25]: BlockingStubConnection gained lock-guarded invalidate()/invalidate_call_count (D-04 LOCKED contract); the seam AsyncConnection.invalidate() -> self._fairy.invalidate() (D-25-03) that stub-backed EDGE-02/04/05/29 assert by name
 - [Phase 25]: AST guard gained banned-asyncio-cancelled-error rule (_GuardVisitor.visit_Attribute, EDGE-28/D-25-06); real _async/ scan stays clean; D-03 preserved (stubs.py still pure-threading)
 - [Phase 25]: strict basedpyright pre-commit gate forces RED+GREEN co-commit when a RED test references a not-yet-existing attribute (Task 1); RED verified via pytest before GREEN landed
+- [Phase 25]: cancellable_offload (watcher/worker task group) + AsyncConnection.invalidate (shielded, bypasses _in_use) shipped; six AsyncCursor query/fetch methods rewired; close untouched (D-25-04); to_thread.run_sync stays literal in _offload.py (scan []) 
+- [Phase 25]: invalidate moved INTO cancellable_offload via an on_abort shielded callback, gated on a worker_started flag (set on the worker thread = entered-driver boundary) — the verbatim RESEARCH cursor-except design deadlocked on a saturated-limiter queued-cancel and over-invalidated never-poisoned connections (EDGE-01/07); fix keeps TestEdge10 green and x20 loop-stable
+- [Phase 25]: adbc_cancel resolved lazily via getattr in AsyncCursor._adbc_cancel — the pytest-adbc-replay ReplayCursor (D-24-04 cassette backend) lacks adbc_cancel; eager attribute access crashed the Snowflake leg on the success path
+- [Phase 25]: method-level mkdocstrings autoref to _async._connection.AsyncConnection.invalidate fails --strict (the gen_ref_pages.py skips any _-prefixed module path) — confirms the Phase-24 lesson; guide names invalidate in inline code, not a cross-ref link
 
 ### Roadmap Evolution
 

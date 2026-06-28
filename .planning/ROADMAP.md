@@ -170,7 +170,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1)*
 
-- [ ] 25-02-PLAN.md — cancellable_offload watcher/worker + AsyncConnection.invalidate + rewire 6 cursor methods (CANCEL-01/02/03, EDGE-19 unwrap)
+- [x] 25-02-PLAN.md — cancellable_offload watcher/worker + AsyncConnection.invalidate + rewire 6 cursor methods (CANCEL-01/02/03, EDGE-19 unwrap) (completed 2026-06-28)
 
 **Wave 3** *(blocked on Wave 2)*
 
