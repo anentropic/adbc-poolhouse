@@ -18,7 +18,11 @@ import ast
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from tests._async_harness.guard import scan_async_package
+from tests._async_harness.guard import (
+    scan_async_package,
+    scan_async_test_hygiene,
+    scan_for_positive_sleep,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -157,6 +161,120 @@ class TestAsyncGuard:
         (tmp_path / "latin1.py").write_bytes(b"x = '\xff\xfe'\n")
         findings = scan_async_package(tmp_path)
         assert [f.rule for f in findings] == ["unparseable-source"]
+
+
+class TestAsyncTestHygiene:
+    """Behaviour of the ``scan_async_test_hygiene`` guard (EDGE-27, D-27-01)."""
+
+    def test_flags_asyncio_import(self, tmp_path: Path) -> None:
+        """`import asyncio` / `from asyncio import ...` each raise a finding."""
+        (tmp_path / "a.py").write_text("import asyncio\n", encoding="utf-8")
+        (tmp_path / "b.py").write_text("from asyncio import sleep\n", encoding="utf-8")
+        rules = [f.rule for f in scan_async_test_hygiene(tmp_path)]
+        assert rules.count("banned-asyncio-import") == 2
+
+    def test_flags_pytest_asyncio_marker(self, tmp_path: Path) -> None:
+        """`@pytest.mark.asyncio` on an async test raises a finding."""
+        (tmp_path / "t.py").write_text(
+            "import pytest\n@pytest.mark.asyncio\nasync def test_x():\n    pass\n",
+            encoding="utf-8",
+        )
+        rules = [f.rule for f in scan_async_test_hygiene(tmp_path)]
+        assert "banned-pytest-asyncio-marker" in rules
+
+    def test_flags_pytest_asyncio_marker_called_form(self, tmp_path: Path) -> None:
+        """The called `@pytest.mark.asyncio()` form is also flagged."""
+        (tmp_path / "t.py").write_text(
+            "import pytest\n@pytest.mark.asyncio()\nasync def test_x():\n    pass\n",
+            encoding="utf-8",
+        )
+        rules = [f.rule for f in scan_async_test_hygiene(tmp_path)]
+        assert "banned-pytest-asyncio-marker" in rules
+
+    def test_flags_async_test_missing_anyio_marker(self, tmp_path: Path) -> None:
+        """An `async def test_x` lacking `@pytest.mark.anyio` raises a finding."""
+        (tmp_path / "t.py").write_text(
+            "async def test_x():\n    pass\n",
+            encoding="utf-8",
+        )
+        rules = [f.rule for f in scan_async_test_hygiene(tmp_path)]
+        assert rules == ["async-test-missing-anyio-marker"]
+
+    def test_anyio_marker_present_is_clean(self, tmp_path: Path) -> None:
+        """
+        An `async def test_y` WITH `@pytest.mark.anyio` raises no finding.
+
+        Pitfall 2: the axis signal is the PRESENCE of the marker, not a literal
+        ``anyio_backend`` argument --- a plain async fixture supplies the param.
+        """
+        (tmp_path / "t.py").write_text(
+            "import pytest\n@pytest.mark.anyio\nasync def test_y(some_fixture):\n    pass\n",
+            encoding="utf-8",
+        )
+        assert scan_async_test_hygiene(tmp_path) == []
+
+    def test_sync_test_is_ignored(self, tmp_path: Path) -> None:
+        """A plain `def test_z` (not async) needs no anyio marker."""
+        (tmp_path / "t.py").write_text(
+            "def test_z():\n    pass\n",
+            encoding="utf-8",
+        )
+        assert scan_async_test_hygiene(tmp_path) == []
+
+    def test_noop_absent_dir(self, tmp_path: Path) -> None:
+        """An absent root returns [] (graceful no-op)."""
+        assert scan_async_test_hygiene(tmp_path / "does_not_exist") == []
+
+    def test_noop_clean_source(self, tmp_path: Path) -> None:
+        """Clean synthetic source (anyio-marked async test) returns []."""
+        (tmp_path / "t.py").write_text(
+            "import pytest\n@pytest.mark.anyio\nasync def test_ok():\n    pass\n",
+            encoding="utf-8",
+        )
+        assert scan_async_test_hygiene(tmp_path) == []
+
+
+class TestPositiveSleepScan:
+    """Behaviour of the ``scan_for_positive_sleep`` guard (EDGE-30)."""
+
+    def test_flags_anyio_sleep_int(self, tmp_path: Path) -> None:
+        """`anyio.sleep(1)` raises a `positive-sleep-literal` finding."""
+        (tmp_path / "s.py").write_text("anyio.sleep(1)\n", encoding="utf-8")
+        assert [f.rule for f in scan_for_positive_sleep(tmp_path)] == ["positive-sleep-literal"]
+
+    def test_flags_time_sleep_float(self, tmp_path: Path) -> None:
+        """`time.sleep(0.5)` raises a finding."""
+        (tmp_path / "s.py").write_text("time.sleep(0.5)\n", encoding="utf-8")
+        assert [f.rule for f in scan_for_positive_sleep(tmp_path)] == ["positive-sleep-literal"]
+
+    def test_flags_bare_sleep(self, tmp_path: Path) -> None:
+        """A bare `sleep(2)` (no module prefix) is also flagged."""
+        (tmp_path / "s.py").write_text("sleep(2)\n", encoding="utf-8")
+        assert [f.rule for f in scan_for_positive_sleep(tmp_path)] == ["positive-sleep-literal"]
+
+    def test_allows_sleep_zero_int(self, tmp_path: Path) -> None:
+        """`anyio.sleep(0)` is an allowed yield --- no finding."""
+        (tmp_path / "s.py").write_text("anyio.sleep(0)\n", encoding="utf-8")
+        assert scan_for_positive_sleep(tmp_path) == []
+
+    def test_allows_sleep_zero_float(self, tmp_path: Path) -> None:
+        """`trio.sleep(0.0)` is an allowed yield --- no finding."""
+        (tmp_path / "s.py").write_text("trio.sleep(0.0)\n", encoding="utf-8")
+        assert scan_for_positive_sleep(tmp_path) == []
+
+    def test_allows_non_literal_arg(self, tmp_path: Path) -> None:
+        """`anyio.sleep(deadline)` (a name, not a literal) is allowed --- no finding."""
+        (tmp_path / "s.py").write_text("anyio.sleep(deadline)\n", encoding="utf-8")
+        assert scan_for_positive_sleep(tmp_path) == []
+
+    def test_noop_absent_dir(self, tmp_path: Path) -> None:
+        """An absent root returns [] (graceful no-op)."""
+        assert scan_for_positive_sleep(tmp_path / "does_not_exist") == []
+
+    def test_noop_clean_source(self, tmp_path: Path) -> None:
+        """Clean synthetic source with only `sleep(0)` returns []."""
+        (tmp_path / "s.py").write_text("anyio.sleep(0)\ntrio.sleep(0.0)\n", encoding="utf-8")
+        assert scan_for_positive_sleep(tmp_path) == []
 
 
 class TestRealAsyncPackage:
