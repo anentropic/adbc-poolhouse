@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.4.0
 milestone_name: Async API
-status: executing
-stopped_at: Completed 25-04-PLAN.md
-last_updated: "2026-06-28T02:21:00.000Z"
-last_activity: 2026-06-28 -- Completed 25-04 (EDGE-19 bare-AdbcError unwrap + checkedout()==0; EDGE-09 cancel-mid-block token leg D-24-02, x50, loop-stable)
+status: verifying
+stopped_at: Completed 25-05-PLAN.md (final Phase 25 plan)
+last_updated: "2026-06-28T07:40:37.067Z"
+last_activity: 2026-06-28
 progress:
   total_phases: 9
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 16
-  completed_plans: 15
-  percent: 42
+  completed_plans: 17
+  percent: 44
 ---
 
 # Project State
@@ -25,10 +25,10 @@ See: .planning/PROJECT.md (updated 2026-06-25)
 
 ## Current Position
 
-Phase: 25 (cancellation) — EXECUTING
-Plan: 5 of 5
+Phase: 26
+Plan: Not started
 Status: Phase 25 plans complete (25-01..25-05 done) — awaiting phase verification
-Last activity: 2026-06-28 -- Completed 25-05 (docs gate: async-guide cancellation section + invalidate cross-link, mkdocs --strict; EDGE-28 async-side meta-assert; phase x20 loop clean, both backends)
+Last activity: 2026-06-28
 
 Progress: [░░░░░░░░░░] 0% (0/7 phases)
 
