@@ -118,7 +118,7 @@ _Event-loop hygiene_
 _trio-vs-asyncio_
 
 - [ ] **EDGE-27**: Every async test is parametrized over asyncio AND trio — no `@pytest.mark.asyncio`, no `asyncio` import in the async test package
-- [ ] **EDGE-28**: Cancellation handling uses `get_cancelled_exc_class()` only — a trio cancel of a blocked execute *does* run `adbc_cancel` + invalidate; no `asyncio.CancelledError` in `_async/`
+- [x] **EDGE-28**: Cancellation handling uses `get_cancelled_exc_class()` only — a trio cancel of a blocked execute *does* run `adbc_cancel` + invalidate; no `asyncio.CancelledError` in `_async/`
 - [x] **EDGE-29**: Cancel-scope behaviour is identical across backends — the `(adbc_cancel_count, invalidate_count, checkedout_after)` tuple is equal under asyncio and trio
 
 _Timing_
@@ -218,7 +218,7 @@ Explicit exclusions for the async layer (with reasoning):
 | EDGE-06 | Phase 25 | Complete (25-03) |
 | EDGE-07 | Phase 25 | Complete (25-03) |
 | EDGE-19 | Phase 25 | Complete |
-| EDGE-28 | Phase 25 | Partial (25-01: AST guard rule banning asyncio.CancelledError; behavioral trio-cancel clause pending 25-02/03) |
+| EDGE-28 | Phase 25 | Complete (25-01 AST rule; 25-02/03 behavioral trio-cancel; 25-05 async-side meta-assert scan_async_package(_async/)==[]) |
 | EDGE-29 | Phase 25 | Complete (25-03) |
 | PKG-01 | Phase 26 | Pending |
 | PKG-02 | Phase 26 | Pending |

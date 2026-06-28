@@ -27,8 +27,8 @@ See: .planning/PROJECT.md (updated 2026-06-25)
 
 Phase: 25 (cancellation) — EXECUTING
 Plan: 5 of 5
-Status: Executing Phase 25 (25-01, 25-02, 25-03, 25-04 complete)
-Last activity: 2026-06-28 -- Completed 25-04 (EDGE-19 bare-AdbcError unwrap + checkedout()==0; EDGE-09 cancel-mid-block token leg D-24-02, x50, loop-stable)
+Status: Phase 25 plans complete (25-01..25-05 done) — awaiting phase verification
+Last activity: 2026-06-28 -- Completed 25-05 (docs gate: async-guide cancellation section + invalidate cross-link, mkdocs --strict; EDGE-28 async-side meta-assert; phase x20 loop clean, both backends)
 
 Progress: [░░░░░░░░░░] 0% (0/7 phases)
 
@@ -132,7 +132,7 @@ v1.4.0 roadmap decisions:
 
 ## Session Continuity
 
-Last session: 2026-06-28T02:21:00.000Z
-Stopped at: Completed 25-04-PLAN.md
-Next step: Execute 25-05 (final Phase 25 plan).
+Last session: 2026-06-28T03:30:00.000Z
+Stopped at: Completed 25-05-PLAN.md (final Phase 25 plan)
+Next step: Verify Phase 25 (/gsd-verify-work) — docs gate green, EDGE-28 clean, x20 loop clean.
 </content>

@@ -179,7 +179,7 @@ Plans:
 
 **Wave 4** *(blocked on Wave 3)*
 
-- [ ] 25-05-PLAN.md — docs gate (async guide cancellation section, mkdocs --strict) + EDGE-28 meta-assert + phase x20 loop gate
+- [x] 25-05-PLAN.md — docs gate (async guide cancellation section, mkdocs --strict) + EDGE-28 meta-assert + phase x20 loop gate (completed 2026-06-28)
 **UI hint**: no
 
 ### Phase 26: Packaging & Extra Scoping
@@ -275,7 +275,7 @@ Plans:
 | 22. Feasibility Spike | v1.4.0 | 2/2 | Complete    | 2026-06-27 |
 | 23. Test Harness Foundation | v1.4.0 | 4/4 | Complete    | 2026-06-27 |
 | 24. Core Async Wrapper | v1.4.0 | 5/5 | Complete    | 2026-06-27 |
-| 25. Cancellation | v1.4.0 | 4/5 | In progress | - |
+| 25. Cancellation | v1.4.0 | 5/5 | Plans complete | - |
 | 26. Packaging & Extra Scoping | v1.4.0 | 0/0 | Not started | - |
 | 27. Dual-Backend Test Matrix | v1.4.0 | 0/0 | Not started | - |
 | 28. Documentation | v1.4.0 | 0/0 | Not started | - |
