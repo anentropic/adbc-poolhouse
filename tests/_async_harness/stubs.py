@@ -27,6 +27,26 @@ self-tests. The loop-facing "worker is inside execute" gate is a SEPARATE
 `anyio.Event` passed to
 [`run_blocking`][tests._async_harness.gating.run_blocking]. Same name, different
 objects -- never await the stub's `threading.Event` on the event loop.
+
+Sticky-release design (load-bearing -- do NOT regress to a bare `Event.set()`):
+`close` and `adbc_cancel` are RELEASE signals that can race AHEAD of the worker
+reaching `_block`. The dispatch-window cancel tests fire `adbc_cancel` after the
+worker is dispatched but before its thread enters `_block`; a real driver's
+`adbc_cancel` likewise latches, so a cancel issued before the call enters is
+still observed. Because `_block` clears the internal `Event` at entry to re-arm
+the gate, a release modelled as a transient `Event.set()` alone is LOST whenever
+it lands before that clear -- a thread-scheduling-dependent lost-wakeup that
+hangs on slower hosts (it surfaced as a Linux-only CI failure that passed on
+macOS). So both terminal releases latch a sticky boolean UNDER THE LOCK
+(`_closed`, `_cancelled`) that `_block` checks at entry before the re-arm clear;
+`Event.set()` only covers a worker that is already waiting. `release` (the happy
+path) stays transient on purpose -- the worker is provably inside `_block`
+(the test waits for `entered`), so it cannot race the clear, and keeping it
+non-sticky is what preserves per-call re-arm (execute -> release -> fetch on one
+cursor). Rule of thumb: a release that can outrun its consumer must latch under
+the same lock the wait re-arms under; a bare `set()` paired with an entry-time
+`clear()` is a lost-wakeup waiting to happen. (Full diagnosis: PR #32 /
+phase-26 LEARNINGS.)
 """
 
 from __future__ import annotations
