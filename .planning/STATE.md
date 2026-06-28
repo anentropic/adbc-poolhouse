@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.4.0
 milestone_name: Async API
 status: executing
-stopped_at: Completed 27-04-PLAN.md
-last_updated: "2026-06-28T15:00:00.000Z"
-last_activity: 2026-06-28 -- Completed Phase 27 Plan 04 (limiter saturation stress: stub-gated 4x(pool_size+max_overflow) flood proving running-max == 8 + no starvation, real-DuckDB smoke flood drains to checkedout()==0, real-clock watchdog, x20 loop-stable — TEST-04)
+stopped_at: Completed 27-05-PLAN.md (Phase 27 local-complete; Linux CI gate pending user push)
+last_updated: "2026-06-28T14:14:00.000Z"
+last_activity: 2026-06-28 -- Completed Phase 27 Plan 05 (EDGE-27/30 real-package meta-guards: scan_async_test_hygiene/scan_for_positive_sleep over tests/async both == []; full async suite 141 passed/2 skipped; mkdocs --strict green; x20 loop-stable 0 hangs across all 4 concurrency tests — EDGE-27/EDGE-30). Linux CI quality job remains the one human-action gate (push gsd/v1.4.0-async-api).
 progress:
   total_phases: 9
   completed_phases: 5
   total_plans: 25
-  completed_plans: 25
+  completed_plans: 26
   percent: 60
 ---
 
@@ -25,10 +25,10 @@ See: .planning/PROJECT.md (updated 2026-06-25)
 
 ## Current Position
 
-Phase: 27 (dual-backend-test-matrix) — EXECUTING
-Plan: 5 of 5
-Status: Executing Phase 27 (Plans 01–04 complete)
-Last activity: 2026-06-28 -- Completed Phase 27 Plan 04 (limiter saturation stress — TEST-04)
+Phase: 27 (dual-backend-test-matrix) — LOCAL COMPLETE (Linux CI gate pending)
+Plan: 5 of 5 (all local plans complete)
+Status: Phase 27 local deliverables complete (Plans 01–05); awaiting human-action Linux `quality` CI confirmation (push gsd/v1.4.0-async-api)
+Last activity: 2026-06-28 -- Completed Phase 27 Plan 05 (EDGE-27/30 meta-guards; x20 loop-stable; mkdocs --strict green)
 
 Progress: [░░░░░░░░░░] 0% (0/7 phases)
 

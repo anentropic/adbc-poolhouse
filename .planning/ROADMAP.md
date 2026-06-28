@@ -237,7 +237,7 @@ Plans:
 
 **Wave 3** *(blocked on Waves 1–2)*
 
-- [ ] 27-05-PLAN.md — EDGE-27/30 real-package meta-tests + phase ×20 loop gate + Linux CI gate + mkdocs --strict docs gate
+- [x] 27-05-PLAN.md — EDGE-27/30 real-package meta-tests (`scan_async_test_hygiene` / `scan_for_positive_sleep` over `tests/async/` both == []) + phase ×20 loop gate (0 hangs, all 4 concurrency tests) + mkdocs --strict docs gate — completed 2026-06-28 (Linux CI gate pending user push)
 
 **UI hint**: no
 
@@ -304,7 +304,7 @@ Plans:
 | 24. Core Async Wrapper | v1.4.0 | 5/5 | Complete    | 2026-06-27 |
 | 25. Cancellation | v1.4.0 | 6/5 | Complete    | 2026-06-28 |
 | 26. Packaging & Extra Scoping | v1.4.0 | 2/4 | In progress | - |
-| 27. Dual-Backend Test Matrix | v1.4.0 | 2/5 | In progress | - |
+| 27. Dual-Backend Test Matrix | v1.4.0 | 5/5 | Local complete (Linux CI pending) | 2026-06-28 |
 | 28. Documentation | v1.4.0 | 0/0 | Not started | - |
 | 21.1. ADBC dispatch URI-positional fix | v1.3.0 | 3/3 | Complete | 2026-05-20 |
 | 21. Quack Backend | v1.3.0 | 3/3 | Complete    | 2026-05-19 |

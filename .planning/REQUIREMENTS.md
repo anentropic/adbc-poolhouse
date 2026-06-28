@@ -117,13 +117,13 @@ _Event-loop hygiene_
 
 _trio-vs-asyncio_
 
-- [ ] **EDGE-27**: Every async test is parametrized over asyncio AND trio — no `@pytest.mark.asyncio`, no `asyncio` import in the async test package
+- [x] **EDGE-27**: Every async test is parametrized over asyncio AND trio — no `@pytest.mark.asyncio`, no `asyncio` import in the async test package
 - [x] **EDGE-28**: Cancellation handling uses `get_cancelled_exc_class()` only — a trio cancel of a blocked execute *does* run `adbc_cancel` + invalidate; no `asyncio.CancelledError` in `_async/`
 - [x] **EDGE-29**: Cancel-scope behaviour is identical across backends — the `(adbc_cancel_count, invalidate_count, checkedout_after)` tuple is equal under asyncio and trio
 
 _Timing_
 
-- [ ] **EDGE-30**: Timeout/cancel tests use a virtual clock or event gating — no positive-duration `sleep` in timeout tests (enforced by a source scan)
+- [x] **EDGE-30**: Timeout/cancel tests use a virtual clock or event gating — no positive-duration `sleep` in timeout tests (enforced by a source scan)
 
 ### Documentation
 
@@ -229,8 +229,8 @@ Explicit exclusions for the async layer (with reasoning):
 | TEST-02 | Phase 27 | Complete (27-02) |
 | TEST-03 | Phase 27 | Complete |
 | TEST-04 | Phase 27 | Complete (27-04) |
-| EDGE-27 | Phase 27 | Pending |
-| EDGE-30 | Phase 27 | Pending |
+| EDGE-27 | Phase 27 | Done |
+| EDGE-30 | Phase 27 | Done |
 | DOCS-01 | Phase 28 | Pending |
 | DOCS-02 | Phase 28 | Pending |
 | DOCS-03 | Phase 28 | Pending |
