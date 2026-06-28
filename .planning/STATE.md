@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.4.0
 milestone_name: Async API
-status: executing
-stopped_at: Completed 26-04-PLAN.md (PKG-04 no-anyio CI guard job) — Phase 26 complete
-last_updated: "2026-06-28T09:00:00.000Z"
+status: completed
+stopped_at: Phase 27 context gathered
+last_updated: "2026-06-28T13:11:06.257Z"
 last_activity: 2026-06-28 -- Completed Phase 26 Plan 04 (PKG-04); Phase 26 complete
 progress:
   total_phases: 9
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 20
-  completed_plans: 20
-  percent: 50
+  completed_plans: 21
+  percent: 56
 ---
 
 # Project State
@@ -140,7 +140,7 @@ v1.4.0 roadmap decisions:
 
 ## Session Continuity
 
-Last session: 2026-06-28T09:00:00.000Z
-Stopped at: Completed 26-04-PLAN.md (PKG-04 — no-anyio CI guard job); Phase 26 complete (all 4 plans, PKG-01..05)
+Last session: 2026-06-28T13:11:06.247Z
+Stopped at: Phase 27 context gathered
 Next step: Phase 27 (Dual-Backend Test Matrix). NOTE: the sync-no-anyio job's live GitHub Actions run is auto-approved pending the next push — confirm it is green on Actions when CI next runs.
 </content>
