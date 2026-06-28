@@ -90,3 +90,35 @@ jobs:
       - name: Cache pruning
         if: always()
         run: uv cache prune --ci
+
+  # TEMPORARY (PR #32 investigation) — remove after diagnosis. Runs the
+  # virtual-clock diagnostic on Linux to find why the Phase-25 deadline-driven
+  # cancel tests hang here but pass on macOS. Non-blocking: it only prints.
+  diag-clock:
+    name: DIAG virtual clock (TEMP PR#32)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.14"]
+      fail-fast: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+          python-version: ${{ matrix.python-version }}
+
+      - name: Sync dev deps (anyio + trio + aiotools)
+        run: uv sync --locked --dev --extra duckdb
+
+      - name: Run virtual-clock diagnostic
+        run: uv run python diag_virtual_clock.py
+
+      - name: Cache pruning
+        if: always()
+        run: uv cache prune --ci
