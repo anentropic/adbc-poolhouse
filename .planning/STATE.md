@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.4.0
 milestone_name: Async API
 status: executing
-stopped_at: Completed 27-03-PLAN.md
-last_updated: "2026-06-28T14:00:00.000Z"
-last_activity: 2026-06-28 -- Completed Phase 27 Plan 03 (Arrow allocator-stability: zero total_allocated_bytes delta over N=100 cursor cycles + one reset per checkin, x {asyncio, trio} — TEST-03)
+stopped_at: Completed 27-04-PLAN.md
+last_updated: "2026-06-28T15:00:00.000Z"
+last_activity: 2026-06-28 -- Completed Phase 27 Plan 04 (limiter saturation stress: stub-gated 4x(pool_size+max_overflow) flood proving running-max == 8 + no starvation, real-DuckDB smoke flood drains to checkedout()==0, real-clock watchdog, x20 loop-stable — TEST-04)
 progress:
   total_phases: 9
   completed_phases: 5
   total_plans: 25
-  completed_plans: 24
+  completed_plans: 25
   percent: 60
 ---
 
@@ -26,9 +26,9 @@ See: .planning/PROJECT.md (updated 2026-06-25)
 ## Current Position
 
 Phase: 27 (dual-backend-test-matrix) — EXECUTING
-Plan: 4 of 5
-Status: Executing Phase 27 (Plans 01–03 complete)
-Last activity: 2026-06-28 -- Completed Phase 27 Plan 03 (Arrow allocator-stability — TEST-03)
+Plan: 5 of 5
+Status: Executing Phase 27 (Plans 01–04 complete)
+Last activity: 2026-06-28 -- Completed Phase 27 Plan 04 (limiter saturation stress — TEST-04)
 
 Progress: [░░░░░░░░░░] 0% (0/7 phases)
 
@@ -61,6 +61,7 @@ Progress: [░░░░░░░░░░] 0% (0/7 phases)
 | Phase 27 P01 | ~20min | 3 tasks | 3 files |
 | Phase 27 P02 | ~15min | 1 tasks | 1 files |
 | Phase 27 P03 | ~5min | 1 tasks | 1 files |
+| Phase 27 P04 | ~15min | 1 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -123,6 +124,7 @@ v1.4.0 roadmap decisions:
 - [Phase 25]: EDGE-09 cancel-mid-block leg (D-24-02 owed from Phase 24) lands — gate a stub worker inside execute, cancel the scope so the watcher fires adbc_cancel, assert adbc_cancel_call_count==1 + borrowed_tokens==0 after the cancelled offload (transient token released exactly once), x50, both backends, x20 loop-stable; a belt-and-braces finally release keeps the group fail-fast (never a hang) without changing the happy cancel path
 - [Phase 27]: P01 shared primitives — snowflake_async_pool cassette fixture (D-27-04, mirrors duckdb_async_pool: importorskip driver, skip on absent cassette, replay-mode dummy SNOWFLAKE_ACCOUNT, close in finally; cassette NOT mounted in the fixture — the consumer carries the adbc_cassette marker) + two pure-AST guard callables. scan_async_test_hygiene (EDGE-27/D-27-01) flags import asyncio, @pytest.mark.asyncio (plain+called), and async def test_* missing @pytest.mark.anyio — the axis signal is the PRESENCE of the marker, NOT a literal anyio_backend arg (RESEARCH Pitfall 2). scan_for_positive_sleep (EDGE-30) flags sleep(<positive numeric literal>) for both <mod>.sleep and bare sleep, ALLOWS sleep(0)/sleep(0.0)/non-literal args (bool excluded). Both exposed exactly like scan_async_package (rglob + tolerant ast.parse + absent-root []) via a shared _scan_with helper; scan_async_package/_GuardVisitor untouched. 16 synthetic self-tests added (27 guard tests green). No src/ change. EDGE-30 meta-scan scope is tests/async/ ONLY (_async_harness has deliberate virtual-clock sleeps)
 - [Phase 27]: P02 read-path matrix (TEST-01/02) — tests/async/test_matrix_readpath.py: connect->execute->fetch_arrow_table/fetchall->checkin x {DuckDB, Snowflake cassette} x {asyncio, trio} = 8 green legs; checkedout()==0 both backends; no src/ change. THREE test-authoring corrections vs the PATTERNS.md plan, all real-cassette/driver discoveries: (1) getfixturevalue in the @pytest.mark.anyio test BODY re-enters the anyio runner (RuntimeError: another coroutine already running) for async-generator pool fixtures — moved the backend-name indirection into a SYNC `pool` fixture (params=_BACKENDS) resolved at SETUP, tests take `pool` directly; (2) snowflake_arrow_round_trip cassette has exactly ONE recorded interaction — a 2nd execute raises CassetteMissError(Interaction 1 not found), so each test does ONE execute (dropped the planned 2nd-execute fetchone leg); (3) backend-neutral assertions required — Snowflake folds unquoted aliases to N/S (DuckDB keeps n/s) and returns N as Decimal('1') (DuckDB int 1), so added a case-insensitive _col() helper and compared by value (Decimal('1')==1). fetchall is typed `object` on the async surface -> cast to Sequence[Sequence[object]]. basedpyright strict 0 errors, hygiene guard clean, mkdocs --strict passes
+- [Phase 27]: P04 limiter saturation stress (TEST-04) — tests/async/test_limiter_stress.py: stub-gated 4x(pool_size+max_overflow) flood (EDGE-12 pattern) of 32 stub-backed AsyncConnections sharing ONE CapacityLimiter(8) proves running-max == bound (borrowed_tokens==8 at saturation, never exceeded) + no starvation (close()-drain -> borrowed_tokens==0). Used the SHIPPED defaults 5+3=8 for the bound (Open Question 1) — 32 gated stubs are cheap, so prove the real shipped bound not a stand-in. close()-drain not release() (Phase 26 lost-wakeup); real_clock_watchdog not anyio.fail_after (Phase 24/25 trio MockClock autojump). [Rule 1] real-DuckDB smoke flood (4x bound real round trips) needed a CapacityLimiter(bound) gating concurrently-HELD connections: holding all 32 open at once genuinely exceeds the real QueuePool (5+3) and trips its 30s checkout TimeoutError (a real bounded-resource limit + hold-and-wait, not a wrapper bug) — gating the holds lets the bounded pool cycle every worker, checkedout()==0 afterwards. Both backends; x20 loop-stable (pass=20 fail=0, 0 hangs); no src/ change; in scope for the Plan 27-05 meta-scan (no import asyncio / @pytest.mark.asyncio / positive real sleep)
 
 ### Roadmap Evolution
 
