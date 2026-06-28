@@ -165,7 +165,11 @@ all = [
     { name = "adbc-driver-quack" },
     { name = "adbc-driver-snowflake" },
     { name = "adbc-driver-sqlite" },
+    { name = "anyio" },
     { name = "duckdb" },
+]
+async = [
+    { name = "anyio" },
 ]
 bigquery = [
     { name = "adbc-driver-bigquery" },
@@ -223,6 +227,7 @@ requires-dist = [
     { name = "adbc-driver-quack", marker = "extra == 'quack'", specifier = ">=0.1.0a1" },
     { name = "adbc-driver-snowflake", marker = "extra == 'snowflake'", specifier = ">=1.0.0" },
     { name = "adbc-driver-sqlite", marker = "extra == 'sqlite'", specifier = ">=1.0.0" },
+    { name = "adbc-poolhouse", extras = ["async"], marker = "extra == 'all'" },
     { name = "adbc-poolhouse", extras = ["bigquery"], marker = "extra == 'all'" },
     { name = "adbc-poolhouse", extras = ["duckdb"], marker = "extra == 'all'" },
     { name = "adbc-poolhouse", extras = ["flightsql"], marker = "extra == 'all'" },
@@ -230,11 +235,12 @@ requires-dist = [
     { name = "adbc-poolhouse", extras = ["quack"], marker = "extra == 'all'" },
     { name = "adbc-poolhouse", extras = ["snowflake"], marker = "extra == 'all'" },
     { name = "adbc-poolhouse", extras = ["sqlite"], marker = "extra == 'all'" },
+    { name = "anyio", marker = "extra == 'async'", specifier = ">=4.13" },
     { name = "duckdb", marker = "extra == 'duckdb'", specifier = ">=0.9.1" },
     { name = "pydantic-settings", specifier = ">=2.0.0" },
     { name = "sqlalchemy", specifier = ">=2.0.0" },
 ]
-provides-extras = ["duckdb", "snowflake", "postgresql", "quack", "flightsql", "bigquery", "sqlite", "all"]
+provides-extras = ["duckdb", "snowflake", "postgresql", "quack", "flightsql", "bigquery", "sqlite", "async", "all"]
 
 [package.metadata.requires-dev]
 dev = [
