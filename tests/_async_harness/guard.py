@@ -8,12 +8,14 @@ with `ast.parse` and walks the tree, so scanning is read-only.
 
 It backs the EDGE meta-guards in later phases (EDGE-25/27/28): those tests assert
 that [`scan_async_package`][tests._async_harness.guard.scan_async_package] returns
-an empty list against the real `src/adbc_poolhouse/_async/` package. Two rules are
+an empty list against the real `src/adbc_poolhouse/_async/` package. Three rules are
 enforced:
 
 - `banned-asyncio-import`: any `import asyncio` / `from asyncio import ...`.
 - `to_thread-without-limiter`: a `to_thread.run_sync(...)` call missing an
   explicit `limiter=` keyword.
+- `banned-asyncio-cancelled-error`: any `asyncio.CancelledError` attribute
+  access (EDGE-28, D-25-06; use `anyio.get_cancelled_exc_class()` instead).
 """
 
 from __future__ import annotations
@@ -32,8 +34,9 @@ class Finding:
         path: The file in which the violation was found.
         lineno: The 1-based line number of the offending node.
         rule: The rule id -- `"banned-asyncio-import"`,
-            `"to_thread-without-limiter"`, or `"unparseable-source"` (a file that
-            could not be parsed; see `scan_async_package`).
+            `"to_thread-without-limiter"`, `"banned-asyncio-cancelled-error"`, or
+            `"unparseable-source"` (a file that could not be parsed; see
+            `scan_async_package`).
         message: A human-readable description of the violation.
     """
 
@@ -78,6 +81,24 @@ class _GuardVisitor(ast.NodeVisitor):
             )
         self.generic_visit(node)
 
+    def visit_Attribute(self, node: ast.Attribute) -> None:  # noqa: N802
+        """Flag `asyncio.CancelledError` attribute access (EDGE-28, D-25-06)."""
+        if (
+            node.attr == "CancelledError"
+            and isinstance(node.value, ast.Name)
+            and node.value.id == "asyncio"
+        ):
+            self.findings.append(
+                Finding(
+                    self.path,
+                    node.lineno,
+                    "banned-asyncio-cancelled-error",
+                    "`asyncio.CancelledError` is banned in _async/; "
+                    "use anyio.get_cancelled_exc_class()",
+                )
+            )
+        self.generic_visit(node)
+
     def visit_Call(self, node: ast.Call) -> None:  # noqa: N802
         """Flag `to_thread.run_sync(...)` calls lacking a `limiter=` keyword."""
         if self._is_to_thread_run_sync(node.func):
@@ -117,9 +138,11 @@ def scan_async_package(root: str | Path) -> list[Finding]:
     Scan every `.py` file under `root` for banned async patterns.
 
     The scan is read-only: each file is parsed with `ast.parse` and walked; the
-    source is never imported or executed. Two rules are enforced -- a literal
-    `import asyncio` ban and a requirement that every `to_thread.run_sync(...)`
-    call passes an explicit `limiter=` keyword.
+    source is never imported or executed. Three rules are enforced -- a literal
+    `import asyncio` ban, a requirement that every `to_thread.run_sync(...)`
+    call passes an explicit `limiter=` keyword, and a ban on
+    `asyncio.CancelledError` attribute access (use
+    `anyio.get_cancelled_exc_class()` instead).
 
     If `root` does not exist, an empty list is returned (D-05 graceful no-op):
     the real `src/adbc_poolhouse/_async/` package is not created until Phase 24,
