@@ -10,11 +10,14 @@ Two complementary tests, both `@pytest.mark.anyio` (run under BOTH asyncio and
 trio):
 
 - The PRIMARY proof is a stub-gated deterministic flood (D-27-10), reusing the
-  EDGE-12 pattern verbatim: `4 x (pool_size + max_overflow)` workers share ONE
+  EDGE-12 pattern: `4 x (pool_size + max_overflow)` workers share ONE
   `anyio.CapacityLimiter`, every worker blocks inside a `BlockingStubConnection`'s
-  `execute`, and the test asserts the observed running-max (`borrowed_tokens` at
-  saturation) equals exactly the bound and is never exceeded, then drains and
-  asserts every queued worker eventually ran (`borrowed_tokens == 0`, no
+  `execute`. The flood proves the bound TWO ways: it polls `borrowed_tokens` to
+  confirm saturation was reached, and --- the load-bearing over-admission check ---
+  it sums each stub's live `in_execute` counter (workers actually inside the
+  blocked section, counted independently of the limiter's own accounting) and
+  asserts that cross-cursor sum equals the bound and is never exceeded. It then
+  drains and asserts every queued worker eventually ran (`borrowed_tokens == 0`, no
   starvation). It uses the shipped defaults `pool_size=5 + max_overflow=3 = 8`, so
   the flood proves the real bound the library ships (Open Question 1).
 - A small real-DuckDB smoke flood adds realism: `4 x bound` genuine
@@ -81,12 +84,19 @@ class TestLimiterFloodBound:
         A `4x(pool_size+max_overflow)` stub-gated flood holds the bound and starves no one.
 
         `_FLOOD` separate stub-backed connections share ONE `CapacityLimiter(_BOUND)`;
-        every worker blocks inside its stub's `execute`. The limiter admits only
-        `_BOUND` workers at once, so the observed running-max --- `borrowed_tokens`
-        polled at saturation --- equals exactly `_BOUND` and is never exceeded. The
-        flood then drains via `close()` (the sticky-latch terminal that admits even a
-        worker that has not yet entered), and `borrowed_tokens` settling to 0 proves
-        every queued worker eventually ran (no starvation).
+        every worker blocks inside its stub's `execute`. Saturation is confirmed by
+        polling `borrowed_tokens == _BOUND`. The real over-admission proof, however,
+        is sampled stub-side, independent of the limiter's own token accounting: each
+        stub cursor holds exactly one worker, and every worker lock-increments its
+        cursor's `_in_execute` on entry to `_block`, so summing `_in_execute` across
+        all cursors counts the workers ACTUALLY inside their blocked section right
+        now. Polling that cross-cursor sum and asserting it never exceeds `_BOUND`
+        (and reaches it) catches an over-admitting wrapper even though
+        `borrowed_tokens` is structurally capped at `_BOUND` by the `CapacityLimiter`
+        type and so could never reveal over-admission on its own. The flood then
+        drains via `close()` (the sticky-latch terminal that admits even a worker
+        that has not yet entered), and `borrowed_tokens` settling to 0 proves every
+        queued worker eventually ran (no starvation).
 
         Deadlock detection is the real-clock `real_clock_watchdog` (NEVER
         `anyio.fail_after`, which autojumps under the trio `MockClock`): if a worker
@@ -104,11 +114,26 @@ class TestLimiterFloodBound:
                 for i, cur in enumerate(cursors):
                     tg.start_soon(functools.partial(cur.execute, f"SELECT {i}"))
                 try:
-                    # Wait until the limiter is saturated, then read the running-max:
-                    # exactly `_BOUND` workers are inside their stubs at once.
-                    await await_inside(lambda: limiter.borrowed_tokens == _BOUND)
-                    observed_max = limiter.borrowed_tokens
-                    assert observed_max == _BOUND  # bound held, never exceeded
+                    # Saturation is sampled stub-side, not via `borrowed_tokens`: a
+                    # worker holds a limiter token from the moment the offload path
+                    # acquires it, but does not reach the stub's `_block` (and so does
+                    # not lock-increment `_in_execute`) until its worker thread runs.
+                    # Polling the cross-cursor `in_execute` sum waits for the workers
+                    # to be genuinely INSIDE the blocked section, closing that race.
+                    def _inside_now() -> int:
+                        return sum(sc.in_execute for sc in stub_cursors)
+
+                    await await_inside(lambda: _inside_now() == _BOUND)
+                    # Genuine over-admission check, independent of the limiter's own
+                    # token accounting: the workers ACTUALLY inside their blocked
+                    # section must number exactly `_BOUND` --- never more (an
+                    # over-admitting wrapper would push this above the bound) and not
+                    # less (saturation was genuinely reached).
+                    inside_now = _inside_now()
+                    assert inside_now == _BOUND, (
+                        f"workers inside execute = {inside_now}, expected {_BOUND}"
+                    )
+                    assert limiter.borrowed_tokens == _BOUND  # limiter agrees
                 finally:
                     # Drain via close() (terminal sticky latch): a closed stub
                     # short-circuits in `_block` and returns at once even for a worker
@@ -143,10 +168,20 @@ class TestLimiterSmokeFlood:
         is held only across its own round trip and released promptly, so the bounded
         pool cycles all `_FLOOD` workers through and `checkedout() == 0` afterwards.
 
-        Wrapped in `real_clock_watchdog([])` (empty --- there are no stubs to break
-        open; the real workers cannot be force-released): if the real flood ever
-        deadlocked, the body would overrun the wall-clock budget and the
-        `watchdog[0] is False` assertion would trip rather than hang CI.
+        Deadlock backstop: unlike the stub leg, this flood has NO blocking stub the
+        watchdog could `close()` to force a stranded worker open --- the real ADBC
+        round trips are not gated, so `real_clock_watchdog([])` is passed an empty
+        cursor list and cannot interrupt a genuinely wedged worker. If the real
+        flood ever deadlocked the `async with` body would never return, so the
+        post-body `watchdog[0]` assertion would never be reached; the actual
+        fail-fast guarantee here is the SUITE-LEVEL / CI job timeout, not this
+        watchdog. The watchdog is retained only as a soft over-budget signal for the
+        non-deadlock case (a slow-but-completing flood): if the body finishes after
+        the wall-clock budget, the side thread will have set `tripped[0]`, and the
+        assertion flags the regression. A virtual `anyio.fail_after` is deliberately
+        NOT used as the backstop --- it autojumps to its own deadline under the trio
+        `MockClock` the instant the workers block off-loop and would trip every run
+        (Phase 24-26 landmine).
         """
         with real_clock_watchdog([]) as watchdog:
             # Hold no more than the pool's capacity at once, so the bounded real
@@ -163,7 +198,10 @@ class TestLimiterSmokeFlood:
             async with anyio.create_task_group() as tg:
                 for i in range(_FLOOD):
                     tg.start_soon(_round_trip, i)
-        assert watchdog[0] is False, "TEST-04 smoke watchdog tripped: real flood hung"
+        # Soft over-budget signal only (see docstring): a wedged worker is caught
+        # by the suite/CI timeout, not here, since the empty watchdog cannot break
+        # an ungated real worker open.
+        assert watchdog[0] is False, "TEST-04 smoke flood exceeded its wall-clock budget"
         # No checkout leak: every connection the flood borrowed is back in the pool.
         assert duckdb_async_pool._pool.checkedout() == 0
         assert duckdb_async_pool._limiter.borrowed_tokens == 0

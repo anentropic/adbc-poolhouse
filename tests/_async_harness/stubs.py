@@ -172,6 +172,19 @@ class BlockingStubCursor:
         with self._lock:
             return self._closed
 
+    @property
+    def in_execute(self) -> int:
+        """
+        Workers currently inside the blocked section of this cursor (lock-read).
+
+        The instantaneous companion to `max_concurrent_in_execute`: it rises on each
+        `_block` entry and falls on exit. Summing it across a flood's cursors yields
+        the live cross-cursor concurrency, which a saturation test asserts never
+        exceeds the shared limiter's bound (TEST-04 over-admission proof).
+        """
+        with self._lock:
+            return self._in_execute
+
     def register_on_enter(self, callback: Callable[[], None]) -> Callable[[], None]:
         """
         Register a worker-entry hook keyed by the CALLING thread's id.
