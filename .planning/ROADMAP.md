@@ -162,7 +162,24 @@ Plans:
   4. The framework cancel class (`get_cancelled_exc_class()`) is never swallowed and never a raw `asyncio.CancelledError`; a trio cancel of a blocked execute *does* run `adbc_cancel` + invalidate; the `(adbc_cancel_count, invalidate_count, checkedout_after)` tuple is equal under asyncio and trio (CANCEL-04, EDGE-03/28/29)
   5. An `ExceptionGroup`/`except*` from a task group preserves the original ADBC errors, keeps cancellation distinguishable, and leaves `checkedout() == 0` (EDGE-19)
 
-**Plans**: TBD
+**Plans**: 5 plans
+Plans:
+**Wave 1**
+
+- [ ] 25-01-PLAN.md — Wave-0 harness prereqs: BlockingStubConnection.invalidate + banned-asyncio-cancelled-error AST rule (EDGE-28)
+
+**Wave 2** *(blocked on Wave 1)*
+
+- [ ] 25-02-PLAN.md — cancellable_offload watcher/worker + AsyncConnection.invalidate + rewire 6 cursor methods (CANCEL-01/02/03, EDGE-19 unwrap)
+
+**Wave 3** *(blocked on Wave 2)*
+
+- [ ] 25-03-PLAN.md — cancel-depth EDGE suite (EDGE-01..07) + backend-parity tuple equality (EDGE-29), x20-loop, dual-backend
+- [ ] 25-04-PLAN.md — EDGE-19 bare-AdbcError unwrap + EDGE-09 cancel-mid-block token leg (D-24-02, x50)
+
+**Wave 4** *(blocked on Wave 3)*
+
+- [ ] 25-05-PLAN.md — docs gate (async guide cancellation section, mkdocs --strict) + EDGE-28 meta-assert + phase x20 loop gate
 **UI hint**: no
 
 ### Phase 26: Packaging & Extra Scoping
