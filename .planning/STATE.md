@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.4.0
 milestone_name: Async API
 status: executing
-stopped_at: Completed 27-02-PLAN.md
-last_updated: "2026-06-28T15:05:00.000Z"
-last_activity: 2026-06-28 -- Completed Phase 27 Plan 02 (read-path backend matrix: connect->execute->fetch->checkin x {DuckDB, Snowflake cassette} x {asyncio, trio})
+stopped_at: Completed 27-03-PLAN.md
+last_updated: "2026-06-28T14:00:00.000Z"
+last_activity: 2026-06-28 -- Completed Phase 27 Plan 03 (Arrow allocator-stability: zero total_allocated_bytes delta over N=100 cursor cycles + one reset per checkin, x {asyncio, trio} — TEST-03)
 progress:
   total_phases: 9
   completed_phases: 5
   total_plans: 25
-  completed_plans: 23
-  percent: 58
+  completed_plans: 24
+  percent: 60
 ---
 
 # Project State
@@ -26,9 +26,9 @@ See: .planning/PROJECT.md (updated 2026-06-25)
 ## Current Position
 
 Phase: 27 (dual-backend-test-matrix) — EXECUTING
-Plan: 3 of 5
-Status: Executing Phase 27 (Plans 01–02 complete)
-Last activity: 2026-06-28 -- Completed Phase 27 Plan 02 (read-path backend matrix)
+Plan: 4 of 5
+Status: Executing Phase 27 (Plans 01–03 complete)
+Last activity: 2026-06-28 -- Completed Phase 27 Plan 03 (Arrow allocator-stability — TEST-03)
 
 Progress: [░░░░░░░░░░] 0% (0/7 phases)
 
@@ -60,6 +60,7 @@ Progress: [░░░░░░░░░░] 0% (0/7 phases)
 | Phase 26 P04 | ~30min | 1 tasks | 2 files |
 | Phase 27 P01 | ~20min | 3 tasks | 3 files |
 | Phase 27 P02 | ~15min | 1 tasks | 1 files |
+| Phase 27 P03 | ~5min | 1 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -146,5 +147,7 @@ v1.4.0 roadmap decisions:
 
 Last session: 2026-06-28T15:05:00.000Z
 Stopped at: Completed 27-02-PLAN.md (read-path backend matrix)
-Next step: Phase 27 Plan 03 (Arrow allocator-stability over N>=100 cycles + reset-event count, both backends — TEST-03). NOTE: the sync-no-anyio job's live GitHub Actions run is auto-approved pending the next push — confirm it is green on Actions when CI next runs.
+Next step: Phase 27 Plan 04 (limiter flood + real-DuckDB smoke flood — TEST-04). NOTE: the sync-no-anyio job's live GitHub Actions run is auto-approved pending the next push — confirm it is green on Actions when CI next runs.
+
+Phase 27 Plan 03 decisions: Arrow allocator-stability proved with an exact-zero pyarrow.total_allocated_bytes() delta over N=100 cursor cycles (NOT process RSS — D-27-07); reset-event count (the _release_arrow_allocators path) gathered once per checkin via a read-only sqlalchemy event.listen on pool._pool, no src/ change (ACONN-06 / D-27-08); runs x{asyncio, trio} via @pytest.mark.anyio (D-27-09); imported `from sqlalchemy import event` (repo _pool_factory.py form) to satisfy basedpyright. 20x loop-stable, 0 hangs.
 </content>

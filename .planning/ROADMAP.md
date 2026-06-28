@@ -232,7 +232,7 @@ Plans:
 **Wave 2** *(blocked on Wave 1)*
 
 - [x] 27-02-PLAN.md — read-path matrix: connect→execute→fetch_arrow_table→checkin × {DuckDB, Snowflake cassette} × {asyncio, trio} (TEST-01/02) — completed 2026-06-28
-- [ ] 27-03-PLAN.md — Arrow allocator-stability over N≥100 cycles + reset-event count, both backends (TEST-03)
+- [x] 27-03-PLAN.md — Arrow allocator-stability over N≥100 cycles + reset-event count, both backends (TEST-03) — completed 2026-06-28
 - [ ] 27-04-PLAN.md — limiter-sizing stress: stub-gated 4× flood (running-max == bound, no starvation) + real-DuckDB smoke flood, real-clock watchdog (TEST-04)
 
 **Wave 3** *(blocked on Waves 1–2)*
