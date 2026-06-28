@@ -487,14 +487,14 @@ async def test_cancel_signal_tuple(record_cancel_tuple, make_stub_async_connecti
 | A3 | `fairy.invalidate()` offloaded under a shield is safe to call after the worker has been joined (offload returned) on the cancel path | Pattern 3 | LOW — CONTEXT probe confirmed `invalidate()` is sufficient and a following `close()` is a no-op; the worker is always joined (`abandon_on_cancel=False`) before cleanup |
 | A4 | The `BlockingStubConnection` exposes (or trivially gains) an `invalidate()` the `AsyncConnection.invalidate()` offload can call for stub-backed cancel tests | Test design / Wave 0 | MEDIUM — `BlockingStubConnection` currently has `close`/`adbc_cancel`/`cursor` but NO `invalidate` (verified in stubs.py). Wave 0 must add a stub `invalidate()` (increment an `invalidate_call_count`, set a flag) to drive EDGE-02/04/05/29 on the stub harness. This is the one harness gap |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **Does `BlockingStubConnection` need an `invalidate()` method, or should stub cancel tests assert via the real DuckDB pool only?**
+1. **Does `BlockingStubConnection` need an `invalidate()` method, or should stub cancel tests assert via the real DuckDB pool only?** — RESOLVED: add `invalidate()` + `invalidate_call_count` to `BlockingStubConnection`, Wave 0 (implemented in 25-01).
    - What we know: `BlockingStubConnection` has `close`/`adbc_cancel`/`cursor` + counters, but NOT `invalidate` `[VERIFIED: stubs.py]`. `AsyncConnection.invalidate()` will call `self._fairy.invalidate()`, which the stub must expose for stub-backed cancel tests.
    - What's unclear: whether to add `invalidate()` + `invalidate_call_count` to the stub (clean, matches the D-04 LOCKED-contract style) or assert the invalidate signal only on the real-driver leg.
    - Recommendation: add `invalidate()` + `invalidate_call_count` to `BlockingStubConnection` in a Wave-0 task (one method, lock-guarded counter, mirroring `close`). This keeps EDGE-02/04/05/29 deterministic on the stub harness and lets the tuple-equality (EDGE-29) read a clean `invalidate_count`. Treat as the single harness extension this phase needs.
 
-2. **In the cursor method, what is the correct `except` ordering so cancellation is handled before a non-cancel group?**
+2. **In the cursor method, what is the correct `except` ordering so cancellation is handled before a non-cancel group?** — RESOLVED: keep the single-member EG unwrap inside `cancellable_offload` so cursor methods catch only a bare `get_cancelled_exc_class()` or a bare `AdbcError` (implemented in 25-02).
    - What we know: on the cancel path anyio collapses to the framework cancellation (`get_cancelled_exc_class()`); on the non-cancel path a genuine error arrives as an `ExceptionGroup` (verified). The unwrap of the group happens inside `cancellable_offload`, so the cursor method should mostly see either a bare cancellation or a bare unwrapped `AdbcError`.
    - What's unclear: whether any residual group can reach the cursor method (it should not, given the unwrap in `cancellable_offload`).
    - Recommendation: keep the unwrap in `cancellable_offload` (Pattern 1) so the cursor method only ever catches `get_cancelled_exc_class()` for the invalidate path and lets a bare `AdbcError` propagate. Verify with EDGE-19 (bare `AdbcError`) and EDGE-02 (bare cancellation).
