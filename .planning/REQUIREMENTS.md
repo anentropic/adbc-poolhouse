@@ -54,10 +54,10 @@ Scope decisions for this milestone:
 
 ### Cancellation
 
-- [ ] **CANCEL-01**: When an awaited `execute` / `fetch_arrow_table` is cancelled or times out, `cursor.adbc_cancel()` is invoked from the event-loop thread to abort the in-flight C call
-- [ ] **CANCEL-02**: A connection whose in-flight operation was cancelled is invalidated rather than returned busy, so the pool is never poisoned (`pool.checkedout() == 0` after a cancelled scope)
-- [ ] **CANCEL-03**: `__aexit__` cleanup is wrapped in `CancelScope(shield=True)` so the connection always returns or invalidates even when the surrounding task is cancelled mid-cleanup
-- [ ] **CANCEL-04**: Deterministic cancellation tests prove no-leak behaviour under both asyncio and trio
+- [x] **CANCEL-01**: When an awaited `execute` / `fetch_arrow_table` is cancelled or times out, `cursor.adbc_cancel()` is invoked from the event-loop thread to abort the in-flight C call
+- [x] **CANCEL-02**: A connection whose in-flight operation was cancelled is invalidated rather than returned busy, so the pool is never poisoned (`pool.checkedout() == 0` after a cancelled scope)
+- [x] **CANCEL-03**: `__aexit__` cleanup is wrapped in `CancelScope(shield=True)` so the connection always returns or invalidates even when the surrounding task is cancelled mid-cleanup
+- [x] **CANCEL-04**: Deterministic cancellation tests prove no-leak behaviour under both asyncio and trio
 
 ### Packaging & Type Safety
 
@@ -81,13 +81,13 @@ Deterministic tests (arrange/trigger/assert) for the failure modes specific to a
 
 _Cancellation depth_
 
-- [ ] **EDGE-01**: Cancel delivered *before* the offload starts — driver `execute` is never called, no `adbc_cancel`, the connection stays clean, and the cancel exception propagates
-- [ ] **EDGE-02**: Cancel *during* the blocked worker — `adbc_cancel` is called exactly once (shielded), the worker is joined, the connection is invalidated, `checkedout() == 0`, and the cancel exception propagates
-- [ ] **EDGE-03**: The framework cancel class is never swallowed by the offload/try-except — the exact `get_cancelled_exc_class()` instance escapes and there is no hang under trio
-- [ ] **EDGE-04**: A double-cancel during shielded cleanup is idempotent — one `adbc_cancel`, one invalidate, one cancel exception
-- [ ] **EDGE-05**: Cancel during `__aexit__`/checkin still completes checkin under shield — `checkedout() == 0` for both connection and cursor
-- [ ] **EDGE-06**: `fail_after` timeout and explicit `scope.cancel()` are handled identically (both → `adbc_cancel` + invalidate); only the surfaced exception type differs
-- [ ] **EDGE-07**: `move_on_after` on an already-finished op does nothing — `cancelled_caught` is False, no `adbc_cancel`, no invalidate
+- [x] **EDGE-01**: Cancel delivered *before* the offload starts — driver `execute` is never called, no `adbc_cancel`, the connection stays clean, and the cancel exception propagates
+- [x] **EDGE-02**: Cancel *during* the blocked worker — `adbc_cancel` is called exactly once (shielded), the worker is joined, the connection is invalidated, `checkedout() == 0`, and the cancel exception propagates
+- [x] **EDGE-03**: The framework cancel class is never swallowed by the offload/try-except — the exact `get_cancelled_exc_class()` instance escapes and there is no hang under trio
+- [x] **EDGE-04**: A double-cancel during shielded cleanup is idempotent — one `adbc_cancel`, one invalidate, one cancel exception
+- [x] **EDGE-05**: Cancel during `__aexit__`/checkin still completes checkin under shield — `checkedout() == 0` for both connection and cursor
+- [x] **EDGE-06**: `fail_after` timeout and explicit `scope.cancel()` are handled identically (both → `adbc_cancel` + invalidate); only the surfaced exception type differs
+- [x] **EDGE-07**: `move_on_after` on an already-finished op does nothing — `cancelled_caught` is False, no `adbc_cancel`, no invalidate
 
 _Limiter / backpressure_
 
@@ -119,7 +119,7 @@ _trio-vs-asyncio_
 
 - [ ] **EDGE-27**: Every async test is parametrized over asyncio AND trio — no `@pytest.mark.asyncio`, no `asyncio` import in the async test package
 - [ ] **EDGE-28**: Cancellation handling uses `get_cancelled_exc_class()` only — a trio cancel of a blocked execute *does* run `adbc_cancel` + invalidate; no `asyncio.CancelledError` in `_async/`
-- [ ] **EDGE-29**: Cancel-scope behaviour is identical across backends — the `(adbc_cancel_count, invalidate_count, checkedout_after)` tuple is equal under asyncio and trio
+- [x] **EDGE-29**: Cancel-scope behaviour is identical across backends — the `(adbc_cancel_count, invalidate_count, checkedout_after)` tuple is equal under asyncio and trio
 
 _Timing_
 
@@ -206,20 +206,20 @@ Explicit exclusions for the async layer (with reasoning):
 | EDGE-21 | Phase 24 | Complete |
 | EDGE-25 | Phase 24 | Complete |
 | EDGE-26 | Phase 24 | Complete |
-| CANCEL-01 | Phase 25 | Pending |
-| CANCEL-02 | Phase 25 | Pending |
-| CANCEL-03 | Phase 25 | Pending |
-| CANCEL-04 | Phase 25 | Pending |
-| EDGE-01 | Phase 25 | Pending |
-| EDGE-02 | Phase 25 | Pending |
-| EDGE-03 | Phase 25 | Pending |
-| EDGE-04 | Phase 25 | Pending |
-| EDGE-05 | Phase 25 | Pending |
-| EDGE-06 | Phase 25 | Pending |
-| EDGE-07 | Phase 25 | Pending |
+| CANCEL-01 | Phase 25 | Complete (25-03) |
+| CANCEL-02 | Phase 25 | Complete (25-03) |
+| CANCEL-03 | Phase 25 | Complete (25-03) |
+| CANCEL-04 | Phase 25 | Complete (25-03) |
+| EDGE-01 | Phase 25 | Complete (25-03) |
+| EDGE-02 | Phase 25 | Complete (25-03) |
+| EDGE-03 | Phase 25 | Complete (25-03) |
+| EDGE-04 | Phase 25 | Complete (25-03) |
+| EDGE-05 | Phase 25 | Complete (25-03) |
+| EDGE-06 | Phase 25 | Complete (25-03) |
+| EDGE-07 | Phase 25 | Complete (25-03) |
 | EDGE-19 | Phase 25 | Pending |
 | EDGE-28 | Phase 25 | Partial (25-01: AST guard rule banning asyncio.CancelledError; behavioral trio-cancel clause pending 25-02/03) |
-| EDGE-29 | Phase 25 | Pending |
+| EDGE-29 | Phase 25 | Complete (25-03) |
 | PKG-01 | Phase 26 | Pending |
 | PKG-02 | Phase 26 | Pending |
 | PKG-03 | Phase 26 | Pending |

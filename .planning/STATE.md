@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.4.0
 milestone_name: Async API
 status: executing
-stopped_at: Completed 25-02-PLAN.md
-last_updated: "2026-06-28T01:20:07.000Z"
-last_activity: 2026-06-28 -- Completed 25-02 (cancellation machinery: cancellable_offload + invalidate)
+stopped_at: Completed 25-03-PLAN.md
+last_updated: "2026-06-28T03:00:00.000Z"
+last_activity: 2026-06-28 -- Completed 25-03 (cancel-depth EDGE-01..07 + EDGE-29 backend parity; fixed real-cancel interrupt swallow in _cancel.py)
 progress:
   total_phases: 9
   completed_phases: 3
   total_plans: 16
-  completed_plans: 13
-  percent: 36
+  completed_plans: 14
+  percent: 39
 ---
 
 # Project State
@@ -26,9 +26,9 @@ See: .planning/PROJECT.md (updated 2026-06-25)
 ## Current Position
 
 Phase: 25 (cancellation) — EXECUTING
-Plan: 3 of 5
-Status: Executing Phase 25 (25-01, 25-02 complete)
-Last activity: 2026-06-28 -- Completed 25-02 (cancellation machinery: cancellable_offload + invalidate)
+Plan: 4 of 5
+Status: Executing Phase 25 (25-01, 25-02, 25-03 complete)
+Last activity: 2026-06-28 -- Completed 25-03 (cancel-depth EDGE-01..07 + EDGE-29 backend parity; fixed real-cancel interrupt swallow in _cancel.py)
 
 Progress: [░░░░░░░░░░] 0% (0/7 phases)
 
@@ -52,6 +52,7 @@ Progress: [░░░░░░░░░░] 0% (0/7 phases)
 | Phase 24 P05 | ~12min | 2 tasks | 4 files |
 | Phase 25 P01 | 9min | 2 tasks | 4 files |
 | Phase 25 P02 | 15min | 2 tasks | 4 files |
+| Phase 25 P03 | ~95min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -103,6 +104,9 @@ v1.4.0 roadmap decisions:
 - [Phase 25]: invalidate moved INTO cancellable_offload via an on_abort shielded callback, gated on a worker_started flag (set on the worker thread = entered-driver boundary) — the verbatim RESEARCH cursor-except design deadlocked on a saturated-limiter queued-cancel and over-invalidated never-poisoned connections (EDGE-01/07); fix keeps TestEdge10 green and x20 loop-stable
 - [Phase 25]: adbc_cancel resolved lazily via getattr in AsyncCursor._adbc_cancel — the pytest-adbc-replay ReplayCursor (D-24-04 cassette backend) lacks adbc_cancel; eager attribute access crashed the Snowflake leg on the success path
 - [Phase 25]: method-level mkdocstrings autoref to _async._connection.AsyncConnection.invalidate fails --strict (the gen_ref_pages.py skips any _-prefixed module path) — confirms the Phase-24 lesson; guide names invalidate in inline code, not a cross-ref link
+- [Phase 25]: 25-02's cancellable_offload leaked the driver interrupt on the REAL cancel path — anyio does NOT collapse the bundle as research assumed; the aborted DuckDB worker RAISES ProgrammingError, surfaced as a single-member ExceptionGroup that escaped past fail_after. Fixed in 25-03 with a cancelled_by_us flag that swallows the interrupt and yields one cancellation checkpoint so the caller's TimeoutError/scope.cancel surfaces (D-25-02/05). Stub legs never hit this (stub adbc_cancel returns the worker cleanly)
+- [Phase 25]: DuckDB's adbc_cancel against an in-flight query is best-effort AND intermittently WEDGES the worker thread inside the C execute (~10-40% of cold runs, faulthandler-confirmed) — an unfixable driver-level hang. The real-driver EDGE-02 leg therefore proves the downstream invariant (AsyncConnection.invalidate drains checkedout() to 0) deterministically instead of racing the wedge-prone cancel; the cancel->abort->invalidate wiring is proven on the stub during leg, real cancel-during-checkin on the trio-stable checkin_duckdb leg
+- [Phase 25]: real-time-sensitive cancel/finish legs release the gated worker from a REAL thread (waiting on the stub's entered threading.Event), because a loop-side releaser is starved under the trio MockClock autojump (EDGE-07)
 
 ### Roadmap Evolution
 
@@ -125,7 +129,7 @@ v1.4.0 roadmap decisions:
 
 ## Session Continuity
 
-Last session: 2026-06-28T01:01:20.000Z
-Stopped at: Completed 25-01-PLAN.md
-Next step: Execute 25-02 (cancel logic: cancellable_offload watcher/worker + AsyncConnection.invalidate + cursor rewire onto the stub invalidate seam + EDGE cancel suite).
+Last session: 2026-06-28T03:00:00.000Z
+Stopped at: Completed 25-03-PLAN.md
+Next step: Execute 25-04 (EDGE-19 bare-AdbcError unwrap + EDGE-09 cancel-mid-block token leg, D-24-02, x50).
 </content>
