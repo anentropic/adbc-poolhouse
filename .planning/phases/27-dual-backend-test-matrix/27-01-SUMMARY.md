@@ -107,6 +107,13 @@ None - no external service configuration required. The Snowflake fixture replays
 - The Wave 3 meta-test can assert `scan_async_test_hygiene("tests/async/") == []` and `scan_for_positive_sleep("tests/async/") == []`. NOTE: the EDGE-30 scan scope is `tests/async/` ONLY — `tests/_async_harness/` has deliberate positive sleeps under virtual clocks.
 - No `src/` modification; the frozen async surface is intact.
 
+## Self-Check: PASSED
+
+- `27-01-SUMMARY.md` exists on disk.
+- Task commits `4094274`, `89a9eaf`, `39bef20` and metadata commit `b0b9b7e` are present in the git log.
+- `git diff src/` empty across all task commits (frozen-surface constraint held).
+- Pre-existing unrelated working-tree changes (`.planning/config.json`, `.planning/.continue-here.md`, `24-CONTEXT.md`) left untouched.
+
 ---
 *Phase: 27-dual-backend-test-matrix*
 *Completed: 2026-06-28*
