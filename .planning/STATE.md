@@ -4,8 +4,8 @@ milestone: v1.4.0
 milestone_name: Async API
 status: verifying
 stopped_at: Completed 25-05-PLAN.md (final Phase 25 plan)
-last_updated: "2026-06-28T07:40:37.067Z"
-last_activity: 2026-06-28
+last_updated: "2026-06-28T08:26:41.910Z"
+last_activity: 2026-06-28 -- Phase 26 planning complete
 progress:
   total_phases: 9
   completed_phases: 4
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-06-25)
 Phase: 26
 Plan: Not started
 Status: Phase 25 plans complete (25-01..25-05 done) — awaiting phase verification
-Last activity: 2026-06-28
+Last activity: 2026-06-28 -- Phase 26 planning complete
 
 Progress: [░░░░░░░░░░] 0% (0/7 phases)
 
