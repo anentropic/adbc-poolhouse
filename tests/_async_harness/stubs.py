@@ -137,6 +137,14 @@ class BlockingStubCursor:
         self._in_execute: int = 0
         self.max_concurrent_in_execute: int = 0
         self._closed: bool = False
+        # Sticky cancel state, symmetric with `_closed`. A real driver's
+        # `adbc_cancel` latches cancellation, so a cancel that arrives BEFORE the
+        # worker enters the driver call is still honoured. `_block` checks this at
+        # entry (under the lock) so a dispatch-window cancel cannot be lost to the
+        # re-arm `clear()` (the cross-platform lost-wakeup the bare `_event.set()`
+        # alone allowed -- it surfaced as a Linux-only hang in the EDGE cancel
+        # tests where the worker thread reaches `_block` after the cancel fires).
+        self._cancelled: bool = False
 
     @property
     def closed(self) -> bool:
@@ -179,11 +187,14 @@ class BlockingStubCursor:
         """
         Re-arm the gate, record entry, fire `on_enter`/`entered`, then wait.
 
-        Clears the internal event at the START so a prior `release`/`adbc_cancel`
-        cannot pre-satisfy this call -- this is what makes the gate re-armable per
+        Clears the internal event at the START so a prior `release` cannot
+        pre-satisfy this call -- this is what makes the gate re-armable per
         blocking call (one cursor can block on `execute`, be released, then block
-        again on `fetch_arrow_table`). A closed cursor short-circuits: it never
-        re-arms and returns immediately so no worker is stranded after teardown.
+        again on `fetch_arrow_table`). A closed OR cancelled cursor short-circuits
+        BEFORE the clear: both `_closed` and `_cancelled` latch sticky under the
+        lock, so a `close`/`adbc_cancel` that arrives before the worker reaches
+        `_block` is honoured (the worker returns at once) instead of being lost to
+        the re-arm clear -- the dispatch-window cancel the EDGE suite exercises.
 
         Lock-guards the `max_concurrent_in_execute` high-water mark on entry and
         the decrement on exit. The `entered` sync signal and the optional
@@ -193,12 +204,19 @@ class BlockingStubCursor:
         (D-CF-01) -- never a worker that merely started.
         """
         with self._lock:
-            if self._closed:
-                # Terminal: a closed cursor never blocks again.
+            if self._closed or self._cancelled:
+                # Terminal: a closed OR already-cancelled cursor never blocks. The
+                # `_cancelled` check (symmetric with `_closed`) honours a cancel
+                # that latched BEFORE the worker reached `_block` -- the dispatch
+                # window the EDGE tests exercise -- instead of clearing it on
+                # re-arm and stranding the non-cancellable worker (the Linux-only
+                # lost-wakeup). A cancel that arrives while the worker is already
+                # waiting is still handled by `adbc_cancel`'s `_event.set()` below.
                 self.entered.set()
                 return
-            # Re-arm: clear before waiting so a prior release/cancel/close from a
-            # FIRST blocking call cannot pre-satisfy this SECOND one.
+            # Re-arm: clear before waiting so a prior release from a FIRST blocking
+            # call cannot pre-satisfy this SECOND one. (Cancel/close latch via
+            # their own sticky flags above, so they are never lost to this clear.)
             self._event.clear()
             self.entered.clear()
             self._in_execute += 1
@@ -255,6 +273,10 @@ class BlockingStubCursor:
         with self._lock:
             self.adbc_cancel_call_count += 1
             self.observed_cancel = True
+            # Latch cancellation (sticky, under the lock) so a worker that reaches
+            # `_block` AFTER this cancel still aborts instead of re-arming and
+            # hanging. The `_event.set()` below covers the worker already waiting.
+            self._cancelled = True
         self._event.set()
 
     def close(self) -> None:
