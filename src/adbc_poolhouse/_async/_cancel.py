@@ -22,7 +22,7 @@ one place (D-25-08 / RESEARCH Pitfall 5).
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, TypeVar
+from typing import TYPE_CHECKING, TypeVar, TypeVarTuple, Unpack
 
 import anyio
 from anyio import get_cancelled_exc_class
@@ -35,12 +35,13 @@ if TYPE_CHECKING:
     from anyio import CapacityLimiter
 
 _T = TypeVar("_T")
+_Ts = TypeVarTuple("_Ts")
 
 
 async def cancellable_offload(
     adbc_cancel: Callable[[], None],
-    fn: Callable[..., _T],
-    *args: object,
+    fn: Callable[[Unpack[_Ts]], _T],
+    *args: Unpack[_Ts],  # noqa: UP044  Unpack[] spelling for 3.11 clarity (PKG-05)
     limiter: CapacityLimiter,
     on_abort: Callable[[], Awaitable[None]] | None = None,
 ) -> _T:

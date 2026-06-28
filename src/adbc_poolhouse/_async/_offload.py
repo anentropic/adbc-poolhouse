@@ -24,7 +24,7 @@ guard --- RESEARCH Pitfall 5).
 from __future__ import annotations
 
 import math
-from typing import TYPE_CHECKING, TypeVar
+from typing import TYPE_CHECKING, TypeVar, TypeVarTuple, Unpack
 
 import anyio
 import anyio.to_thread
@@ -35,11 +35,12 @@ if TYPE_CHECKING:
     from anyio import CapacityLimiter
 
 _T = TypeVar("_T")
+_Ts = TypeVarTuple("_Ts")
 
 
 async def offload(
-    fn: Callable[..., _T],
-    *args: object,
+    fn: Callable[[Unpack[_Ts]], _T],
+    *args: Unpack[_Ts],  # noqa: UP044  Unpack[] spelling for 3.11 clarity (PKG-05)
     limiter: CapacityLimiter,
     on_dispatch: Callable[[], None] | None = None,
 ) -> _T:
