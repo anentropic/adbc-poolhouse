@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.4.0
 milestone_name: Async API
 status: executing
-stopped_at: Completed 26-01-PLAN.md ([async] extra + relock + metadata test)
-last_updated: "2026-06-28T09:00:00.000Z"
-last_activity: 2026-06-28 -- Completed Phase 26 Plan 01 (PKG-01)
+stopped_at: Completed 26-02-PLAN.md (PKG-05 TypeVarTuple/Unpack offload tightening + expect-error fixture)
+last_updated: "2026-06-28T08:39:44.000Z"
+last_activity: 2026-06-28 -- Completed Phase 26 Plan 02 (PKG-05)
 progress:
   total_phases: 9
   completed_phases: 4
   total_plans: 20
-  completed_plans: 18
-  percent: 44
+  completed_plans: 19
+  percent: 47
 ---
 
 # Project State
@@ -26,9 +26,9 @@ See: .planning/PROJECT.md (updated 2026-06-25)
 ## Current Position
 
 Phase: 26 (Packaging & Extra Scoping) — EXECUTING
-Plan: 2 of 4
-Status: Executing Phase 26 (26-01 complete)
-Last activity: 2026-06-28 -- Completed Phase 26 Plan 01 (PKG-01)
+Plan: 3 of 4
+Status: Executing Phase 26 (26-01, 26-02 complete)
+Last activity: 2026-06-28 -- Completed Phase 26 Plan 02 (PKG-05)
 
 Progress: [░░░░░░░░░░] 0% (0/7 phases)
 
@@ -55,6 +55,7 @@ Progress: [░░░░░░░░░░] 0% (0/7 phases)
 | Phase 25 P03 | ~95min | 2 tasks | 3 files |
 | Phase 25 P04 | ~7min | 2 tasks | 2 files |
 | Phase 26 P01 | ~10min | 2 tasks | 3 files |
+| Phase 26 P02 | 5min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -111,6 +112,7 @@ v1.4.0 roadmap decisions:
 - [Phase 25]: real-time-sensitive cancel/finish legs release the gated worker from a REAL thread (waiting on the stub's entered threading.Event), because a loop-side releaser is starved under the trio MockClock autojump (EDGE-07)
 - [Phase 25]: EDGE-19 pins the 25-02 single-member-EG unwrap on a real DuckDB pool — a genuine AdbcError escapes cancellable_offload BARE (pytest.raises(AdbcError) AND not isinstance(excinfo.value, BaseExceptionGroup)); after a NON-cancel error the connection returns via the reset path (_pool.checkedout()==0), NOT invalidated (invalidate-only-on-cancel, Pitfall 6 / EDGE-18)
 - [Phase 26]: [async] extra pins anyio>=4.13 (D-02, NOT >=4.0.0) matching the dev-group floor → resolves to 4.14.1; [all] gains adbc-poolhouse[async]; no new third-party package introduced (T-26-01 accept). uv.lock relocked so Plan 04's --locked no-anyio install stays coherent. Metadata test (tests/test_pkg_extra.py) is anyio-free (importlib.metadata only) so it collects under the no-anyio CI job
+- [Phase 26]: PKG-05 tightened offload()/cancellable_offload() with PEP 646 TypeVarTuple/Unpack (fn: Callable[[Unpack[_Ts]], _T] + *args: Unpack[_Ts]) — NOT ParamSpec (the typing spec forbids keyword-only limiter/on_dispatch/on_abort after *args: P.args; RESEARCH Pitfall 1, basedpyright reportGeneralTypeIssues). Mirrors anyio's own to_thread.run_sync. Positional args now type-checked at the dispatch boundary; basedpyright strict stays 0 errors. The anyio.to_thread.run_sync chokepoint body left byte-for-byte (scan_async_package clean). Kept the mandated Unpack[] spelling + per-line noqa UP044 (ruff wants inline *_Ts; both type-check at pythonVersion 3.11). tests/test_offload_typing.py pins the win: load-bearing # pyright: ignore[reportArgumentType] on str-where-int probes (stripping them surfaces 2 errors; a *args: object regression makes them unnecessary → red). Fixture imports offload under TYPE_CHECKING (anyio-free, collects in no-anyio CI)
 - [Phase 25]: EDGE-09 cancel-mid-block leg (D-24-02 owed from Phase 24) lands — gate a stub worker inside execute, cancel the scope so the watcher fires adbc_cancel, assert adbc_cancel_call_count==1 + borrowed_tokens==0 after the cancelled offload (transient token released exactly once), x50, both backends, x20 loop-stable; a belt-and-braces finally release keeps the group fail-fast (never a hang) without changing the happy cancel path
 
 ### Roadmap Evolution
@@ -134,7 +136,7 @@ v1.4.0 roadmap decisions:
 
 ## Session Continuity
 
-Last session: 2026-06-28T09:00:00.000Z
-Stopped at: Completed 26-01-PLAN.md ([async] extra + relock + metadata test)
-Next step: Execute Phase 26 Plan 02 (PKG-05 — TypeVarTuple/Unpack tightening of offload/cancellable_offload).
+Last session: 2026-06-28T08:39:44.000Z
+Stopped at: Completed 26-02-PLAN.md (PKG-05 TypeVarTuple/Unpack offload tightening + expect-error fixture)
+Next step: Execute Phase 26 Plan 03 (PKG-02/03 — subprocess-isolated import-guard regression tests).
 </content>

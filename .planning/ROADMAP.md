@@ -201,7 +201,7 @@ Plans:
 **Wave 1**
 
 - [x] 26-01-PLAN.md — `[async]` extra (`anyio>=4.13`) + `[all]` aggregation + relock + metadata test (PKG-01)
-- [ ] 26-02-PLAN.md — TypeVarTuple/Unpack tightening of offload/cancellable_offload + expect-error fixture (PKG-05)
+- [x] 26-02-PLAN.md — TypeVarTuple/Unpack tightening of offload/cancellable_offload + expect-error fixture (PKG-05)
 - [ ] 26-03-PLAN.md — subprocess + meta-path-block import-guard regression (PKG-02/03)
 
 **Wave 2** *(blocked on Wave 1 — needs the relocked uv.lock from 26-01)*
@@ -288,7 +288,7 @@ Plans:
 | 23. Test Harness Foundation | v1.4.0 | 4/4 | Complete    | 2026-06-27 |
 | 24. Core Async Wrapper | v1.4.0 | 5/5 | Complete    | 2026-06-27 |
 | 25. Cancellation | v1.4.0 | 6/5 | Complete    | 2026-06-28 |
-| 26. Packaging & Extra Scoping | v1.4.0 | 0/4 | Planned | - |
+| 26. Packaging & Extra Scoping | v1.4.0 | 2/4 | In progress | - |
 | 27. Dual-Backend Test Matrix | v1.4.0 | 0/0 | Not started | - |
 | 28. Documentation | v1.4.0 | 0/0 | Not started | - |
 | 21.1. ADBC dispatch URI-positional fix | v1.3.0 | 3/3 | Complete | 2026-05-20 |

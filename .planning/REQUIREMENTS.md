@@ -65,7 +65,7 @@ Scope decisions for this milestone:
 - [ ] **PKG-02**: `import adbc_poolhouse` succeeds with anyio not installed; async names are guarded by a PEP 562 `__getattr__` lazy import so the sync path stays zero-cost
 - [ ] **PKG-03**: Accessing an async symbol without anyio installed raises a clear `ImportError` naming the `[async]` extra
 - [ ] **PKG-04**: The existing sync test suite passes with anyio uninstalled (a CI job proves there is no hard async dependency)
-- [ ] **PKG-05**: All async public API is fully typed under basedpyright strict, using `ParamSpec`/`Concatenate` to mirror the sync overloads
+- [x] **PKG-05**: All async public API is fully typed under basedpyright strict, using ~~`ParamSpec`/`Concatenate`~~ **PEP 646 `TypeVarTuple`/`Unpack`** (mechanism corrected in Phase 26 RESEARCH: ParamSpec does not compile — keyword-only params cannot follow `*args: P.args`; `TypeVarTuple` is anyio's own approach) to type-check the offload-boundary args (Phase 26 Plan 02)
 
 ### Testing
 
@@ -224,7 +224,7 @@ Explicit exclusions for the async layer (with reasoning):
 | PKG-02 | Phase 26 | Pending |
 | PKG-03 | Phase 26 | Pending |
 | PKG-04 | Phase 26 | Pending |
-| PKG-05 | Phase 26 | Pending |
+| PKG-05 | Phase 26 | Complete (Plan 02) |
 | TEST-01 | Phase 27 | Pending |
 | TEST-02 | Phase 27 | Pending |
 | TEST-03 | Phase 27 | Pending |
