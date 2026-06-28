@@ -227,7 +227,7 @@ Plans:
 
 **Wave 1**
 
-- [ ] 27-01-PLAN.md — shared primitives: `snowflake_async_pool` cassette fixture + two AST guard callables (`scan_async_test_hygiene`, `scan_for_positive_sleep`) + synthetic self-tests
+- [x] 27-01-PLAN.md — shared primitives: `snowflake_async_pool` cassette fixture + two AST guard callables (`scan_async_test_hygiene`, `scan_for_positive_sleep`) + synthetic self-tests — completed 2026-06-28
 
 **Wave 2** *(blocked on Wave 1)*
 
@@ -304,7 +304,7 @@ Plans:
 | 24. Core Async Wrapper | v1.4.0 | 5/5 | Complete    | 2026-06-27 |
 | 25. Cancellation | v1.4.0 | 6/5 | Complete    | 2026-06-28 |
 | 26. Packaging & Extra Scoping | v1.4.0 | 2/4 | In progress | - |
-| 27. Dual-Backend Test Matrix | v1.4.0 | 0/0 | Not started | - |
+| 27. Dual-Backend Test Matrix | v1.4.0 | 1/5 | In progress | - |
 | 28. Documentation | v1.4.0 | 0/0 | Not started | - |
 | 21.1. ADBC dispatch URI-positional fix | v1.3.0 | 3/3 | Complete | 2026-05-20 |
 | 21. Quack Backend | v1.3.0 | 3/3 | Complete    | 2026-05-19 |
