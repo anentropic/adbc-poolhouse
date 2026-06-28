@@ -206,6 +206,29 @@ class AsyncConnection:
         finally:
             self._exit_offload()
 
+    async def invalidate(self) -> None:
+        """
+        Drop a poisoned connection from the pool (offloaded, shielded).
+
+        A connection whose in-flight call was cancelled is genuinely poisoned ---
+        the driver leaves it with an aborted transaction, so reusing it fails
+        (D-25-03). This drops it instead of returning it: it offloads the fairy's
+        `invalidate()`, which detaches the underlying dbapi connection and drives
+        the sync pool's `checkedout()` to 0, inside `anyio.CancelScope(shield=True)`
+        so a second cancellation arriving mid-recovery cannot leave the pool
+        accounting wrong (CANCEL-02 / D-25-07).
+
+        Like `__aexit__`, it bypasses the `_in_use` guard: the cursor method that
+        drives this recovery still holds `_in_use` across its own `try`/`finally`,
+        so a connection left marked busy by the cancelled call is still reclaimed.
+
+        It is the poison-recovery counterpart to `close`: invalidate is the cancel
+        path, `close` the normal check-in. A `close()` after an `invalidate()` is a
+        safe no-op (probe-confirmed).
+        """
+        with anyio.CancelScope(shield=True):
+            await offload(self._fairy.invalidate, limiter=self._limiter)
+
     async def __aenter__(self) -> AsyncConnection:
         """
         Enter the async context.

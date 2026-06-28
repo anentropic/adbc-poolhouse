@@ -156,9 +156,34 @@ cancellation that arrives mid-close cannot abandon the pool or a connection in a
 unknown state, so driver resources are released even when the surrounding task is
 being torn down.
 
-Full cancellation handling for in-flight queries (cooperative `adbc_cancel` and
-the cancel-mid-query path) lands in a later release. The shield that protects
-check-in and pool close ships now.
+## Cancelling an in-flight query
+
+Wrap a query in `fail_after` or `move_on_after` (or cancel its task group) to put
+a deadline on `execute` and `fetch_arrow_table`:
+
+```python
+import anyio
+
+async with await pool.connect() as conn:
+    cursor = conn.cursor()
+    with anyio.fail_after(5):
+        await cursor.execute("SELECT * FROM big_table")
+        table = await cursor.fetch_arrow_table()
+```
+
+A blocking ADBC call runs on a worker thread that the event loop cannot interrupt
+on its own. When the deadline fires while the query is in flight, the pool aborts
+it cooperatively: it calls the driver's thread-safe `adbc_cancel` to unblock the
+worker, then drops the now-poisoned connection from the pool with
+`AsyncConnection.invalidate` rather than returning it. The connection count stays
+correct, and your task sees its own `TimeoutError` (for `fail_after`) or a clean
+cancellation, never a driver "interrupted" error leaking through.
+
+A query cancelled before it reaches the driver (for example, the limiter is
+saturated and the call is still queued for a worker) touches no connection and
+leaves the pool unchanged. Recovery runs under a shield, so a second cancellation
+arriving during cleanup cannot leave the pool miscounted. The behaviour is
+identical under asyncio and trio.
 
 ## See also
 

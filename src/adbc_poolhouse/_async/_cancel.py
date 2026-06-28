@@ -30,7 +30,7 @@ from anyio import get_cancelled_exc_class
 from adbc_poolhouse._async._offload import offload
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Awaitable, Callable
 
     from anyio import CapacityLimiter
 
@@ -42,6 +42,7 @@ async def cancellable_offload(
     fn: Callable[..., _T],
     *args: object,
     limiter: CapacityLimiter,
+    on_abort: Callable[[], Awaitable[None]] | None = None,
 ) -> _T:
     """
     Run a blocking call off the loop, abortable via the driver's `adbc_cancel`.
@@ -56,14 +57,24 @@ async def cancellable_offload(
     operation, so firing it across the loop/worker boundary is the intended
     interrupt path (CANCEL-01).
 
-    The watcher carries a `cancelled_by_us` flag, set the moment it fires
-    `adbc_cancel`, so "this driver error is the side-effect of our own cancel" is
-    decided by an explicit flag rather than by sniffing the (non-portable) driver
-    error type or message (D-25-02). The `adbc_cancel()` call runs inside
-    `anyio.CancelScope(shield=True)` so a second cancellation arriving during the
-    abort cannot abort the abort: `adbc_cancel` fires exactly once (D-25-07). The
-    watcher always re-raises the cancellation it caught --- it never swallows it
-    (D-25-06).
+    The abort is gated on a `worker_started` flag the worker sets (on the worker
+    thread) the instant it begins running `fn` --- that is, only once it has
+    acquired a limiter token and entered the driver call. A cancellation that
+    arrives while the worker is still *queued* at token-acquire (the limiter is
+    saturated, the worker never touched the driver) finds `worker_started` False,
+    so neither `adbc_cancel` nor the `on_abort` recovery runs: a never-started
+    call leaves the connection clean (EDGE-01/07 semantics), and gating the
+    recovery this way also avoids a deadlock where a poison-recovery that itself
+    needs a limiter token would wait forever behind the very workers saturating
+    the limiter.
+
+    When the worker *had* started, the watcher fires `adbc_cancel()` inside
+    `anyio.CancelScope(shield=True)` (so a second cancellation arriving during the
+    abort cannot abort the abort --- `adbc_cancel` fires exactly once, D-25-07),
+    then, still shielded, awaits `on_abort()` if supplied (the connection's
+    poison-recovery; the just-unblocked worker has released its token, so the
+    recovery's own offload can acquire one). It always re-raises the cancellation
+    it caught --- it never swallows it (D-25-06).
 
     On the success or error path the worker releases the watcher by setting the
     `Event` in a `finally`, so the watcher exits cleanly without ever entering its
@@ -84,7 +95,8 @@ async def cancellable_offload(
         adbc_cancel: The driver's thread-safe cancel hook (e.g.
             `cursor.adbc_cancel`). Called once, shielded, from the loop thread
             only when the surrounding scope is cancelled while the worker is
-            mid-call. Never called on the success path.
+            genuinely running the driver call. Never called on the success path
+            nor when the worker was cancelled while still queued for a token.
         fn: The blocking callable to run off the event loop (typically a bound
             method of the sync cursor).
         *args: Positional arguments forwarded to `fn`.
@@ -92,6 +104,10 @@ async def cancellable_offload(
             `offload` by keyword. Bounds how many worker threads run at once and
             is borrowed only for the duration of this one call (transient-token
             model).
+        on_abort: Optional async poison-recovery to run (shielded) only when a
+            genuinely-started call was aborted by `adbc_cancel` --- typically the
+            owning connection's `invalidate`. Skipped when the worker never
+            started, so a clean (never-poisoned) connection is not invalidated.
 
     Returns:
         Whatever `fn(*args)` returns.
@@ -105,21 +121,30 @@ async def cancellable_offload(
     """
     done = anyio.Event()
     result: dict[str, _T] = {}
-    cancelled_by_us = False
+    worker_started = False
+
+    def _run() -> _T:
+        # Runs ON the worker thread, so it executes only after a limiter token is
+        # acquired and the thread starts --- the precise "entered the driver call"
+        # boundary. A queued-at-token-acquire cancellation never reaches here.
+        nonlocal worker_started
+        worker_started = True
+        return fn(*args)
 
     async def _watcher() -> None:
-        nonlocal cancelled_by_us
         try:
             await done.wait()  # event-driven park, NOT a poll
         except get_cancelled_exc_class():
-            cancelled_by_us = True
-            with anyio.CancelScope(shield=True):
-                adbc_cancel()  # thread-safe; unblocks the worker, fires ONCE
+            if worker_started:
+                with anyio.CancelScope(shield=True):
+                    adbc_cancel()  # thread-safe; unblocks the worker, fires ONCE
+                    if on_abort is not None:
+                        await on_abort()  # poison recovery (D-25-03), shielded
             raise  # never swallow the cancellation (D-25-06)
 
     async def _worker() -> None:
         try:
-            result["v"] = await offload(fn, *args, limiter=limiter)  # abandon_on_cancel=False
+            result["v"] = await offload(_run, limiter=limiter)  # abandon_on_cancel=False
         finally:
             done.set()  # release the watcher on the success/error path
 

@@ -34,6 +34,7 @@ from typing import TYPE_CHECKING, Protocol
 
 import anyio
 
+from adbc_poolhouse._async._cancel import cancellable_offload
 from adbc_poolhouse._async._offload import offload
 
 if TYPE_CHECKING:
@@ -69,6 +70,7 @@ class _SyncCursor(Protocol):
     def fetchmany(self, size: int = ..., /) -> Sequence[object]: ...
     def fetchall(self) -> Sequence[object]: ...
     def fetch_arrow_table(self) -> pyarrow.Table: ...
+    def adbc_cancel(self) -> None: ...
     def close(self) -> None: ...
 
 
@@ -125,6 +127,21 @@ class AsyncCursor:
         self._limiter = limiter
         self._owner = owner
 
+    def _adbc_cancel(self) -> None:
+        """
+        Fire the driver's thread-safe `adbc_cancel` to abort an in-flight call.
+
+        Resolved lazily and called only by `cancellable_offload` when a
+        genuinely-running offload is cancelled (never on the success path). The
+        ADBC dbapi cursor always exposes `adbc_cancel`; a replay/cassette backend
+        that does not block (and so never aborts mid-flight) need not provide it,
+        so its absence is tolerated as a no-op rather than surfaced --- the abort
+        path is unreachable for an instant, non-blocking backend.
+        """
+        cancel = getattr(self._cursor, "adbc_cancel", None)
+        if cancel is not None:
+            cancel()
+
     @property
     def description(self) -> object:
         """
@@ -171,17 +188,24 @@ class AsyncCursor:
             operation: The SQL text to execute.
             parameters: Optional bound parameters, forwarded to the dbapi cursor.
 
+        If the surrounding scope is cancelled or times out while the statement is
+        in flight, the in-flight C call is aborted with `cursor.adbc_cancel`, the
+        now-poisoned connection is invalidated (shielded), and the cancellation is
+        re-raised --- the connection never returns to the pool busy (CANCEL-01/02).
+
         Raises:
             ConnectionBusyError: If another offloaded call on the owning connection
                 is already in flight.
         """
         self._owner._enter_offload()  # noqa: SLF001 (intentional parent guard, see module docstring)
         try:
-            await offload(
+            await cancellable_offload(
+                self._adbc_cancel,
                 self._cursor.execute,
                 operation,
                 parameters,
                 limiter=self._limiter,
+                on_abort=self._owner.invalidate,  # poison recovery on a real abort (D-25-03)
             )
         finally:
             self._owner._exit_offload()  # noqa: SLF001
@@ -198,17 +222,23 @@ class AsyncCursor:
             seq_of_parameters: The sequence of parameter sets, forwarded to the
                 dbapi cursor.
 
+        If the surrounding scope is cancelled mid-flight, the in-flight call is
+        aborted with `cursor.adbc_cancel`, the poisoned connection is invalidated
+        (shielded), and the cancellation is re-raised (CANCEL-01/02).
+
         Raises:
             ConnectionBusyError: If another offloaded call on the owning connection
                 is already in flight.
         """
         self._owner._enter_offload()  # noqa: SLF001
         try:
-            await offload(
+            await cancellable_offload(
+                self._adbc_cancel,
                 self._cursor.executemany,
                 operation,
                 seq_of_parameters,
                 limiter=self._limiter,
+                on_abort=self._owner.invalidate,  # poison recovery on a real abort (D-25-03)
             )
         finally:
             self._owner._exit_offload()  # noqa: SLF001
@@ -216,6 +246,10 @@ class AsyncCursor:
     async def fetchone(self) -> object:
         """
         Fetch the next row on a worker thread.
+
+        If the surrounding scope is cancelled mid-fetch, the in-flight call is
+        aborted with `cursor.adbc_cancel`, the poisoned connection is invalidated
+        (shielded), and the cancellation is re-raised (CANCEL-01/02).
 
         Returns:
             The next row (a tuple), or `None` when the result set is exhausted.
@@ -226,9 +260,11 @@ class AsyncCursor:
         """
         self._owner._enter_offload()  # noqa: SLF001
         try:
-            return await offload(
+            return await cancellable_offload(
+                self._adbc_cancel,
                 self._cursor.fetchone,
                 limiter=self._limiter,
+                on_abort=self._owner.invalidate,  # poison recovery on a real abort (D-25-03)
             )
         finally:
             self._owner._exit_offload()  # noqa: SLF001
@@ -241,6 +277,10 @@ class AsyncCursor:
             size: The number of rows to fetch. When `None`, the dbapi cursor's
                 `arraysize` is used.
 
+        If the surrounding scope is cancelled mid-fetch, the in-flight call is
+        aborted with `cursor.adbc_cancel`, the poisoned connection is invalidated
+        (shielded), and the cancellation is re-raised (CANCEL-01/02).
+
         Returns:
             A sequence of rows (possibly empty when the result set is exhausted).
 
@@ -251,14 +291,18 @@ class AsyncCursor:
         self._owner._enter_offload()  # noqa: SLF001
         try:
             if size is None:
-                return await offload(
+                return await cancellable_offload(
+                    self._adbc_cancel,
                     self._cursor.fetchmany,
                     limiter=self._limiter,
+                    on_abort=self._owner.invalidate,  # poison recovery on a real abort (D-25-03)
                 )
-            return await offload(
+            return await cancellable_offload(
+                self._adbc_cancel,
                 self._cursor.fetchmany,
                 size,
                 limiter=self._limiter,
+                on_abort=self._owner.invalidate,  # poison recovery on a real abort (D-25-03)
             )
         finally:
             self._owner._exit_offload()  # noqa: SLF001
@@ -266,6 +310,10 @@ class AsyncCursor:
     async def fetchall(self) -> object:
         """
         Fetch all remaining rows on a worker thread.
+
+        If the surrounding scope is cancelled mid-fetch, the in-flight call is
+        aborted with `cursor.adbc_cancel`, the poisoned connection is invalidated
+        (shielded), and the cancellation is re-raised (CANCEL-01/02).
 
         Returns:
             A sequence of all remaining rows.
@@ -276,9 +324,11 @@ class AsyncCursor:
         """
         self._owner._enter_offload()  # noqa: SLF001
         try:
-            return await offload(
+            return await cancellable_offload(
+                self._adbc_cancel,
                 self._cursor.fetchall,
                 limiter=self._limiter,
+                on_abort=self._owner.invalidate,  # poison recovery on a real abort (D-25-03)
             )
         finally:
             self._owner._exit_offload()  # noqa: SLF001
@@ -293,6 +343,11 @@ class AsyncCursor:
         is never a streaming `RecordBatchReader` bound to the (soon-closed) cursor
         (EDGE-21 / Pitfall 7).
 
+        If the surrounding scope is cancelled or times out while the result is
+        being materialized, the in-flight C call is aborted with
+        `cursor.adbc_cancel`, the now-poisoned connection is invalidated
+        (shielded), and the cancellation is re-raised (CANCEL-01/02).
+
         Returns:
             The materialized `pyarrow.Table` for the current result set.
 
@@ -302,9 +357,11 @@ class AsyncCursor:
         """
         self._owner._enter_offload()  # noqa: SLF001
         try:
-            return await offload(
+            return await cancellable_offload(
+                self._adbc_cancel,
                 self._cursor.fetch_arrow_table,
                 limiter=self._limiter,
+                on_abort=self._owner.invalidate,  # poison recovery on a real abort (D-25-03)
             )
         finally:
             self._owner._exit_offload()  # noqa: SLF001
