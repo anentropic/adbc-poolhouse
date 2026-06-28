@@ -191,6 +191,23 @@ class TestAsyncTestHygiene:
         rules = [f.rule for f in scan_async_test_hygiene(tmp_path)]
         assert "banned-pytest-asyncio-marker" in rules
 
+    def test_flags_pytest_asyncio_marker_imported_name_form(self, tmp_path: Path) -> None:
+        """`from pytest import mark; @mark.asyncio` is flagged (WR-01 false negative)."""
+        (tmp_path / "t.py").write_text(
+            "from pytest import mark\n@mark.asyncio\nasync def test_x():\n    pass\n",
+            encoding="utf-8",
+        )
+        rules = [f.rule for f in scan_async_test_hygiene(tmp_path)]
+        assert "banned-pytest-asyncio-marker" in rules
+
+    def test_anyio_marker_imported_name_form_is_clean(self, tmp_path: Path) -> None:
+        """`from pytest import mark; @mark.anyio` raises no finding (WR-01 false positive)."""
+        (tmp_path / "t.py").write_text(
+            "from pytest import mark\n@mark.anyio\nasync def test_y(some_fixture):\n    pass\n",
+            encoding="utf-8",
+        )
+        assert scan_async_test_hygiene(tmp_path) == []
+
     def test_flags_async_test_missing_anyio_marker(self, tmp_path: Path) -> None:
         """An `async def test_x` lacking `@pytest.mark.anyio` raises a finding."""
         (tmp_path / "t.py").write_text(

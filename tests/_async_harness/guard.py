@@ -283,15 +283,18 @@ def _is_pytest_mark(decorator: ast.expr, mark: str) -> bool:
 
     Matches both the bare `@pytest.mark.anyio` attribute chain and the called
     `@pytest.mark.asyncio()` form by unwrapping an `ast.Call` to its `.func`. The
-    chain is matched structurally: `<...>.mark.<mark>` where the `mark` attribute's
-    value is itself a `.mark` attribute.
+    chain is matched structurally: a `.<mark>` attribute whose value is the `mark`
+    segment, which may be either an `ast.Attribute` (the full `pytest.mark.<mark>`
+    chain) OR an `ast.Name` (the `from pytest import mark; @mark.<mark>` form).
+    Matching both forms avoids a false negative on a banned `@mark.asyncio` and a
+    false positive on a legitimate `@mark.anyio` written via the imported name.
     """
     node = decorator.func if isinstance(decorator, ast.Call) else decorator
-    return (
-        isinstance(node, ast.Attribute)
-        and node.attr == mark
-        and isinstance(node.value, ast.Attribute)
-        and node.value.attr == "mark"
+    if not (isinstance(node, ast.Attribute) and node.attr == mark):
+        return False
+    base = node.value
+    return (isinstance(base, ast.Attribute) and base.attr == "mark") or (
+        isinstance(base, ast.Name) and base.id == "mark"
     )
 
 
