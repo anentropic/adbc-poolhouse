@@ -161,29 +161,36 @@ being torn down.
 Wrap a query in `fail_after` or `move_on_after` (or cancel its task group) to put
 a deadline on `execute` and `fetch_arrow_table`:
 
-```python
-import anyio
+!!! example
 
-async with await pool.connect() as conn:
-    cursor = conn.cursor()
-    with anyio.fail_after(5):
-        await cursor.execute("SELECT * FROM big_table")
-        table = await cursor.fetch_arrow_table()
-```
+    ```python
+    import anyio
+
+    async with await pool.connect() as conn:
+        cursor = conn.cursor()
+        with anyio.fail_after(5):
+            await cursor.execute("SELECT * FROM big_table")
+            table = await cursor.fetch_arrow_table()
+    ```
 
 A blocking ADBC call runs on a worker thread that the event loop cannot interrupt
 on its own. When the deadline fires while the query is in flight, the pool aborts
-it cooperatively: it calls the driver's thread-safe `adbc_cancel` to unblock the
-worker, then drops the now-poisoned connection from the pool with
-`AsyncConnection.invalidate` rather than returning it. The connection count stays
-correct, and your task sees its own `TimeoutError` (for `fail_after`) or a clean
-cancellation, never a driver "interrupted" error leaking through.
+it cooperatively. It calls the driver's thread-safe `adbc_cancel` to unblock the
+worker, joins that worker, then drops the now-poisoned connection from the pool
+with [`AsyncConnection.invalidate`](#see-also) rather than returning it. The
+connection count stays correct, so `pool.checkedout()` never reports a connection
+that the pool has already reclaimed. Your task sees its own exception and nothing
+from the driver: `fail_after` raises `TimeoutError`, `move_on_after` returns
+quietly, and an explicit `scope.cancel()` surfaces no value at all. The same
+cleanup runs underneath each of them.
 
 A query cancelled before it reaches the driver (for example, the limiter is
 saturated and the call is still queued for a worker) touches no connection and
-leaves the pool unchanged. Recovery runs under a shield, so a second cancellation
-arriving during cleanup cannot leave the pool miscounted. The behaviour is
-identical under asyncio and trio.
+leaves the pool unchanged: no `adbc_cancel`, no invalidate, nothing to recover.
+Recovery itself runs under a shield, so a second cancellation arriving during
+cleanup cannot leave the pool miscounted. The behaviour is identical under asyncio
+and trio. Only the surfaced exception type differs, and that difference comes from
+anyio's scope, not from anything the pool does.
 
 ## See also
 
@@ -191,4 +198,6 @@ identical under asyncio and trio.
   fixtures
 - [Configuration reference](configuration.md) for env var loading and pool tuning
 - [API Reference](../reference/) for the generated `AsyncPool`,
-  `AsyncConnection`, and `AsyncCursor` docs
+  `AsyncConnection`, and `AsyncCursor` docs, including
+  [`AsyncConnection.invalidate`](../reference/) (the poison-recovery drop the
+  cancellation path uses)
