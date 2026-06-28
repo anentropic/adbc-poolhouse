@@ -25,6 +25,12 @@ trivial sentinel --- the real assertion is performed statically by basedpyright
 
 from __future__ import annotations
 
+# Scope the unnecessary-ignore rule to THIS fixture only (it is too noisy to enable
+# project-wide). It is what gives the negative half its teeth: if the PKG-05 offload
+# signature regressed to `*args: object`, the `reportArgumentType` suppressions below
+# would stop firing and basedpyright would flag them as unnecessary here, turning the
+# fixture red. Without this pragma the negative assertions are silently toothless.
+# pyright: reportUnnecessaryTypeIgnoreComment=error
 from typing import TYPE_CHECKING, assert_type
 
 if TYPE_CHECKING:

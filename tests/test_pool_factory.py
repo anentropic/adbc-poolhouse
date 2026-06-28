@@ -108,13 +108,13 @@ class TestNoGlobalState:
         # Inspect module namespace — no QueuePool or Connection attributes.
         # The lazy async entry points (PEP 562 ``__getattr__``) raise ImportError
         # on access when the optional ``[async]`` extra (anyio) is absent — the
-        # supported sync-only install. Such names are by definition not a
-        # module-level QueuePool instance, so skip the ones that cannot be read.
+        # supported sync-only install. Those names are by definition not a
+        # module-level QueuePool, so skip exactly them; any OTHER name that fails
+        # to read is a real regression and should still raise here.
         for name in dir(adbc_poolhouse):
-            try:
-                val = getattr(adbc_poolhouse, name)
-            except ImportError:
+            if name in adbc_poolhouse._LAZY_ASYNC_NAMES:
                 continue
+            val = getattr(adbc_poolhouse, name)
             assert not isinstance(val, sqlalchemy.pool.QueuePool), (
                 f"Module-level QueuePool found: {name}"
             )
@@ -125,10 +125,9 @@ class TestNoGlobalState:
         import adbc_poolhouse
 
         for name in dir(adbc_poolhouse):
-            try:
-                val = getattr(adbc_poolhouse, name)
-            except ImportError:
+            if name in adbc_poolhouse._LAZY_ASYNC_NAMES:
                 continue
+            val = getattr(adbc_poolhouse, name)
             assert not isinstance(val, sqlalchemy.pool.QueuePool)
 
 
