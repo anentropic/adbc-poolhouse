@@ -233,7 +233,6 @@ class TestEdgeCancelDepth:
         """
         del anyio_backend_name
         async_conn, stub_conn = make_stub_async_connection()
-        sc = stub_conn.cursors[0] if stub_conn.cursors else None
         releaser: threading.Thread | None = None
         with real_clock_watchdog(stub_conn.cursors) as tripped:
             async with anyio.create_task_group() as tg:
@@ -251,7 +250,6 @@ class TestEdgeCancelDepth:
                 tg.cancel_scope.cancel()  # drain the (empty) group cleanly
         if releaser is not None:
             releaser.join(timeout=5)
-        del sc
         assert tripped[0] is False
         # checkin completed despite the cancel: the connection-level close ran.
         assert stub_conn.close_call_count == 1
@@ -350,6 +348,56 @@ class TestEdgeCancelDepth:
         assert sc.observed_cancel is False
         assert stub_conn.invalidate_call_count == 0
 
+    @pytest.mark.anyio
+    async def test_cancel_in_dispatch_window_still_aborts(
+        self,
+        make_stub_async_connection: _StubFactory,
+        anyio_backend_name: str,
+    ) -> None:
+        """
+        CR-01 regression: a cancel in the post-dispatch / pre-driver-call window aborts.
+
+        This is the TOCTOU window the prior `worker_started` flag missed: the cancel
+        is delivered AFTER the offload has acquired its token and dispatched the
+        worker thread, but BEFORE the worker has entered the driver call (the stub's
+        blocked `execute`). Under the trio `MockClock`, `fail_after(5)` fires the
+        instant every loop task is blocked on the just-dispatched worker --- i.e. in
+        exactly that window --- so this exercises it deterministically with no
+        positive-duration sleep.
+
+        Crucially, the gated worker is NOT released in a `finally`: the ONLY thing
+        that can unblock it is the watcher firing the stub's `adbc_cancel`. With the
+        flag written on the worker thread (the old bug), the watcher read a stale
+        `False`, skipped the abort, and the non-cancellable worker hung until the
+        wall-clock watchdog forced it open (`tripped is True`). With the flag set
+        synchronously on the loop thread at dispatch (the fix), `adbc_cancel` fires
+        once, the worker returns, `invalidate` runs once, and the watchdog never
+        trips. Runs under BOTH backends and survives the x20 loop gate.
+        """
+        async_conn, stub_conn = make_stub_async_connection()
+        cur = async_conn.cursor()
+        sc = stub_conn.cursors[0]
+        timed_out = False
+        with (
+            real_clock_watchdog(stub_conn.cursors) as tripped,
+            virtual_clock(anyio_backend_name),
+        ):
+            try:
+                # The deadline fires in the dispatch window: the worker is
+                # dispatched but has not yet entered the stub's blocked execute.
+                with anyio.fail_after(5):
+                    await cur.execute("SELECT 1")
+            except TimeoutError:
+                timed_out = True
+            # No release-in-finally: only the watcher's adbc_cancel can unblock the
+            # worker. If the abort were skipped (the CR-01 bug) the worker would hang
+            # and the watchdog would trip below.
+        assert tripped[0] is False, "worker hung: the dispatch-window cancel skipped adbc_cancel"
+        assert timed_out is True
+        assert sc.adbc_cancel_call_count == 1  # the abort fired despite the narrow window
+        assert sc.observed_cancel is True
+        assert stub_conn.invalidate_call_count == 1  # poison-recovery ran once
+
 
 class TestEdgeCancelDepthRealDriver:
     """The real in-process DuckDB legs: the invalidate poison-recovery and checkin cancel."""
@@ -424,3 +472,76 @@ class TestEdgeCancelDepthRealDriver:
         # Both the cursor (closed above) and the connection are drained: the sync
         # pool tracks every checkout, so checkedout() == 0 proves both returned.
         assert duckdb_async_pool._pool.checkedout() == 0
+
+
+class TestOffloadDispatchSync:
+    """
+    CR-01 mechanism lock: `offload`'s `on_dispatch` is the loop-thread, pre-call hook.
+
+    These deterministically pin the synchronization that closes the CR-01 TOCTOU
+    window --- distinct from the timing-driven `test_cancel_in_dispatch_window_*`
+    integration leg above. They fail HARD on the pre-fix code (which had no
+    `on_dispatch` parameter and set the started-flag on the worker thread), so they
+    are a durable guard against re-introducing a cross-thread flag write.
+    """
+
+    @pytest.mark.anyio
+    async def test_on_dispatch_runs_on_loop_thread_before_fn(self, anyio_backend_name: str) -> None:
+        """
+        `on_dispatch` runs on the LOOP thread and strictly BEFORE `fn` is entered.
+
+        The CR-01 fix hinges on the started-flag being written on the loop thread
+        (where the watcher reads it) at dispatch, not on the worker thread mid-flag.
+        This asserts both halves of that contract: `on_dispatch` records the loop
+        thread id and runs before the worker `fn` records the worker thread id, and
+        the two thread ids differ (the call genuinely went off-loop).
+        """
+        del anyio_backend_name
+        offload = importlib.import_module("adbc_poolhouse._async._offload").offload
+        loop_thread_id = threading.get_ident()
+        order: list[str] = []
+        dispatch_thread_id: list[int] = []
+        worker_thread_id: list[int] = []
+
+        def _on_dispatch() -> None:
+            order.append("dispatch")
+            dispatch_thread_id.append(threading.get_ident())
+
+        def _fn() -> int:
+            order.append("fn")
+            worker_thread_id.append(threading.get_ident())
+            return 7
+
+        result = await offload(
+            _fn,
+            limiter=anyio.CapacityLimiter(1),
+            on_dispatch=_on_dispatch,
+        )
+        assert result == 7
+        # Strict ordering: the dispatch hook fires before the worker function.
+        assert order == ["dispatch", "fn"]
+        # The hook ran on the loop thread; the function ran off-loop.
+        assert dispatch_thread_id == [loop_thread_id]
+        assert worker_thread_id and worker_thread_id[0] != loop_thread_id
+
+    @pytest.mark.anyio
+    async def test_on_dispatch_token_held_when_hook_fires(self, anyio_backend_name: str) -> None:
+        """
+        `on_dispatch` fires only AFTER the per-pool token is acquired.
+
+        The watcher must treat the worker as "started" only once it holds a token
+        and is committed to the driver call (EDGE-02), never while still queued
+        (EDGE-01/07). This asserts the hook observes `borrowed_tokens == 1`, proving
+        the token is held at the moment the started-flag would be set.
+        """
+        del anyio_backend_name
+        offload = importlib.import_module("adbc_poolhouse._async._offload").offload
+        limiter = anyio.CapacityLimiter(1)
+        borrowed_at_dispatch: list[int] = []
+
+        def _on_dispatch() -> None:
+            borrowed_at_dispatch.append(limiter.borrowed_tokens)
+
+        await offload(lambda: None, limiter=limiter, on_dispatch=_on_dispatch)
+        assert borrowed_at_dispatch == [1]  # a token was held when the hook fired
+        assert limiter.borrowed_tokens == 0  # and released on return

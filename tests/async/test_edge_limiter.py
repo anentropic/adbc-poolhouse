@@ -194,6 +194,50 @@ class TestEdge10CancelWhileQueued:
         assert limiter.borrowed_tokens == 0
 
 
+class TestEdge09bOneTokenInvalidate:
+    """WR-03: cancel -> invalidate on a 1-token limiter never deadlocks recovery."""
+
+    @pytest.mark.anyio
+    async def test_cancel_invalidate_on_one_token_limiter(self, anyio_backend_name: str) -> None:
+        """
+        A cancel-driven `invalidate` on a `total_tokens == 1` pool does not deadlock --- x20.
+
+        The WR-03 hazard: the watcher fires `adbc_cancel` then awaits the
+        connection's `invalidate` poison-recovery, which itself offloads. On a
+        single-token pool the just-aborted worker still holds the only pool token
+        until its thread returns, so a recovery that competed for that same token
+        would deadlock on unenforced scheduler ordering. The fix routes
+        `invalidate` through a DEDICATED teardown limiter, so recovery never
+        contends for the pool token it just freed.
+
+        Each iteration gates a stub worker inside `execute` on a 1-token limiter,
+        cancels the scope, and proves the abort + recovery both complete
+        (`adbc_cancel == 1`, `invalidate == 1`) with the watchdog never tripping ---
+        x20, both backends. The worker is NOT released in a `finally`: only the
+        watcher's `adbc_cancel` can unblock it, so a recovery deadlock would strand
+        the worker and trip the watchdog.
+        """
+        del anyio_backend_name
+        for _ in range(20):
+            limiter = anyio.CapacityLimiter(1)  # the single-token pool WR-03 targets
+            conn, stub = _stub_conn_on(limiter)
+            cur = conn.cursor()
+            stub_cur = stub.cursors[0]
+            with real_clock_watchdog([stub_cur]) as watchdog:
+                async with anyio.create_task_group() as tg:
+                    tg.start_soon(functools.partial(cur.execute, "SELECT 1"))
+
+                    async def _gate_then_cancel(sc: object = stub_cur, group: object = tg) -> None:
+                        await await_inside(lambda: sc.execute_call_count == 1)  # type: ignore[attr-defined]
+                        group.cancel_scope.cancel()  # type: ignore[attr-defined]
+
+                    tg.start_soon(_gate_then_cancel)
+            assert watchdog[0] is False, "WR-03 watchdog tripped: 1-token invalidate deadlocked"
+            assert stub_cur.adbc_cancel_call_count == 1
+            assert stub.invalidate_call_count == 1  # recovery completed, no deadlock
+            assert limiter.borrowed_tokens == 0  # pool token released cleanly
+
+
 class TestEdge11NoSelfDeadlock:
     """EDGE-11: a transient token makes a second offload on a held connection safe."""
 

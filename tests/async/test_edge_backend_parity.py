@@ -117,13 +117,27 @@ class TestEdge29BackendParity:
         Assert both backend legs recorded the SAME cancel-signal tuple (EDGE-29).
 
         Non-parametrized and ordered AFTER the parametrized recorder (pytest runs
-        the two recorder invocations first), so both `"asyncio"` and `"trio"` keys
-        are present. The load-bearing assertion is tuple EQUALITY: the individual
-        values are pinned by `test_edge_cancel_depth.py`; here the only claim is that
-        the cancel machinery is backend-symmetric (CANCEL-04).
+        the two recorder invocations first), so in a full in-process run both
+        `"asyncio"` and `"trio"` keys are present. The load-bearing assertion is
+        tuple EQUALITY: the individual values are pinned by
+        `test_edge_cancel_depth.py`; here the only claim is that the cancel
+        machinery is backend-symmetric (CANCEL-04).
+
+        Robust to runner topology (WR-05): if either backend leg did not run --- a
+        `-k` filter selecting one backend, a single-backend selection, or pytest-
+        xdist distributing the two parametrized recorder cases to DIFFERENT workers
+        so neither worker's session dict holds both keys --- this `skip`s with a
+        clear reason rather than KeyErroring or vacuously comparing a backend to
+        itself. This suite MUST therefore run in-process (no `-n`/xdist) for the
+        parity assertion to be meaningful; under xdist it self-skips instead of
+        passing falsely.
         """
-        assert "asyncio" in record_cancel_tuple, "the asyncio leg did not record its tuple"
-        assert "trio" in record_cancel_tuple, "the trio leg did not record its tuple"
+        missing = {"asyncio", "trio"} - record_cancel_tuple.keys()
+        if missing:
+            pytest.skip(
+                "EDGE-29 parity needs both backend legs in ONE process; missing "
+                f"{sorted(missing)} (run in-process, not under -k/xdist)"
+            )
         assert record_cancel_tuple["asyncio"] == record_cancel_tuple["trio"], (
             "cancel-signal tuple differs across backends: "
             f"asyncio={record_cancel_tuple['asyncio']} trio={record_cancel_tuple['trio']}"
