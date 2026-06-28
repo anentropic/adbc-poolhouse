@@ -15,7 +15,7 @@
 - [x] **Phase 23: Test Harness Foundation** — Build the `BlockingStubCursor` harness, event-gating/virtual-clock helpers, and the import-lint guard the EDGE suite rides on (completed 2026-06-27)
 - [x] **Phase 24: Core Async Wrapper** — Offload helper, per-pool `CapacityLimiter`, `AsyncPool`/`AsyncConnection`/`AsyncCursor`, full DBAPI surface incl. `fetch_arrow_table`, plus structural EDGE coverage (completed 2026-06-27)
 - [x] **Phase 25: Cancellation** — `adbc_cancel` wiring, shielded checkin, invalidate-on-cancel, no-leak under asyncio + trio, plus cancellation EDGE coverage (completed 2026-06-28)
-- [ ] **Phase 26: Packaging & Extra Scoping** — `[async]` extra, PEP 562 lazy import, zero-cost sync path, basedpyright-strict async typing
+- [x] **Phase 26: Packaging & Extra Scoping** — `[async]` extra, PEP 562 lazy import, zero-cost sync path, basedpyright-strict async typing (4/4 plans, PKG-01..05; completed 2026-06-28)
 - [ ] **Phase 27: Dual-Backend Test Matrix** — anyio asyncio+trio parametrization across DuckDB + Snowflake cassette; Arrow-stability and limiter-stress proofs; meta-guards
 - [ ] **Phase 28: Documentation** — Async usage guide (honest about I/O vs materialization), API reference, configuration/index updates, docs quality gate
 

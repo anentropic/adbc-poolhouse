@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v1.4.0
 milestone_name: Async API
 status: executing
-stopped_at: Completed 26-03-PLAN.md (PKG-02/03 subprocess-isolated import-guard regression tests)
+stopped_at: Completed 26-04-PLAN.md (PKG-04 no-anyio CI guard job) — Phase 26 complete
 last_updated: "2026-06-28T09:00:00.000Z"
-last_activity: 2026-06-28 -- Completed Phase 26 Plan 03 (PKG-02/03)
+last_activity: 2026-06-28 -- Completed Phase 26 Plan 04 (PKG-04); Phase 26 complete
 progress:
   total_phases: 9
   completed_phases: 4
@@ -25,10 +25,10 @@ See: .planning/PROJECT.md (updated 2026-06-25)
 
 ## Current Position
 
-Phase: 26 (Packaging & Extra Scoping) — EXECUTING
-Plan: 4 of 4
-Status: Executing Phase 26 (26-01, 26-02, 26-03 complete)
-Last activity: 2026-06-28 -- Completed Phase 26 Plan 03 (PKG-02/03)
+Phase: 26 (Packaging & Extra Scoping) — COMPLETE
+Plan: 4 of 4 (all complete)
+Status: Phase 26 complete (26-01..04; PKG-01..05). Next: Phase 27 (Dual-Backend Test Matrix)
+Last activity: 2026-06-28 -- Completed Phase 26 Plan 04 (PKG-04); Phase 26 complete
 
 Progress: [░░░░░░░░░░] 0% (0/7 phases)
 
@@ -57,6 +57,7 @@ Progress: [░░░░░░░░░░] 0% (0/7 phases)
 | Phase 26 P01 | ~10min | 2 tasks | 3 files |
 | Phase 26 P02 | 5min | 2 tasks | 3 files |
 | Phase 26 P03 | ~6min | 1 tasks | 1 files |
+| Phase 26 P04 | ~30min | 1 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -115,6 +116,7 @@ v1.4.0 roadmap decisions:
 - [Phase 26]: [async] extra pins anyio>=4.13 (D-02, NOT >=4.0.0) matching the dev-group floor → resolves to 4.14.1; [all] gains adbc-poolhouse[async]; no new third-party package introduced (T-26-01 accept). uv.lock relocked so Plan 04's --locked no-anyio install stays coherent. Metadata test (tests/test_pkg_extra.py) is anyio-free (importlib.metadata only) so it collects under the no-anyio CI job
 - [Phase 26]: PKG-05 tightened offload()/cancellable_offload() with PEP 646 TypeVarTuple/Unpack (fn: Callable[[Unpack[_Ts]], _T] + *args: Unpack[_Ts]) — NOT ParamSpec (the typing spec forbids keyword-only limiter/on_dispatch/on_abort after *args: P.args; RESEARCH Pitfall 1, basedpyright reportGeneralTypeIssues). Mirrors anyio's own to_thread.run_sync. Positional args now type-checked at the dispatch boundary; basedpyright strict stays 0 errors. The anyio.to_thread.run_sync chokepoint body left byte-for-byte (scan_async_package clean). Kept the mandated Unpack[] spelling + per-line noqa UP044 (ruff wants inline *_Ts; both type-check at pythonVersion 3.11). tests/test_offload_typing.py pins the win: load-bearing # pyright: ignore[reportArgumentType] on str-where-int probes (stripping them surfaces 2 errors; a *args: object regression makes them unnecessary → red). Fixture imports offload under TYPE_CHECKING (anyio-free, collects in no-anyio CI)
 - [Phase 26]: PKG-02/03 pinned by tests/test_pkg_import_guard.py — two anyio-free tests share one meta-path-block child interpreter (importlib.abc.MetaPathFinder raising ImportError for anyio*). Subprocess (not in-process monkeypatch) is mandatory: sys.modules caching of anyio/_async from an earlier worker test would mask the guard's except-ImportError negative branch (RESEARCH Pitfall 2). Each branch prints its own sentinel (SYNC_IMPORT_OK / ASYNC_GUARD_OK) so the child proves the asserted path executed. D-01 honored — src/adbc_poolhouse/__init__.py left byte-for-byte. Module is anyio-free at collection so it collects under Plan 04's no-anyio CI job
+- [Phase 26]: PKG-04 sync-no-anyio CI job shipped — uv sync --locked --no-default-groups --extra duckdb --extra sqlite (drops the dev group, the only place anyio/trio live), asserts find_spec('anyio') is None (T-26-07), runs the sync suite via uv run --with pytest --with pytest-adbc-replay. RESEARCH/PLAN under-specified the deselection: tests/_async_harness (trio.testing at collection) must ALSO be ignored alongside tests/async, and the snowflake/databricks markers deselected (pytest-adbc-replay keys the cassette on the installed driver, which the minimal install omits → CassetteMissError). Added --extra sqlite so the SQLite integration test runs (anyio-free, in-proc). [Rule 1] TestNoGlobalState eagerly getattr'd lazy async names → ImportError under the supported [async]-absent install; now skips names whose access raises. Verified end-to-end in a clean throwaway UV_PROJECT_ENVIRONMENT venv: 299 passed, 4 deselected, anyio genuinely absent. Live GitHub Actions run is the one manual-only item, auto-approved under --auto pending next push
 - [Phase 25]: EDGE-09 cancel-mid-block leg (D-24-02 owed from Phase 24) lands — gate a stub worker inside execute, cancel the scope so the watcher fires adbc_cancel, assert adbc_cancel_call_count==1 + borrowed_tokens==0 after the cancelled offload (transient token released exactly once), x50, both backends, x20 loop-stable; a belt-and-braces finally release keeps the group fail-fast (never a hang) without changing the happy cancel path
 
 ### Roadmap Evolution
@@ -139,6 +141,6 @@ v1.4.0 roadmap decisions:
 ## Session Continuity
 
 Last session: 2026-06-28T09:00:00.000Z
-Stopped at: Completed 26-03-PLAN.md (PKG-02/03 subprocess-isolated import-guard regression tests)
-Next step: Execute Phase 26 Plan 04 (PKG-04 — no-anyio CI guard job).
+Stopped at: Completed 26-04-PLAN.md (PKG-04 — no-anyio CI guard job); Phase 26 complete (all 4 plans, PKG-01..05)
+Next step: Phase 27 (Dual-Backend Test Matrix). NOTE: the sync-no-anyio job's live GitHub Actions run is auto-approved pending the next push — confirm it is green on Actions when CI next runs.
 </content>
