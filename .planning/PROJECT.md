@@ -53,7 +53,7 @@ One config in, one pool out — `create_pool(SnowflakeConfig(...))` returns a re
 
 ### Active
 
-**Milestone v1.4.0 — Async API:** In progress (requirements defined this milestone; async surface for all 13 backends behind an `[async]` extra)
+**Milestone v1.4.0 — Async API:** In progress (requirements defined this milestone; async surface for all 13 backends behind an `[async]` extra). Phases 22–25 complete: async pool/connection/cursor surface, dedicated per-pool limiter, and cooperative cancellation (cancel/timeout never poisons the pool — `adbc_cancel` fired once from the loop thread, shielded invalidate, identical under asyncio + trio; CANCEL-01..04, EDGE-01..07/19/28/29). Remaining: Phase 26 (packaging/`[async]` extra) and Phase 27 (dual-backend test matrix).
 
 **Carried (externally blocked):**
 - [ ] Verify Teradata field names against real Columnar ADBC Teradata driver
@@ -136,4 +136,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-06-28 — Phase 24 (Core Async Wrapper) complete; the full async surface (`create_async_pool`/`connect`/`execute`/`fetch_arrow_table`/checkin), dedicated per-pool limiter, and structural EDGE coverage ship. Cancellation (Phase 25) remains.*
+*Last updated: 2026-06-28 — Phase 25 (Cancellation) complete; a cancelled/timed-out async op never poisons the pool — the in-flight C call is aborted via one shielded `adbc_cancel` from the loop thread, the worker is joined, the connection is invalidated, identical under asyncio + trio (CANCEL-01..04, EDGE-01..07/19/28/29; the EDGE-09 cancel-mid-block leg owed from Phase 24 is closed). A post-review pass fixed a critical `worker_started` TOCTOU race (CR-01) by moving the started/queued signal to the loop thread. Next: Phase 26 (packaging & `[async]` extra).*
