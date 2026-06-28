@@ -73,23 +73,34 @@ async def cancellable_offload(
     abort cannot abort the abort --- `adbc_cancel` fires exactly once, D-25-07),
     then, still shielded, awaits `on_abort()` if supplied (the connection's
     poison-recovery; the just-unblocked worker has released its token, so the
-    recovery's own offload can acquire one). It always re-raises the cancellation
-    it caught --- it never swallows it (D-25-06).
+    recovery's own offload can acquire one). It records that it drove the abort in
+    a `cancelled_by_us` flag and always re-raises the cancellation it caught ---
+    it never swallows it (D-25-06).
 
     On the success or error path the worker releases the watcher by setting the
     `Event` in a `finally`, so the watcher exits cleanly without ever entering its
     `except` branch and `adbc_cancel` is never called.
 
-    On the **cancel path** anyio collapses the task group's bundled exceptions
-    (the framework cancellation plus the worker's driver interrupt) back into the
-    framework cancellation before control reaches the `except BaseExceptionGroup`
-    branch, so the caller sees only its own `TimeoutError` (or nothing, for an
-    explicit `scope.cancel()`) and never a spurious "Interrupted!". On the
-    **non-cancel path** a genuine worker `AdbcError` exits the task group wrapped
-    in a single-member `ExceptionGroup`; this helper unwraps it via
-    `eg.exceptions[0]` so the caller sees the bare `AdbcError` with its exact type
-    and off-loop worker frame intact, preserving the Phase 24 EDGE-17 contract
-    (EDGE-19).
+    On the **cancel path** the just-aborted worker's blocking call typically
+    returns by *raising* the driver's interrupt error (the live DuckDB probe
+    raises `ProgrammingError("...INTERRUPT Error: Interrupted!")`), so the task
+    group surfaces a single-member `ExceptionGroup` carrying that interrupt rather
+    than collapsing to the framework cancellation. Because `cancelled_by_us` is
+    set, this helper recognises that interrupt as the expected side-effect of its
+    own `adbc_cancel` (D-25-02 --- identified by the flag, never by sniffing the
+    error type or message), swallows it, and yields at one cancellation checkpoint
+    (`await anyio.sleep(0)`): an enclosing cancelled scope (a caller's `fail_after`
+    / `move_on_after` / `scope.cancel`) then surfaces its own `TimeoutError` (or
+    nothing), and the caller never sees a spurious "Interrupted!". A stub worker
+    that returns cleanly on `adbc_cancel` produces no interrupt at all, so the
+    cancel path simply re-raises the framework cancellation without reaching this
+    branch.
+
+    On the **non-cancel path** (`cancelled_by_us` stays `False`) a genuine worker
+    `AdbcError` exits the task group wrapped in a single-member `ExceptionGroup`;
+    this helper unwraps it via `eg.exceptions[0]` so the caller sees the bare
+    `AdbcError` with its exact type and off-loop worker frame intact, preserving
+    the Phase 24 EDGE-17 contract (EDGE-19).
 
     Args:
         adbc_cancel: The driver's thread-safe cancel hook (e.g.
@@ -122,6 +133,7 @@ async def cancellable_offload(
     done = anyio.Event()
     result: dict[str, _T] = {}
     worker_started = False
+    cancelled_by_us = False
 
     def _run() -> _T:
         # Runs ON the worker thread, so it executes only after a limiter token is
@@ -132,10 +144,12 @@ async def cancellable_offload(
         return fn(*args)
 
     async def _watcher() -> None:
+        nonlocal cancelled_by_us
         try:
             await done.wait()  # event-driven park, NOT a poll
         except get_cancelled_exc_class():
             if worker_started:
+                cancelled_by_us = True  # the interrupt the worker now raises is OURS
                 with anyio.CancelScope(shield=True):
                     adbc_cancel()  # thread-safe; unblocks the worker, fires ONCE
                     if on_abort is not None:
@@ -152,11 +166,22 @@ async def cancellable_offload(
         async with anyio.create_task_group() as tg:
             tg.start_soon(_watcher)
             tg.start_soon(_worker)
-    except BaseExceptionGroup as eg:  # NON-cancel path: the worker raised a real error
-        # The task group wraps a lone worker AdbcError in a single-member group.
-        # Unwrap to preserve the exact type + off-loop worker frame (EDGE-17/19).
-        # On the cancel path anyio collapses the bundle to the framework
-        # cancellation before reaching here, so a group that arrives is GENUINE.
+    except BaseExceptionGroup as eg:
+        if cancelled_by_us:
+            # CANCEL path: the aborted worker returned by raising the driver's
+            # interrupt (e.g. DuckDB's `ProgrammingError("...Interrupted!")`). That
+            # error is the expected side-effect of OUR `adbc_cancel`, identified by
+            # the flag (D-25-02 --- never by sniffing the type/message), so swallow
+            # it and yield once: an enclosing cancelled scope (the caller's
+            # fail_after / move_on_after / scope.cancel) surfaces its own
+            # cancellation at this checkpoint, while an already-exited internal
+            # cancel scope makes it a clean no-op. The caller never sees a spurious
+            # "Interrupted!" (D-25-05).
+            await anyio.sleep(0)
+            return result.get("v")  # type: ignore[return-value]
+        # NON-cancel path: the task group wraps a lone worker AdbcError in a
+        # single-member group. Unwrap to preserve the exact type + off-loop worker
+        # frame (EDGE-17/19).
         if len(eg.exceptions) == 1:
             raise eg.exceptions[0] from None
         raise
