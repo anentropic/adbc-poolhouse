@@ -93,6 +93,16 @@ class TestAsyncGuard:
         rules = [f.rule for f in findings]
         assert rules.count("banned-asyncio-import") == 2
 
+    def test_bans_asyncio_cancelled_error(self, tmp_path: Path) -> None:
+        """`asyncio.CancelledError` attribute access raises one finding (EDGE-28, D-25-06)."""
+        (tmp_path / "c.py").write_text(
+            "try:\n    pass\nexcept asyncio.CancelledError:\n    pass\n",
+            encoding="utf-8",
+        )
+        findings = scan_async_package(tmp_path)
+        rules = [f.rule for f in findings]
+        assert rules.count("banned-asyncio-cancelled-error") == 1
+
     def test_to_thread_without_limiter_flagged(self, tmp_path: Path) -> None:
         """A bare `to_thread.run_sync(fn)` is flagged; the `limiter=` form is clean."""
         (tmp_path / "bad.py").write_text(
