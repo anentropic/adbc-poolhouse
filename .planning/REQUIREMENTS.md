@@ -69,8 +69,8 @@ Scope decisions for this milestone:
 
 ### Testing
 
-- [ ] **TEST-01**: The async suite runs parametrized over asyncio and trio via the anyio pytest plugin (`@pytest.mark.anyio`)
-- [ ] **TEST-02**: The async layer is exercised against DuckDB (in-proc) and Snowflake (pytest-adbc-replay cassette) to prove backend-generic coverage
+- [x] **TEST-01**: The async suite runs parametrized over asyncio and trio via the anyio pytest plugin (`@pytest.mark.anyio`)
+- [x] **TEST-02**: The async layer is exercised against DuckDB (in-proc) and Snowflake (pytest-adbc-replay cassette) to prove backend-generic coverage
 - [ ] **TEST-03**: An Arrow memory-stability test confirms no allocator growth across many async cursor lifecycles
 - [ ] **TEST-04**: A limiter-sizing stress test confirms no deadlock or starvation when concurrency exceeds `pool_size`
 - [x] **TEST-05**: A shared deterministic test harness exists — a `BlockingStubCursor` (blocks on a `threading.Event` released only by the test or by `adbc_cancel`; records thread-id, call counts, max-concurrent-in-execute) plus event-gating/virtual-clock helpers and a source-scan/import-lint guard — so edge-case tests need no real sleeps
@@ -225,8 +225,8 @@ Explicit exclusions for the async layer (with reasoning):
 | PKG-03 | Phase 26 | Complete (26-03) |
 | PKG-04 | Phase 26 | Complete (26-04) |
 | PKG-05 | Phase 26 | Complete (Plan 02) |
-| TEST-01 | Phase 27 | Pending |
-| TEST-02 | Phase 27 | Pending |
+| TEST-01 | Phase 27 | Complete (27-02) |
+| TEST-02 | Phase 27 | Complete (27-02) |
 | TEST-03 | Phase 27 | Pending |
 | TEST-04 | Phase 27 | Pending |
 | EDGE-27 | Phase 27 | Pending |
