@@ -218,7 +218,7 @@ Explicit exclusions for the async layer (with reasoning):
 | EDGE-06 | Phase 25 | Pending |
 | EDGE-07 | Phase 25 | Pending |
 | EDGE-19 | Phase 25 | Pending |
-| EDGE-28 | Phase 25 | Pending |
+| EDGE-28 | Phase 25 | Partial (25-01: AST guard rule banning asyncio.CancelledError; behavioral trio-cancel clause pending 25-02/03) |
 | EDGE-29 | Phase 25 | Pending |
 | PKG-01 | Phase 26 | Pending |
 | PKG-02 | Phase 26 | Pending |

@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.4.0
 milestone_name: Async API
 status: executing
-stopped_at: Completed 24-03-PLAN.md
-last_updated: "2026-06-28T00:56:32.342Z"
-last_activity: 2026-06-28 -- Phase 25 planning complete
+stopped_at: Completed 25-01-PLAN.md
+last_updated: "2026-06-28T01:01:20.000Z"
+last_activity: 2026-06-28 -- Completed 25-01 (cancellation harness prerequisites)
 progress:
   total_phases: 9
   completed_phases: 3
-  total_plans: 11
-  completed_plans: 11
+  total_plans: 16
+  completed_plans: 12
   percent: 33
 ---
 
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-25)
 
 **Core value:** One config in, one pool out — `create_pool(SnowflakeConfig(...))` returns a ready-to-use SQLAlchemy QueuePool in a single call.
-**Current focus:** Phase 24 — core-async-wrapper
+**Current focus:** Phase 25 — cancellation
 
 ## Current Position
 
-Phase: 25
-Plan: Not started
-Status: Ready to execute
-Last activity: 2026-06-28 -- Phase 25 planning complete
+Phase: 25 (cancellation) — EXECUTING
+Plan: 2 of 5
+Status: Executing Phase 25 (25-01 complete)
+Last activity: 2026-06-28 -- Completed 25-01 (cancellation harness prerequisites)
 
 Progress: [░░░░░░░░░░] 0% (0/7 phases)
 
@@ -50,6 +50,7 @@ Progress: [░░░░░░░░░░] 0% (0/7 phases)
 | Phase 24 P03 | 6min | 2 tasks | 2 files |
 | Phase 24 P04 | ~25min | 3 tasks | 10 files |
 | Phase 24 P05 | ~12min | 2 tasks | 4 files |
+| Phase 25 P01 | 9min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -94,6 +95,9 @@ v1.4.0 roadmap decisions:
 - [Phase ?]: [Phase 24]: tests/async cannot be imported by dotted path (async is a keyword) — sibling helpers loaded via importlib; real-clock watchdog (not anyio.fail_after) used for concurrency bodies per the MockClock autojump gotcha
 - [Phase ?]: [Phase 24]: Async docs gate closed — guide quotes Phase 22 SPIKE numbers honestly (execute ~2.77x@N=4, fetch_arrow_table ~1.67x@N=4, in-process DuckDB caveat); aliasing antipattern + ConnectionBusyError documented (D-24-03)
 - [Phase ?]: [Phase 24]: AsyncPool/AsyncConnection/AsyncCursor are NOT top-level exports — guide cross-refs only the exported factory fns + ConnectionBusyError; method-level mkdocstrings refs fail autorefs --strict, use inline code
+- [Phase 25]: BlockingStubConnection gained lock-guarded invalidate()/invalidate_call_count (D-04 LOCKED contract); the seam AsyncConnection.invalidate() -> self._fairy.invalidate() (D-25-03) that stub-backed EDGE-02/04/05/29 assert by name
+- [Phase 25]: AST guard gained banned-asyncio-cancelled-error rule (_GuardVisitor.visit_Attribute, EDGE-28/D-25-06); real _async/ scan stays clean; D-03 preserved (stubs.py still pure-threading)
+- [Phase 25]: strict basedpyright pre-commit gate forces RED+GREEN co-commit when a RED test references a not-yet-existing attribute (Task 1); RED verified via pytest before GREEN landed
 
 ### Roadmap Evolution
 
@@ -116,7 +120,7 @@ v1.4.0 roadmap decisions:
 
 ## Session Continuity
 
-Last session: 2026-06-27T23:26:19.865Z
-Stopped at: Completed 24-03-PLAN.md
-Next step: Execute 24-04 (Lifecycle + EDGE suite: EDGE-09/10/11/12/15/17/18/21/25/26, both backends, loop-stable; guard extension).
+Last session: 2026-06-28T01:01:20.000Z
+Stopped at: Completed 25-01-PLAN.md
+Next step: Execute 25-02 (cancel logic: cancellable_offload watcher/worker + AsyncConnection.invalidate + cursor rewire onto the stub invalidate seam + EDGE cancel suite).
 </content>

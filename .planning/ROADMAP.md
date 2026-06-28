@@ -166,7 +166,7 @@ Plans:
 Plans:
 **Wave 1**
 
-- [ ] 25-01-PLAN.md — Wave-0 harness prereqs: BlockingStubConnection.invalidate + banned-asyncio-cancelled-error AST rule (EDGE-28)
+- [x] 25-01-PLAN.md — Wave-0 harness prereqs: BlockingStubConnection.invalidate + banned-asyncio-cancelled-error AST rule (EDGE-28) (completed 2026-06-28)
 
 **Wave 2** *(blocked on Wave 1)*
 
@@ -275,7 +275,7 @@ Plans:
 | 22. Feasibility Spike | v1.4.0 | 2/2 | Complete    | 2026-06-27 |
 | 23. Test Harness Foundation | v1.4.0 | 4/4 | Complete    | 2026-06-27 |
 | 24. Core Async Wrapper | v1.4.0 | 5/5 | Complete    | 2026-06-27 |
-| 25. Cancellation | v1.4.0 | 0/0 | Not started | - |
+| 25. Cancellation | v1.4.0 | 1/5 | In progress | - |
 | 26. Packaging & Extra Scoping | v1.4.0 | 0/0 | Not started | - |
 | 27. Dual-Backend Test Matrix | v1.4.0 | 0/0 | Not started | - |
 | 28. Documentation | v1.4.0 | 0/0 | Not started | - |
