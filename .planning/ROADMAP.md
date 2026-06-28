@@ -223,7 +223,22 @@ Plans:
   3. A limiter-sizing stress test confirms no deadlock or starvation when concurrency exceeds `pool_size` (TEST-04)
   4. A meta-test asserts every async test is parametrized over both backends with no `@pytest.mark.asyncio` and no `asyncio` import in the async test package, and timeout/cancel tests use a virtual clock or event gating with no positive-duration `sleep` (source-scan enforced) (EDGE-27/30)
 
-**Plans**: TBD
+**Plans**: 5 plans
+
+**Wave 1**
+
+- [ ] 27-01-PLAN.md — shared primitives: `snowflake_async_pool` cassette fixture + two AST guard callables (`scan_async_test_hygiene`, `scan_for_positive_sleep`) + synthetic self-tests
+
+**Wave 2** *(blocked on Wave 1)*
+
+- [ ] 27-02-PLAN.md — read-path matrix: connect→execute→fetch_arrow_table→checkin × {DuckDB, Snowflake cassette} × {asyncio, trio} (TEST-01/02)
+- [ ] 27-03-PLAN.md — Arrow allocator-stability over N≥100 cycles + reset-event count, both backends (TEST-03)
+- [ ] 27-04-PLAN.md — limiter-sizing stress: stub-gated 4× flood (running-max == bound, no starvation) + real-DuckDB smoke flood, real-clock watchdog (TEST-04)
+
+**Wave 3** *(blocked on Waves 1–2)*
+
+- [ ] 27-05-PLAN.md — EDGE-27/30 real-package meta-tests + phase ×20 loop gate + Linux CI gate + mkdocs --strict docs gate
+
 **UI hint**: no
 
 ### Phase 28: Documentation
