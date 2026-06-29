@@ -12,6 +12,22 @@ Pool construction is synchronous because it does no per-call I/O. Checkout,
 queries, and teardown are the parts that block, so those are the parts that get
 awaited.
 
+!!! warning "Experimental"
+
+    The async API is experimental. Its surface may change between minor releases,
+    so pin the version you build against and read the changelog before you upgrade.
+
+    It is also incomplete. The following are not available yet on the async side:
+
+    - **Arrow streaming** — `fetch_record_batch` and `async for batch in ...`
+    - **Async bulk write** — `adbc_ingest`
+    - **DataFrame convenience** — `fetch_df` and `fetch_polars`
+    - **Async ADBC metadata** — `adbc_get_table_schema`, `adbc_get_objects`, `adbc_get_info`
+    - **Async prepared statements** — `adbc_prepare`, `adbc_execute_schema`
+
+    What you get today is checkout, `execute` / `executemany`, the `fetch*` methods,
+    `fetch_arrow_table`, and cooperative cancellation. The rest is on the roadmap.
+
 ## Install
 
 The async wrapper depends on `anyio`, which ships behind the `[async]` extra:
