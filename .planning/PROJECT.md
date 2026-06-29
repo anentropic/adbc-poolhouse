@@ -53,7 +53,7 @@ One config in, one pool out — `create_pool(SnowflakeConfig(...))` returns a re
 
 ### Active
 
-**Milestone v1.4.0 — Async API:** In progress (requirements defined this milestone; async surface for all 13 backends behind an `[async]` extra). Phases 22–25 complete: async pool/connection/cursor surface, dedicated per-pool limiter, and cooperative cancellation (cancel/timeout never poisons the pool — `adbc_cancel` fired once from the loop thread, shielded invalidate, identical under asyncio + trio; CANCEL-01..04, EDGE-01..07/19/28/29). Remaining: Phase 26 (packaging/`[async]` extra) and Phase 27 (dual-backend test matrix).
+**Milestone v1.4.0 — Async API:** Complete (all phases 22–28 done; async surface for all 13 backends behind an `[async]` extra). Phases 22–25: async pool/connection/cursor surface, dedicated per-pool limiter, and cooperative cancellation (cancel/timeout never poisons the pool — `adbc_cancel` fired once from the loop thread, shielded invalidate, identical under asyncio + trio; CANCEL-01..04, EDGE-01..07/19/28/29). Phase 26 (packaging/`[async]` extra) and Phase 27 (dual-backend test matrix) complete. Phase 28 (Documentation) complete: honest async usage guide, async API reference, configuration/index/changelog updates, docs quality gate passing (DOCS-01..04). Milestone ready for `/gsd-complete-milestone`.
 
 **Carried (externally blocked):**
 - [ ] Verify Teradata field names against real Columnar ADBC Teradata driver
@@ -136,4 +136,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-06-28 — Phase 25 (Cancellation) complete; a cancelled/timed-out async op never poisons the pool — the in-flight C call is aborted via one shielded `adbc_cancel` from the loop thread, the worker is joined, the connection is invalidated, identical under asyncio + trio (CANCEL-01..04, EDGE-01..07/19/28/29; the EDGE-09 cancel-mid-block leg owed from Phase 24 is closed). A post-review pass fixed a critical `worker_started` TOCTOU race (CR-01) by moving the started/queued signal to the loop thread. Next: Phase 26 (packaging & `[async]` extra).*
+*Last updated: 2026-06-29 — Phase 28 (Documentation) complete, closing out the v1.4.0 Async API milestone (phases 22–28). Ships an honest async usage guide distinguishing I/O-bound wins (~2.77x execute) from materialization-bound limits per the Phase 22 benchmarks, an API reference rendering `AsyncPool`/`AsyncConnection`/`AsyncCursor` plus the three entry points, configuration/index/changelog updates flagging the async API experimental, and a passing `mkdocs build --strict` + humanizer gate (DOCS-01..04). Next: `/gsd-complete-milestone` to archive v1.4.0.*
