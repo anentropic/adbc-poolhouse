@@ -260,7 +260,7 @@ Plans:
 
 - [x] 28-01-PLAN.md — Experimental caveat + honest-concurrency audit in the async guide and index (DOCS-01) — completed 2026-06-29
 - [x] 28-02-PLAN.md — Render AsyncPool/AsyncConnection/AsyncCursor in the API reference at their real _async paths via the gen-files generator (DOCS-02) — completed 2026-06-29
-- [ ] 28-03-PLAN.md — Configuration async section + v1.4.0 experimental changelog entry (DOCS-03)
+- [x] 28-03-PLAN.md — Configuration async section + v1.4.0 experimental changelog entry (DOCS-03) — completed 2026-06-29
 
 **Wave 2** *(blocked on Wave 1)*
 
