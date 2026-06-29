@@ -254,7 +254,18 @@ Plans:
   3. The configuration and index pages list the `[async]` extra and the async entry points (DOCS-03)
   4. `uv run mkdocs build --strict` passes and a humanizer pass is applied to all new or substantially rewritten prose (DOCS-04)
 
-**Plans**: TBD
+**Plans**: 4 plans
+
+**Wave 1**
+
+- [ ] 28-01-PLAN.md — Experimental caveat + honest-concurrency audit in the async guide and index (DOCS-01)
+- [ ] 28-02-PLAN.md — Render AsyncPool/AsyncConnection/AsyncCursor in the API reference at their real _async paths (DOCS-02)
+- [ ] 28-03-PLAN.md — Configuration async section + v1.4.0 experimental changelog entry (DOCS-03)
+
+**Wave 2** *(blocked on Wave 1)*
+
+- [ ] 28-04-PLAN.md — Humanizer pass + `mkdocs build --strict` docs quality gate (DOCS-04)
+
 **UI hint**: no
 
 ### Phase 21: Quack Backend
