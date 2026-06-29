@@ -17,7 +17,7 @@
 - [x] **Phase 25: Cancellation** — `adbc_cancel` wiring, shielded checkin, invalidate-on-cancel, no-leak under asyncio + trio, plus cancellation EDGE coverage (completed 2026-06-28)
 - [x] **Phase 26: Packaging & Extra Scoping** — `[async]` extra, PEP 562 lazy import, zero-cost sync path, basedpyright-strict async typing (4/4 plans, PKG-01..05; completed 2026-06-28)
 - [ ] **Phase 27: Dual-Backend Test Matrix** — anyio asyncio+trio parametrization across DuckDB + Snowflake cassette; Arrow-stability and limiter-stress proofs; meta-guards
-- [ ] **Phase 28: Documentation** — Async usage guide (honest about I/O vs materialization), API reference, configuration/index updates, docs quality gate
+- [x] **Phase 28: Documentation** — Async usage guide (honest about I/O vs materialization), API reference, configuration/index updates, docs quality gate (4/4 plans, DOCS-01..04; completed 2026-06-29)
 
 <details>
 <summary>✅ v1.3.0 Quack Backend (Phases 21-21.1) — awaiting release</summary>
@@ -264,7 +264,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1)*
 
-- [ ] 28-04-PLAN.md — Humanizer pass + `mkdocs build --strict` docs quality gate (DOCS-04)
+- [x] 28-04-PLAN.md — Humanizer pass + `mkdocs build --strict` docs quality gate (DOCS-04) — completed 2026-06-29
 
 **UI hint**: no
 
@@ -316,7 +316,7 @@ Plans:
 | 25. Cancellation | v1.4.0 | 6/5 | Complete    | 2026-06-28 |
 | 26. Packaging & Extra Scoping | v1.4.0 | 2/4 | In progress | - |
 | 27. Dual-Backend Test Matrix | v1.4.0 | 5/5 | Local complete (Linux CI pending) | 2026-06-28 |
-| 28. Documentation | v1.4.0 | 0/0 | Not started | - |
+| 28. Documentation | v1.4.0 | 4/4 | Complete | 2026-06-29 |
 | 21.1. ADBC dispatch URI-positional fix | v1.3.0 | 3/3 | Complete | 2026-05-20 |
 | 21. Quack Backend | v1.3.0 | 3/3 | Complete    | 2026-05-19 |
 | 16. Driver Import Semi-Integration Tests | v1.2.0 | 2/2 | Complete | 2026-03-12 |
