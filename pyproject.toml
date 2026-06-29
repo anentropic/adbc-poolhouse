@@ -58,6 +58,8 @@ dev = [
     "anyio>=4.13",
     "trio>=0.31",
     "aiotools>=2.2",
+    "pytest-repeat",
+    "pytest-timeout",
 ]
 docs = [
     "mkdocs>=1.6.0",

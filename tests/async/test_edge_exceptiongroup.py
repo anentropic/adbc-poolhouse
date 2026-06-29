@@ -36,6 +36,8 @@ if TYPE_CHECKING:
 # the limiter suite to keep the loop-count constant in one conceptual place.
 _helpers = importlib.import_module("tests.async.test_edge_limiter")
 _ACCOUNTING_LOOPS = _helpers._ACCOUNTING_LOOPS  # noqa: SLF001 (shared loop count)
+# Repeat (env-controlled) + timeout: codify the "0-hang" loop gate (see _edge_helpers).
+pytestmark = importlib.import_module("tests.async._edge_helpers").concurrency_marks
 
 
 class TestEdge19BareAdbcError:

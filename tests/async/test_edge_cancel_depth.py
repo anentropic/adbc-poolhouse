@@ -61,6 +61,8 @@ if TYPE_CHECKING:
 _helpers = importlib.import_module("tests.async._edge_helpers")
 await_inside = _helpers.await_inside
 real_clock_watchdog = _helpers.real_clock_watchdog
+# Repeat (env-controlled) + timeout: codify the "0-hang" loop gate (see _edge_helpers).
+pytestmark = _helpers.concurrency_marks
 _clock = importlib.import_module("tests._async_harness.clock")
 virtual_clock = _clock.virtual_clock
 

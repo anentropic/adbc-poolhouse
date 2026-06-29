@@ -88,11 +88,26 @@ def __getattr__(name: str) -> object:
     if name in _LAZY_ASYNC_NAMES:
         try:
             from adbc_poolhouse import _async
-        except ImportError as exc:  # anyio (the [async] extra) is missing
-            raise ImportError(
-                f"{name!r} requires the optional async dependencies. "
-                "Install them with: pip install adbc-poolhouse[async]"
-            ) from exc
+        except ImportError as exc:
+            # Relabel ONLY the missing-anyio case (the [async] extra). Any other
+            # ImportError --- a bug in the async subpackage, a broken transitive
+            # import, a half-installed env --- must propagate unchanged rather than
+            # be mis-attributed to an uninstalled extra and send the user to
+            # reinstall something they already have. Prefer the structured
+            # `ModuleNotFoundError.name`; fall back to the message only when no name
+            # is set (e.g. a bare `ImportError` from a meta-path finder).
+            missing = getattr(exc, "name", None)
+            anyio_absent = (
+                missing == "anyio"
+                or (missing or "").startswith("anyio.")
+                or (missing is None and "anyio" in str(exc))
+            )
+            if anyio_absent:
+                raise ImportError(
+                    f"{name!r} requires the optional async dependencies. "
+                    "Install them with: pip install adbc-poolhouse[async]"
+                ) from exc
+            raise
         return getattr(_async, name)
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 

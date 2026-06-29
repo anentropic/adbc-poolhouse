@@ -12,6 +12,7 @@ issue. Real DuckDB, both backends.
 
 from __future__ import annotations
 
+import importlib
 from typing import TYPE_CHECKING
 
 import pyarrow
@@ -19,6 +20,9 @@ import pytest
 
 if TYPE_CHECKING:
     from adbc_poolhouse._async._pool import AsyncPool
+
+# Repeat (env-controlled) + timeout: codify the "0-hang" loop gate (see _edge_helpers).
+pytestmark = importlib.import_module("tests.async._edge_helpers").concurrency_marks
 
 # A few repeats so an allocator-reuse / use-after-free bug has a chance to surface.
 _LIFETIME_LOOPS = 5

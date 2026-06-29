@@ -197,8 +197,7 @@ class AsyncCursor:
             ConnectionBusyError: If another offloaded call on the owning connection
                 is already in flight.
         """
-        self._owner._enter_offload()  # noqa: SLF001 (intentional parent guard, see module docstring)
-        try:
+        with self._owner._offloading():  # noqa: SLF001 (intentional parent guard, see module docstring)
             await cancellable_offload(
                 self._adbc_cancel,
                 self._cursor.execute,
@@ -207,8 +206,6 @@ class AsyncCursor:
                 limiter=self._limiter,
                 on_abort=self._owner.invalidate,  # poison recovery on a real abort (D-25-03)
             )
-        finally:
-            self._owner._exit_offload()  # noqa: SLF001
 
     async def executemany(self, operation: str, seq_of_parameters: object) -> None:
         """
@@ -230,8 +227,7 @@ class AsyncCursor:
             ConnectionBusyError: If another offloaded call on the owning connection
                 is already in flight.
         """
-        self._owner._enter_offload()  # noqa: SLF001
-        try:
+        with self._owner._offloading():  # noqa: SLF001
             await cancellable_offload(
                 self._adbc_cancel,
                 self._cursor.executemany,
@@ -240,8 +236,6 @@ class AsyncCursor:
                 limiter=self._limiter,
                 on_abort=self._owner.invalidate,  # poison recovery on a real abort (D-25-03)
             )
-        finally:
-            self._owner._exit_offload()  # noqa: SLF001
 
     async def fetchone(self) -> object:
         """
@@ -258,16 +252,13 @@ class AsyncCursor:
             ConnectionBusyError: If another offloaded call on the owning connection
                 is already in flight.
         """
-        self._owner._enter_offload()  # noqa: SLF001
-        try:
+        with self._owner._offloading():  # noqa: SLF001
             return await cancellable_offload(
                 self._adbc_cancel,
                 self._cursor.fetchone,
                 limiter=self._limiter,
                 on_abort=self._owner.invalidate,  # poison recovery on a real abort (D-25-03)
             )
-        finally:
-            self._owner._exit_offload()  # noqa: SLF001
 
     async def fetchmany(self, size: int | None = None) -> object:
         """
@@ -288,8 +279,11 @@ class AsyncCursor:
             ConnectionBusyError: If another offloaded call on the owning connection
                 is already in flight.
         """
-        self._owner._enter_offload()  # noqa: SLF001
-        try:
+        with self._owner._offloading():  # noqa: SLF001
+            # Forward `size` only when given, so the dbapi cursor falls back to its
+            # own `arraysize` default. The two arms differ only by that argument; a
+            # single `*tuple`-spread call would lose the `TypeVarTuple` arity the
+            # `cancellable_offload` signature enforces, so the branch stays explicit.
             if size is None:
                 return await cancellable_offload(
                     self._adbc_cancel,
@@ -304,8 +298,6 @@ class AsyncCursor:
                 limiter=self._limiter,
                 on_abort=self._owner.invalidate,  # poison recovery on a real abort (D-25-03)
             )
-        finally:
-            self._owner._exit_offload()  # noqa: SLF001
 
     async def fetchall(self) -> object:
         """
@@ -322,16 +314,13 @@ class AsyncCursor:
             ConnectionBusyError: If another offloaded call on the owning connection
                 is already in flight.
         """
-        self._owner._enter_offload()  # noqa: SLF001
-        try:
+        with self._owner._offloading():  # noqa: SLF001
             return await cancellable_offload(
                 self._adbc_cancel,
                 self._cursor.fetchall,
                 limiter=self._limiter,
                 on_abort=self._owner.invalidate,  # poison recovery on a real abort (D-25-03)
             )
-        finally:
-            self._owner._exit_offload()  # noqa: SLF001
 
     async def fetch_arrow_table(self) -> pyarrow.Table:
         """
@@ -355,16 +344,13 @@ class AsyncCursor:
             ConnectionBusyError: If another offloaded call on the owning connection
                 is already in flight.
         """
-        self._owner._enter_offload()  # noqa: SLF001
-        try:
+        with self._owner._offloading():  # noqa: SLF001
             return await cancellable_offload(
                 self._adbc_cancel,
                 self._cursor.fetch_arrow_table,
                 limiter=self._limiter,
                 on_abort=self._owner.invalidate,  # poison recovery on a real abort (D-25-03)
             )
-        finally:
-            self._owner._exit_offload()  # noqa: SLF001
 
     async def close(self) -> None:
         """
@@ -379,15 +365,11 @@ class AsyncCursor:
             ConnectionBusyError: If another offloaded call on the owning connection
                 is already in flight.
         """
-        self._owner._enter_offload()  # noqa: SLF001
-        try:
-            with anyio.CancelScope(shield=True):
-                await offload(
-                    self._cursor.close,
-                    limiter=self._limiter,
-                )
-        finally:
-            self._owner._exit_offload()  # noqa: SLF001
+        with self._owner._offloading(), anyio.CancelScope(shield=True):  # noqa: SLF001
+            await offload(
+                self._cursor.close,
+                limiter=self._limiter,
+            )
 
     async def __aenter__(self) -> AsyncCursor:
         """

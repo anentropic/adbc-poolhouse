@@ -73,13 +73,16 @@ async def cancellable_offload(
 
     When the worker *had* started, the watcher fires `adbc_cancel()` inside
     `anyio.CancelScope(shield=True)` (so a second cancellation arriving during the
-    abort cannot abort the abort --- `adbc_cancel` fires exactly once, D-25-07),
-    then, still shielded, awaits `on_abort()` if supplied (the connection's
-    poison-recovery). `cancelled_by_us` is set to `True` only *after* both
-    `adbc_cancel()` and `on_abort()` have returned without raising (WR-02): if the
-    poison-recovery itself fails, the flag stays `False` so its exception is
-    surfaced on the non-cancel branch rather than silently swallowed. The watcher
-    always re-raises the cancellation it caught --- it never swallows it (D-25-06).
+    abort cannot abort the abort --- `adbc_cancel` fires exactly once, D-25-07) and
+    sets `aborted_by_us` immediately, so the worker's resulting error is recognised
+    as OUR interrupt by that flag alone (D-25-02), never by sniffing its type or
+    message. Still shielded, it then awaits `on_abort()` if supplied (the
+    connection's poison-recovery). If `on_abort` itself raises (WR-02) its exception
+    is captured in `abort_error` and surfaced *bare* on the cancel branch --- it is
+    the actionable failure, raised in place of the expected driver interrupt rather
+    than riding out as an opaque multi-member `ExceptionGroup` next to it. The
+    watcher always re-raises the cancellation it caught --- never swallows it
+    (D-25-06).
 
     The synchronization that makes `worker_started` safe (CR-01 / IN-01): the flag
     is set by an `on_dispatch` callback that `offload` runs --- bridged from the
@@ -101,19 +104,21 @@ async def cancellable_offload(
     returns by *raising* the driver's interrupt error (the live DuckDB probe
     raises `ProgrammingError("...INTERRUPT Error: Interrupted!")`), so the task
     group surfaces a single-member `ExceptionGroup` carrying that interrupt rather
-    than collapsing to the framework cancellation. Because `cancelled_by_us` is
-    set, this helper recognises that interrupt as the expected side-effect of its
-    own `adbc_cancel` (D-25-02 --- identified by the flag, never by sniffing the
-    error type or message), swallows it, and re-raises the cancellation rather than
+    than collapsing to the framework cancellation. Because `aborted_by_us` is set,
+    this helper recognises that interrupt as the expected side-effect of its own
+    `adbc_cancel` (D-25-02 --- identified by the flag, never by sniffing the error
+    type or message), swallows it, and re-raises the cancellation rather than
     returning a value (WR-01/WR-04): it surfaces an enclosing cancellation if one
     is pending at the `await anyio.sleep(0)` checkpoint (a caller's `fail_after` /
     `move_on_after` / `scope.cancel`), and otherwise raises
     `get_cancelled_exc_class()`, so a cancelled call can never return `None`/stale
-    as though the query had succeeded. A stub worker that returns cleanly on
-    `adbc_cancel` produces no interrupt at all, so the cancel path simply re-raises
-    the framework cancellation without reaching this branch.
+    as though the query had succeeded. If the poison-recovery failed, the captured
+    `abort_error` is raised bare here instead, so that failure is never lost behind
+    the expected interrupt. A stub worker that returns cleanly on `adbc_cancel`
+    produces no interrupt at all, so the cancel path simply re-raises the framework
+    cancellation without reaching the interrupt-swallowing logic.
 
-    On the **non-cancel path** (`cancelled_by_us` stays `False`) a genuine worker
+    On the **non-cancel path** (`aborted_by_us` stays `False`) a genuine worker
     `AdbcError` exits the task group wrapped in a single-member `ExceptionGroup`;
     this helper unwraps it via `eg.exceptions[0]` so the caller sees the bare
     `AdbcError` with its exact type and off-loop worker frame intact, preserving
@@ -146,15 +151,19 @@ async def cancellable_offload(
             `anyio.get_cancelled_exc_class()`) is raised --- an enclosing pending
             cancellation surfaces at the `await anyio.sleep(0)` checkpoint,
             otherwise a fresh `get_cancelled_exc_class()` is raised so a cancelled
-            call never returns a stale/`None` value. A genuine worker error (e.g.
-            an `AdbcError`), or a failed `on_abort` poison-recovery, is re-raised
+            call never returns a stale/`None` value. A failed `on_abort`
+            poison-recovery is re-raised bare on the cancel path, in place of the
+            cancellation. A genuine worker error (e.g. an `AdbcError`) is re-raised
             bare on the non-cancel path, unwrapped from its single-member
             `ExceptionGroup`.
     """
     done = anyio.Event()
     result: dict[str, _T] = {}
     worker_started = False
-    cancelled_by_us = False
+    aborted_by_us = False
+    # A holder (the same idiom as `result`) so a failed poison-recovery survives the
+    # `_watcher` closure without a captured Optional --- mutated, never rebound.
+    abort_error: dict[str, BaseException] = {}
 
     def _mark_started() -> None:
         # Runs on the LOOP thread (bridged there by `offload` via
@@ -167,20 +176,27 @@ async def cancellable_offload(
         worker_started = True
 
     async def _watcher() -> None:
-        nonlocal cancelled_by_us
+        nonlocal aborted_by_us, abort_error
         try:
             await done.wait()  # event-driven park, NOT a poll
         except get_cancelled_exc_class():
             if worker_started:
                 with anyio.CancelScope(shield=True):
                     adbc_cancel()  # thread-safe; unblocks the worker, fires ONCE
+                    # From here the worker's resulting error is OUR interrupt,
+                    # recognised by this flag alone (D-25-02) --- never by sniffing
+                    # the error type or message. Set BEFORE `on_abort` so a failing
+                    # poison-recovery is still attributed to the cancel path.
+                    aborted_by_us = True
                     if on_abort is not None:
-                        await on_abort()  # poison recovery (D-25-03), shielded
-                # Set ONLY after both the abort and the recovery returned cleanly
-                # (WR-02): if `on_abort` raised, the flag stays False so that
-                # failure surfaces on the non-cancel branch rather than being
-                # swallowed as the expected driver interrupt.
-                cancelled_by_us = True
+                        try:
+                            await on_abort()  # poison recovery (D-25-03), shielded
+                        except BaseException as exc:  # noqa: BLE001
+                            # The poison-recovery itself failed (WR-02). Capture it
+                            # so the handler can surface it BARE on the cancel branch,
+                            # instead of letting it ride out as an opaque, multi-member
+                            # `ExceptionGroup` next to our own expected interrupt.
+                            abort_error["exc"] = exc
             raise  # never swallow the cancellation (D-25-06)
 
     async def _worker() -> None:
@@ -199,22 +215,31 @@ async def cancellable_offload(
             tg.start_soon(_watcher)
             tg.start_soon(_worker)
     except BaseExceptionGroup as eg:
-        if cancelled_by_us:
-            # CANCEL path: the aborted worker returned by raising the driver's
-            # interrupt (e.g. DuckDB's `ProgrammingError("...Interrupted!")`). That
-            # error is the expected side-effect of OUR `adbc_cancel`, identified by
-            # the flag (D-25-02 --- never by sniffing the type/message), so swallow
-            # it. NEVER return a value here (WR-01/WR-04): yield once so an enclosing
-            # cancelled scope (the caller's fail_after / move_on_after /
-            # scope.cancel) surfaces its own cancellation at this checkpoint, and if
-            # none is pending raise the framework cancellation outright --- a
-            # cancelled, poisoned call must never look like a successful `None`/stale
-            # result (D-25-05).
+        if aborted_by_us:
+            # CANCEL path: OUR `adbc_cancel` aborted the worker, which returned by
+            # raising the driver's interrupt (e.g. DuckDB's
+            # `ProgrammingError("...Interrupted!")`). That error is the expected
+            # side-effect of our abort, identified by the flag (D-25-02 --- never by
+            # sniffing the type/message).
+            if "exc" in abort_error:
+                # The poison-recovery itself failed (WR-02). Surface THAT bare --- it
+                # is the actionable error --- in place of the expected interrupt,
+                # rather than re-raising an opaque multi-member `ExceptionGroup`
+                # carrying both. (Without this, an `on_abort` failure that coincided
+                # with the worker's interrupt leaked a two-member group to the caller.)
+                raise abort_error["exc"] from None
+            # Recovery succeeded (or none was supplied): swallow the expected interrupt
+            # and re-raise the cancellation. NEVER return a value here (WR-01/WR-04):
+            # yield once so an enclosing cancelled scope (the caller's fail_after /
+            # move_on_after / scope.cancel) surfaces its own cancellation at this
+            # checkpoint, and if none is pending raise the framework cancellation
+            # outright --- a cancelled, poisoned call must never look like a successful
+            # `None`/stale result (D-25-05).
             await anyio.sleep(0)
             raise get_cancelled_exc_class() from None
         # NON-cancel path: the task group wraps a lone worker AdbcError in a
         # single-member group. Unwrap to preserve the exact type + off-loop worker
-        # frame (EDGE-17/19). A failed `on_abort` (WR-02) also reaches here, bare.
+        # frame (EDGE-17/19).
         if len(eg.exceptions) == 1:
             raise eg.exceptions[0] from None
         raise

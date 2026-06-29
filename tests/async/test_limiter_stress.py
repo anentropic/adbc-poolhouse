@@ -59,6 +59,8 @@ if TYPE_CHECKING:
 _helpers = importlib.import_module("tests.async._edge_helpers")
 await_inside = _helpers.await_inside
 real_clock_watchdog = _helpers.real_clock_watchdog
+# Repeat (env-controlled) + timeout: codify the "0-hang" loop gate (see _edge_helpers).
+pytestmark = _helpers.concurrency_marks
 
 # The shipped pool defaults (Open Question 1): the flood proves the REAL bound the
 # library ships, not a stand-in. 32 gated stubs is cheap (no real I/O).

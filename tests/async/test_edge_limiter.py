@@ -44,6 +44,8 @@ if TYPE_CHECKING:
 _helpers = importlib.import_module("tests.async._edge_helpers")
 await_inside = _helpers.await_inside
 real_clock_watchdog = _helpers.real_clock_watchdog
+# Repeat (env-controlled) + timeout: codify the "0-hang" loop gate (see _edge_helpers).
+pytestmark = _helpers.concurrency_marks
 
 # Token-accounting loop count (EDGE-09): a flaky leak shows up across repeats.
 _ACCOUNTING_LOOPS = 50

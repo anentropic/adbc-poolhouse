@@ -38,6 +38,8 @@ if TYPE_CHECKING:
 _helpers = importlib.import_module("tests.async._edge_helpers")
 await_inside = _helpers.await_inside
 real_clock_watchdog = _helpers.real_clock_watchdog
+# Repeat (env-controlled) + timeout: codify the "0-hang" loop gate (see _edge_helpers).
+pytestmark = _helpers.concurrency_marks
 
 # The factory the `make_stub_async_connection` conftest fixture hands back.
 _StubFactory = Callable[[], "tuple[AsyncConnection, BlockingStubConnection]"]

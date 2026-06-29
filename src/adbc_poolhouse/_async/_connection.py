@@ -34,6 +34,7 @@ DuckDB driver).
 
 from __future__ import annotations
 
+import contextlib
 from typing import TYPE_CHECKING, cast
 
 import anyio
@@ -43,6 +44,7 @@ from adbc_poolhouse._async._offload import offload
 from adbc_poolhouse._exceptions import ConnectionBusyError
 
 if TYPE_CHECKING:
+    from collections.abc import Generator
     from types import TracebackType
 
     from anyio import CapacityLimiter
@@ -142,6 +144,31 @@ class AsyncConnection:
         """Release the connection after an offloaded call (call from `finally`)."""
         self._in_use = False
 
+    @contextlib.contextmanager
+    def _offloading(self) -> Generator[None]:
+        """
+        Hold the single-task `_in_use` guard for the span of one offloaded call.
+
+        Claims the connection on entry (raising `ConnectionBusyError` if it is
+        already executing a call) and releases it on exit, so every offloading
+        method on this connection --- and on its cursors --- brackets its work
+        identically without repeating the `try`/`finally` (D-24-03). If the guard
+        rejects the caller the body never runs and `_in_use` is left untouched for
+        the call that legitimately holds it.
+
+        Yields:
+            `None`. The guarded offload runs inside the `with` body.
+
+        Raises:
+            ConnectionBusyError: If an offloaded call on this connection is already
+                in flight.
+        """
+        self._enter_offload()
+        try:
+            yield
+        finally:
+            self._exit_offload()
+
     def cursor(self) -> AsyncCursor:
         """
         Open a cursor on this connection.
@@ -169,15 +196,20 @@ class AsyncConnection:
         `_in_use` guard, so a concurrent commit/query on this connection is
         rejected with `ConnectionBusyError`.
 
+        Unlike the cursor's `execute`/`fetch*`, this call is **not** cooperatively
+        cancellable: it runs through the non-interruptible `offload` with no
+        `adbc_cancel` hook, so a surrounding timeout or cancellation cannot abort an
+        in-flight commit. The loop defers the cancellation and waits for the driver
+        call to return before raising it. Keep commits short, or enforce a
+        server-side statement timeout, if you need a bound on how long a commit can
+        block.
+
         Raises:
             ConnectionBusyError: If another offloaded call on this connection is
                 already in flight.
         """
-        self._enter_offload()
-        try:
+        with self._offloading():
             await offload(self._fairy.commit, limiter=self._limiter)
-        finally:
-            self._exit_offload()
 
     async def rollback(self) -> None:
         """
@@ -186,15 +218,16 @@ class AsyncConnection:
         Offloads `fairy.rollback()` through the pool limiter while holding the
         `_in_use` guard.
 
+        Like `commit`, this call is **not** cooperatively cancellable: a surrounding
+        timeout or cancellation cannot abort an in-flight rollback. The loop defers
+        the cancellation and waits for the driver call to return before raising it.
+
         Raises:
             ConnectionBusyError: If another offloaded call on this connection is
                 already in flight.
         """
-        self._enter_offload()
-        try:
+        with self._offloading():
             await offload(self._fairy.rollback, limiter=self._limiter)
-        finally:
-            self._exit_offload()
 
     async def close(self) -> None:
         """
@@ -210,12 +243,8 @@ class AsyncConnection:
             ConnectionBusyError: If another offloaded call on this connection is
                 already in flight.
         """
-        self._enter_offload()
-        try:
-            with anyio.CancelScope(shield=True):
-                await offload(self._fairy.close, limiter=self._limiter)
-        finally:
-            self._exit_offload()
+        with self._offloading(), anyio.CancelScope(shield=True):
+            await offload(self._fairy.close, limiter=self._limiter)
 
     async def invalidate(self) -> None:
         """

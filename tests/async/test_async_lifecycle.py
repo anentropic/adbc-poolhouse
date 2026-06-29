@@ -15,6 +15,7 @@ is skipped cleanly when the Snowflake driver or its cassette is unavailable.
 
 from __future__ import annotations
 
+import importlib
 import inspect
 import os
 from pathlib import Path
@@ -35,6 +36,9 @@ if TYPE_CHECKING:
     from adbc_poolhouse._async._pool import AsyncPool
 
 _CASSETTE_ROOT = Path(__file__).parent.parent / "cassettes"
+
+# Repeat (env-controlled) + timeout: codify the "0-hang" loop gate (see _edge_helpers).
+pytestmark = importlib.import_module("tests.async._edge_helpers").concurrency_marks
 
 
 class TestHappyPath:

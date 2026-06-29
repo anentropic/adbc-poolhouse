@@ -39,7 +39,13 @@ jobs:
       - name: Run quality gates
         run: prek run --all-files
 
+      # ADBC_ASYNC_REPEAT runs the concurrency-sensitive async suite N times (the
+      # `concurrency_marks` repeat gate in tests/async/_edge_helpers.py), so an
+      # intermittent worker-thread deadlock fails CI instead of slipping through on a
+      # single lucky pass. pytest-timeout backstops any genuine hang.
       - name: Tests
+        env:
+          ADBC_ASYNC_REPEAT: "20"
         run: uv run pytest
 
       - name: Cache pruning
