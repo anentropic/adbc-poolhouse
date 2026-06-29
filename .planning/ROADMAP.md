@@ -316,7 +316,7 @@ Plans:
 | 25. Cancellation | v1.4.0 | 6/5 | Complete    | 2026-06-28 |
 | 26. Packaging & Extra Scoping | v1.4.0 | 2/4 | In progress | - |
 | 27. Dual-Backend Test Matrix | v1.4.0 | 5/5 | Local complete (Linux CI pending) | 2026-06-28 |
-| 28. Documentation | v1.4.0 | 4/4 | Complete | 2026-06-29 |
+| 28. Documentation | v1.4.0 | 4/4 | Complete    | 2026-06-29 |
 | 21.1. ADBC dispatch URI-positional fix | v1.3.0 | 3/3 | Complete | 2026-05-20 |
 | 21. Quack Backend | v1.3.0 | 3/3 | Complete    | 2026-05-19 |
 | 16. Driver Import Semi-Integration Tests | v1.2.0 | 2/2 | Complete | 2026-03-12 |
