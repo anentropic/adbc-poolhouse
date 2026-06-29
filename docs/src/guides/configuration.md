@@ -57,6 +57,23 @@ export SNOWFLAKE_POOL_SIZE=10
 export SNOWFLAKE_MAX_OVERFLOW=5
 ```
 
+## Async pools
+
+!!! warning "Experimental"
+    The async API is experimental and incomplete. See the [async pool guide](async.md) for the full caveat.
+
+The async entry points live behind an optional extra. Install it with:
+
+```bash
+pip install adbc-poolhouse[async]
+```
+
+The three async entry points — `create_async_pool`, `managed_async_pool`, and `close_async_pool` — mirror the signatures of their sync counterparts (`create_pool`, `managed_pool`, `close_pool`). The same `pool_size`, `max_overflow`, `timeout`, `recycle`, and `pre_ping` fields documented in [Pool tuning](#pool-tuning) apply, with the same defaults.
+
+Each async pool sizes its own `anyio.CapacityLimiter` to `pool_size + max_overflow`. That limiter caps how many blocking ADBC calls run on worker threads at once, so the same tuning fields that size the underlying `QueuePool` also govern async concurrency — there is no separate knob.
+
+For the first-query walkthrough, concurrency limits, and the one-connection-per-task rule, see the [async pool guide](async.md).
+
 ## Secret fields
 
 Fields like `password`, `private_key_pem`, and `token` are `SecretStr` values. They are masked in `repr()` output to avoid leaking credentials in logs:
@@ -133,6 +150,7 @@ For writing a reusable config class instead, see the [custom backends guide](cus
 
 ## See also
 
+- [Async pool](async.md) — the asyncio/trio wrapper, the `[async]` extra, and concurrency limits
 - [Snowflake guide](snowflake.md) — JWT, OAuth, and private key configuration
 - [Custom backends](custom-backends.md) — writing a config class for unsupported drivers
 - [API Reference](../reference/) — full field listing per config class
