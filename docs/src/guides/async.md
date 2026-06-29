@@ -194,8 +194,8 @@ on its own. When the deadline fires while the query is in flight, the pool abort
 it cooperatively. It calls the driver's thread-safe `adbc_cancel` to unblock the
 worker, joins that worker, then drops the now-poisoned connection from the pool
 with [`AsyncConnection.invalidate`](#see-also) rather than returning it. The
-connection count stays correct, so `pool.checkedout()` never reports a connection
-that the pool has already reclaimed. Your task sees its own exception and nothing
+connection count stays correct, so the pool's checked-out count never includes a
+connection that the pool has already reclaimed. Your task sees its own exception and nothing
 from the driver: `fail_after` raises `TimeoutError`, `move_on_after` returns
 quietly, and an explicit `scope.cancel()` surfaces no value at all. The same
 cleanup runs underneath each of them.
