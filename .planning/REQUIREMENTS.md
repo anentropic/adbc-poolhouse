@@ -127,7 +127,7 @@ _Timing_
 
 ### Documentation
 
-- [ ] **DOCS-01**: An async usage guide shows `create_async_pool` → `connect` → `execute` → `fetch_arrow_table` → checkin, honest about I/O-bound vs materialization-bound concurrency (per SPIKE findings)
+- [x] **DOCS-01**: An async usage guide shows `create_async_pool` → `connect` → `execute` → `fetch_arrow_table` → checkin, honest about I/O-bound vs materialization-bound concurrency (per SPIKE findings)
 - [ ] **DOCS-02**: API reference documents `AsyncPool`, `AsyncConnection`, `AsyncCursor`, and the three entry-point functions with Google-style docstrings (Args/Returns/Raises + Example)
 - [ ] **DOCS-03**: Configuration / index pages list the `[async]` extra and the async entry points
 - [ ] **DOCS-04**: `uv run mkdocs build --strict` passes; humanizer pass applied to all new or substantially rewritten prose
@@ -231,7 +231,7 @@ Explicit exclusions for the async layer (with reasoning):
 | TEST-04 | Phase 27 | Complete (27-04) |
 | EDGE-27 | Phase 27 | Done |
 | EDGE-30 | Phase 27 | Done |
-| DOCS-01 | Phase 28 | Pending |
+| DOCS-01 | Phase 28 | Complete (28-01) |
 | DOCS-02 | Phase 28 | Pending |
 | DOCS-03 | Phase 28 | Pending |
 | DOCS-04 | Phase 28 | Pending |

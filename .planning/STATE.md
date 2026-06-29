@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.4.0
 milestone_name: Async API
 status: executing
-stopped_at: Completed 27-05-PLAN.md (Phase 27 local-complete; Linux CI gate pending user push)
-last_updated: "2026-06-28T14:14:00.000Z"
-last_activity: 2026-06-28 -- Completed Phase 27 Plan 05 (EDGE-27/30 real-package meta-guards: scan_async_test_hygiene/scan_for_positive_sleep over tests/async both == []; full async suite 141 passed/2 skipped; mkdocs --strict green; x20 loop-stable 0 hangs across all 4 concurrency tests — EDGE-27/EDGE-30). Linux CI quality job remains the one human-action gate (push gsd/v1.4.0-async-api).
+stopped_at: Completed 28-01-PLAN.md (async experimental caveat + concurrency audit)
+last_updated: "2026-06-29T10:30:00.000Z"
+last_activity: 2026-06-29 -- Completed 28-01-PLAN.md
 progress:
   total_phases: 9
-  completed_phases: 5
-  total_plans: 25
-  completed_plans: 26
-  percent: 60
+  completed_phases: 6
+  total_plans: 29
+  completed_plans: 27
+  percent: 69
 ---
 
 # Project State
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-25)
 
 **Core value:** One config in, one pool out — `create_pool(SnowflakeConfig(...))` returns a ready-to-use SQLAlchemy QueuePool in a single call.
-**Current focus:** Phase 27 — dual-backend-test-matrix
+**Current focus:** Phase 28 — documentation
 
 ## Current Position
 
-Phase: 27 (dual-backend-test-matrix) — LOCAL COMPLETE (Linux CI gate pending)
-Plan: 5 of 5 (all local plans complete)
-Status: Phase 27 local deliverables complete (Plans 01–05); awaiting human-action Linux `quality` CI confirmation (push gsd/v1.4.0-async-api)
-Last activity: 2026-06-28 -- Completed Phase 27 Plan 05 (EDGE-27/30 meta-guards; x20 loop-stable; mkdocs --strict green)
+Phase: 28 (documentation) — EXECUTING
+Plan: 2 of 4
+Status: Executing Phase 28 (28-01 complete)
+Last activity: 2026-06-29 -- Completed 28-01-PLAN.md
 
 Progress: [░░░░░░░░░░] 0% (0/7 phases)
 
@@ -62,6 +62,7 @@ Progress: [░░░░░░░░░░] 0% (0/7 phases)
 | Phase 27 P02 | ~15min | 1 tasks | 1 files |
 | Phase 27 P03 | ~5min | 1 tasks | 1 files |
 | Phase 27 P04 | ~15min | 1 tasks | 1 files |
+| Phase 28 P01 | ~12min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -124,6 +125,7 @@ v1.4.0 roadmap decisions:
 - [Phase 25]: EDGE-09 cancel-mid-block leg (D-24-02 owed from Phase 24) lands — gate a stub worker inside execute, cancel the scope so the watcher fires adbc_cancel, assert adbc_cancel_call_count==1 + borrowed_tokens==0 after the cancelled offload (transient token released exactly once), x50, both backends, x20 loop-stable; a belt-and-braces finally release keeps the group fail-fast (never a hang) without changing the happy cancel path
 - [Phase 27]: P01 shared primitives — snowflake_async_pool cassette fixture (D-27-04, mirrors duckdb_async_pool: importorskip driver, skip on absent cassette, replay-mode dummy SNOWFLAKE_ACCOUNT, close in finally; cassette NOT mounted in the fixture — the consumer carries the adbc_cassette marker) + two pure-AST guard callables. scan_async_test_hygiene (EDGE-27/D-27-01) flags import asyncio, @pytest.mark.asyncio (plain+called), and async def test_* missing @pytest.mark.anyio — the axis signal is the PRESENCE of the marker, NOT a literal anyio_backend arg (RESEARCH Pitfall 2). scan_for_positive_sleep (EDGE-30) flags sleep(<positive numeric literal>) for both <mod>.sleep and bare sleep, ALLOWS sleep(0)/sleep(0.0)/non-literal args (bool excluded). Both exposed exactly like scan_async_package (rglob + tolerant ast.parse + absent-root []) via a shared _scan_with helper; scan_async_package/_GuardVisitor untouched. 16 synthetic self-tests added (27 guard tests green). No src/ change. EDGE-30 meta-scan scope is tests/async/ ONLY (_async_harness has deliberate virtual-clock sleeps)
 - [Phase 27]: P02 read-path matrix (TEST-01/02) — tests/async/test_matrix_readpath.py: connect->execute->fetch_arrow_table/fetchall->checkin x {DuckDB, Snowflake cassette} x {asyncio, trio} = 8 green legs; checkedout()==0 both backends; no src/ change. THREE test-authoring corrections vs the PATTERNS.md plan, all real-cassette/driver discoveries: (1) getfixturevalue in the @pytest.mark.anyio test BODY re-enters the anyio runner (RuntimeError: another coroutine already running) for async-generator pool fixtures — moved the backend-name indirection into a SYNC `pool` fixture (params=_BACKENDS) resolved at SETUP, tests take `pool` directly; (2) snowflake_arrow_round_trip cassette has exactly ONE recorded interaction — a 2nd execute raises CassetteMissError(Interaction 1 not found), so each test does ONE execute (dropped the planned 2nd-execute fetchone leg); (3) backend-neutral assertions required — Snowflake folds unquoted aliases to N/S (DuckDB keeps n/s) and returns N as Decimal('1') (DuckDB int 1), so added a case-insensitive _col() helper and compared by value (Decimal('1')==1). fetchall is typed `object` on the async surface -> cast to Sequence[Sequence[object]]. basedpyright strict 0 errors, hygiene guard clean, mkdocs --strict passes
+- [Phase 28]: P01 async experimental caveat (DOCS-01/D-28-01) — `!!! warning "Experimental"` admonition added to async.md (before Install) naming the five deferred feature areas (Arrow streaming/fetch_record_batch, adbc_ingest, fetch_df/fetch_polars, async metadata, async prepared statements) sourced from REQUIREMENTS.md Future Requirements; one experimental flag line added to index.md Async section linking the guide. D-28-03 audit: async.md "What actually runs in parallel" prose verified against 22-GO-NO-GO.md (execute ~2.77x/~69%, fetch_arrow_table ~1.67x/~42%, parallelism-vs-I/O-concurrency distinction, in-process DuckDB inference gap, no linear-speedup promise) — already faithful, NO over-claim found, no edit to the parallelism section. Status carried by guide+index prose, not per-symbol docstring caveats (D-28-01). `.venv/bin/mkdocs build --strict` exit 0.
 - [Phase 27]: P04 limiter saturation stress (TEST-04) — tests/async/test_limiter_stress.py: stub-gated 4x(pool_size+max_overflow) flood (EDGE-12 pattern) of 32 stub-backed AsyncConnections sharing ONE CapacityLimiter(8) proves running-max == bound (borrowed_tokens==8 at saturation, never exceeded) + no starvation (close()-drain -> borrowed_tokens==0). Used the SHIPPED defaults 5+3=8 for the bound (Open Question 1) — 32 gated stubs are cheap, so prove the real shipped bound not a stand-in. close()-drain not release() (Phase 26 lost-wakeup); real_clock_watchdog not anyio.fail_after (Phase 24/25 trio MockClock autojump). [Rule 1] real-DuckDB smoke flood (4x bound real round trips) needed a CapacityLimiter(bound) gating concurrently-HELD connections: holding all 32 open at once genuinely exceeds the real QueuePool (5+3) and trips its 30s checkout TimeoutError (a real bounded-resource limit + hold-and-wait, not a wrapper bug) — gating the holds lets the bounded pool cycle every worker, checkedout()==0 afterwards. Both backends; x20 loop-stable (pass=20 fail=0, 0 hangs); no src/ change; in scope for the Plan 27-05 meta-scan (no import asyncio / @pytest.mark.asyncio / positive real sleep)
 
 ### Roadmap Evolution
@@ -147,9 +149,9 @@ v1.4.0 roadmap decisions:
 
 ## Session Continuity
 
-Last session: 2026-06-28T15:05:00.000Z
-Stopped at: Completed 27-02-PLAN.md (read-path backend matrix)
-Next step: Phase 27 Plan 04 (limiter flood + real-DuckDB smoke flood — TEST-04). NOTE: the sync-no-anyio job's live GitHub Actions run is auto-approved pending the next push — confirm it is green on Actions when CI next runs.
+Last session: 2026-06-29T10:30:00.000Z
+Stopped at: Completed 28-01-PLAN.md (async experimental caveat + concurrency audit)
+Next step: Phase 28 Plan 02 (render AsyncPool/AsyncConnection/AsyncCursor in the API reference at their real _async paths — DOCS-02/D-28-02). NOTE: the sync-no-anyio job's live GitHub Actions run is auto-approved pending the next push — confirm it is green on Actions when CI next runs.
 
 Phase 27 Plan 03 decisions: Arrow allocator-stability proved with an exact-zero pyarrow.total_allocated_bytes() delta over N=100 cursor cycles (NOT process RSS — D-27-07); reset-event count (the _release_arrow_allocators path) gathered once per checkin via a read-only sqlalchemy event.listen on pool._pool, no src/ change (ACONN-06 / D-27-08); runs x{asyncio, trio} via @pytest.mark.anyio (D-27-09); imported `from sqlalchemy import event` (repo _pool_factory.py form) to satisfy basedpyright. 20x loop-stable, 0 hangs.
 </content>
