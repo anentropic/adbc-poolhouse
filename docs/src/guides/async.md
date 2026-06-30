@@ -1,12 +1,15 @@
 # Async pool
 
-The async API mirrors the sync one. Where the sync side has `create_pool`,
-`managed_pool`, and `close_pool`, the async side has
+The async API mirrors the sync one. Where the sync side has [`create_pool`][adbc_poolhouse.create_pool],
+[`managed_pool`][adbc_poolhouse.managed_pool], and [`close_pool`][adbc_poolhouse.close_pool], the async side has
 [`create_async_pool`][adbc_poolhouse.create_async_pool],
 [`managed_async_pool`][adbc_poolhouse.managed_async_pool], and
-[`close_async_pool`][adbc_poolhouse.close_async_pool]. The wrapper runs each
-blocking ADBC call on a worker thread (via [anyio](https://anyio.readthedocs.io/)),
-so it works under both asyncio and trio.
+[`close_async_pool`][adbc_poolhouse.close_async_pool].
+
+The wrapper is built on
+[anyio](https://anyio.readthedocs.io/), which runs on top of either __asyncio__ or
+__trio__. It offloads each blocking ADBC call to a worker thread under whichever of
+those your application already runs, the same code works under either.
 
 Pool construction is synchronous because it does no per-call I/O. Checkout,
 queries, and teardown are the parts that block, so those are the parts that get
@@ -41,8 +44,9 @@ You still need an ADBC driver for your warehouse. See the
 
 ## A first query
 
-The flow is checkout, cursor, execute, fetch, check in. The `async with` block
-returns the connection to the pool when it exits.
+The flow is checkout, cursor, execute, fetch, check in. The connection and the
+cursor are both async context managers, so a nested `async with` pair checks the
+connection back into the pool and closes the cursor when the block exits.
 
 ```python
 import anyio
@@ -53,10 +57,10 @@ async def main():
     pool = create_async_pool(DuckDBConfig(database="/tmp/warehouse.db"))  # synchronous: no await
     try:
         async with await pool.connect() as conn:
-            cur = conn.cursor()  # synchronous: no await
-            await cur.execute("SELECT 42 AS answer")
-            table = await cur.fetch_arrow_table()
-            print(table.column("answer")[0].as_py())  # 42
+            async with conn.cursor() as cur:
+                await cur.execute("SELECT 42 AS answer")
+                table = await cur.fetch_arrow_table()
+                print(table.column("answer")[0].as_py())  # 42
     finally:
         await close_async_pool(pool)
 
@@ -64,11 +68,21 @@ async def main():
 anyio.run(main)
 ```
 
-Two calls are not coroutines, and that is deliberate:
+The `async with await pool.connect()` line stacks two keywords because two things
+happen. `pool.connect()` is a coroutine: awaiting it checks a connection out of the
+pool and hands back an [`AsyncConnection`][adbc_poolhouse._async._connection.AsyncConnection]. That connection is itself an async context
+manager, and the `async with` checks it back in when the block exits. Read it
+inside out: `await pool.connect()` runs first, then `async with` wraps the result.
 
-- `conn.cursor()` does no I/O, so it returns directly with no `await`.
-- `cur.description`, `cur.rowcount`, and `cur.arraysize` are plain property
-  reads. Awaiting them would raise "coroutine was never awaited".
+`conn.cursor()` is not awaited, because it does no I/O and returns the cursor
+directly. The cursor is still an async context manager, so `async with` closes it
+on exit. That is the rule across the whole surface: every call that reaches the
+driver is awaited, while `cursor()` and the `description` / `rowcount` /
+`arraysize` property reads are not.
+
+If you have used psycopg3's async interface, this will feel familiar. The
+connection-and-cursor context-manager shape, including the `async with await
+...connect()` form, is deliberately the same.
 
 `fetch_arrow_table` returns a fully materialized `pyarrow.Table` that owns its
 own buffers. You can
@@ -83,8 +97,8 @@ from adbc_poolhouse import DuckDBConfig, managed_async_pool
 
 async with managed_async_pool(DuckDBConfig(database="/tmp/warehouse.db")) as pool:
     async with await pool.connect() as conn:
-        cur = conn.cursor()
-        await cur.execute("SELECT 1")
+        async with conn.cursor() as cur:
+            await cur.execute("SELECT 1")
 # pool is closed here
 ```
 
@@ -94,13 +108,13 @@ The concurrency win is not uniform across the call surface.
 
 Each blocking call is offloaded to a worker thread. ADBC releases the GIL during
 its C calls, so the `execute` step of several queries can run at the same time on
-separate connections. The Phase 22 spike measured this on DuckDB: with four
-concurrent `execute` calls, throughput scaled about 2.77x (roughly 69%
-efficiency).
+separate connections. Benchmarking during v1.4.0 development measured this on
+DuckDB: with four concurrent `execute` calls, throughput scaled about 2.77x
+(roughly 69% efficiency).
 
 Materialization is different. `fetch_arrow_table` builds Python and pyarrow
 objects, and that construction reacquires the GIL for parts of the work. The same
-spike measured about 1.67x for four concurrent fetches (roughly 42% efficiency).
+benchmark measured about 1.67x for four concurrent fetches (roughly 42% efficiency).
 The fetch step partially serializes even though it runs off the event loop.
 
 So the realistic picture: queries that spend their time in the driver (network
@@ -115,7 +129,7 @@ wait, so they capture the GIL behavior rather than real network concurrency. A
 networked backend has genuine I/O latency to overlap, which is exactly the case
 the worker-thread model is built for.
 
-The pool caps concurrency for you. Each `AsyncPool` owns one
+The pool caps concurrency for you. Each [`AsyncPool`][adbc_poolhouse._async._pool.AsyncPool] owns one
 `anyio.CapacityLimiter` sized to `pool_size + max_overflow`, so the number of
 in-flight offloaded calls can never exceed the pool's checkout ceiling. There is
 no separate knob to tune and no global limiter to collide with.
@@ -176,17 +190,15 @@ being torn down.
 Wrap a query in `fail_after` or `move_on_after` (or cancel its task group) to put
 a deadline on `execute` and `fetch_arrow_table`:
 
-!!! example
+```python
+import anyio
 
-    ```python
-    import anyio
-
-    async with await pool.connect() as conn:
-        cursor = conn.cursor()
-        with anyio.fail_after(5):
-            await cursor.execute("SELECT * FROM big_table")
-            table = await cursor.fetch_arrow_table()
-    ```
+async with await pool.connect() as conn:
+    cursor = conn.cursor()
+    with anyio.fail_after(5):
+        await cursor.execute("SELECT * FROM big_table")
+        table = await cursor.fetch_arrow_table()
+```
 
 A blocking ADBC call runs on a worker thread that the event loop cannot interrupt
 on its own. When the deadline fires while the query is in flight, the pool aborts
@@ -213,6 +225,6 @@ anyio's scope, not from anything the pool does.
   fixtures
 - [Configuration reference](configuration.md) for env var loading and pool tuning
 - [API Reference](../reference/) for the generated `AsyncPool`,
-  `AsyncConnection`, and `AsyncCursor` docs, including
+  `AsyncConnection`, and [`AsyncCursor`][adbc_poolhouse._async._cursor.AsyncCursor] docs, including
   [`AsyncConnection.invalidate`][adbc_poolhouse._async._connection.AsyncConnection.invalidate]
   (the poison-recovery drop the cancellation path uses)

@@ -40,9 +40,9 @@ adbc-poolhouse manages the pool, not the driver. You also need an ADBC driver fo
 
 All supported warehouses have a typed config class.
 
-PyPI-installed: `BigQueryConfig`, `DuckDBConfig`, `FlightSQLConfig`, `PostgreSQLConfig`, `QuackConfig`, `SnowflakeConfig`, `SQLiteConfig`.
+PyPI-installed: [`BigQueryConfig`][adbc_poolhouse.BigQueryConfig], [`DuckDBConfig`][adbc_poolhouse.DuckDBConfig], [`FlightSQLConfig`][adbc_poolhouse.FlightSQLConfig], [`PostgreSQLConfig`][adbc_poolhouse.PostgreSQLConfig], [`QuackConfig`][adbc_poolhouse.QuackConfig], [`SnowflakeConfig`][adbc_poolhouse.SnowflakeConfig], [`SQLiteConfig`][adbc_poolhouse.SQLiteConfig].
 
-Foundry-distributed: `ClickHouseConfig`, `DatabricksConfig`, `MSSQLConfig`, `MySQLConfig`, `RedshiftConfig`, `TrinoConfig`.
+Foundry-distributed: [`ClickHouseConfig`][adbc_poolhouse.ClickHouseConfig], [`DatabricksConfig`][adbc_poolhouse.DatabricksConfig], [`MSSQLConfig`][adbc_poolhouse.MSSQLConfig], [`MySQLConfig`][adbc_poolhouse.MySQLConfig], [`RedshiftConfig`][adbc_poolhouse.RedshiftConfig], [`TrinoConfig`][adbc_poolhouse.TrinoConfig].
 
 The example below uses DuckDB, which needs no credentials or running server.
 
@@ -62,11 +62,11 @@ with pool.connect() as conn:
 close_pool(pool)
 ```
 
-`pool.connect()` checks out a connection from the pool and returns it when the `with` block exits. `close_pool(pool)` drains the pool and closes the underlying ADBC source connection.
+`pool.connect()` checks out a connection from the pool and returns it when the `with` block exits. [`close_pool(pool)`][adbc_poolhouse.close_pool] drains the pool and closes the underlying ADBC source connection.
 
 ## Async
 
-For asyncio or trio code, `create_async_pool`, `managed_async_pool`, and `close_async_pool` mirror the sync entry points and run each blocking ADBC call on a worker thread. Install the `[async]` extra (`pip install adbc-poolhouse[async]`) and see the [async pool guide](guides/async.md).
+For asyncio or trio code, [`create_async_pool`][adbc_poolhouse.create_async_pool], [`managed_async_pool`][adbc_poolhouse.managed_async_pool], and [`close_async_pool`][adbc_poolhouse.close_async_pool] mirror the sync entry points and run each blocking ADBC call on a worker thread. Install the `[async]` extra (`pip install adbc-poolhouse[async]`) and see the [async pool guide](guides/async.md).
 
 The async API is experimental and incomplete. Its surface may change between minor releases, and several features (Arrow streaming, `adbc_ingest`, DataFrame fetches, async metadata, and prepared statements) are not available yet. See the [async pool guide](guides/async.md) for the full caveat.
 

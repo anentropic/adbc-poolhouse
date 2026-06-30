@@ -48,7 +48,7 @@ All config classes inherit pool tuning fields from [`BaseWarehouseConfig`][adbc_
 | `max_overflow` | `3` | Extra connections allowed when pool is full |
 | `timeout` | `30` | Seconds to wait for a connection before raising `sqlalchemy.exc.TimeoutError` |
 | `recycle` | `3600` | Seconds before a connection is closed and replaced |
-| `pre_ping` | `False` | Ping connections before checkout. Disabled by default — does not function on standalone `QueuePool` without a SQLAlchemy dialect; use `recycle` for connection health. |
+| `pre_ping` | `False` | Ping connections before checkout. Disabled by default. It does not function on standalone `QueuePool` without a SQLAlchemy dialect; use `recycle` for connection health. |
 
 To override pool size via environment variable:
 
@@ -74,7 +74,7 @@ The async entry points live behind an optional extra. Install it with:
 pip install adbc-poolhouse[async]
 ```
 
-The three async entry points (`create_async_pool`, `managed_async_pool`, and `close_async_pool`) mirror the signatures of their sync counterparts (`create_pool`, `managed_pool`, `close_pool`). The same `pool_size`, `max_overflow`, `timeout`, `recycle`, and `pre_ping` fields documented in [Pool tuning](#pool-tuning) apply, with the same defaults.
+The three async entry points ([`create_async_pool`][adbc_poolhouse.create_async_pool], [`managed_async_pool`][adbc_poolhouse.managed_async_pool], and [`close_async_pool`][adbc_poolhouse.close_async_pool]) mirror the signatures of their sync counterparts (`create_pool`, `managed_pool`, [`close_pool`][adbc_poolhouse.close_pool]). The same `pool_size`, `max_overflow`, `timeout`, `recycle`, and `pre_ping` fields documented in [Pool tuning](#pool-tuning) apply, with the same defaults.
 
 Each async pool sizes its own `anyio.CapacityLimiter` to `pool_size + max_overflow`. That limiter caps how many blocking ADBC calls run on worker threads at once, so the same tuning fields that size the underlying `QueuePool` also govern async concurrency. There is no separate knob.
 

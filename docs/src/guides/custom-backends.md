@@ -2,7 +2,7 @@
 
 adbc-poolhouse ships config classes for 13 ADBC backends. If your driver is not
 on that list you have two options: pass
-[raw driver arguments](configuration.md#raw-driver-arguments) to `create_pool()`
+[raw driver arguments](configuration.md#raw-driver-arguments) to [`create_pool()`][adbc_poolhouse.create_pool]
 directly, or write a config class as described below.
 
 ## The short version

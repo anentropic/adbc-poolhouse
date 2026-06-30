@@ -47,9 +47,13 @@ Do not hold a connection outside a `with` block. Connections held past the `with
 
 `QueuePool` is thread-safe, so one pool can serve many concurrent workers: call `pool.connect()` from each request handler or worker thread and every checkout returns a distinct connection. Keep to one connection per thread. A checked-out connection should be used by a single thread at a time, never shared across concurrent tasks. The pool hands out at most `pool_size + max_overflow` connections at once; when they are all checked out, the next `pool.connect()` waits up to `timeout` seconds and then raises `sqlalchemy.exc.TimeoutError`. Size the pool against the connections you expect to be in use at the same time (see [Sizing under load](configuration.md#sizing-under-load)).
 
-## Disposing the pool
+## Closing the pool
 
-To shut down cleanly, call [`close_pool`][adbc_poolhouse.close_pool]:
+A pool holds a real ADBC source connection, a file handle or network socket, so it must be closed when you are done with it. There are two ways to close a pool, and which one fits depends on whether the pool's lifetime maps cleanly onto a single block of code.
+
+### Explicit close, for lifetimes that span your app
+
+When the pool outlives any single scope, such as a long-running server or backend that opens the pool at startup and serves requests for hours, close it explicitly with [`close_pool`][adbc_poolhouse.close_pool]:
 
 ```python
 from adbc_poolhouse import close_pool
@@ -59,7 +63,11 @@ close_pool(pool)
 
 `close_pool` drains the pool, closes each pooled connection, and releases the ADBC source connection in one call. Calling `pool.dispose()` alone leaves a file handle or network socket open until the process exits.
 
-For scripts and short-lived processes, use [`managed_pool`][adbc_poolhouse.managed_pool] as a context manager instead:
+In practice you wire this into your framework's startup and shutdown hooks: create the pool when the app boots and call `close_pool` when it shuts down. See [Consumer patterns](consumer-patterns.md) for a FastAPI lifespan example that does exactly this.
+
+### Context manager, for lifetimes that fit a scope
+
+When the pool's lifetime fits neatly inside an enclosing block, such as a script, a short-lived process, or a test, use [`managed_pool`][adbc_poolhouse.managed_pool] as a context manager:
 
 ```python
 from adbc_poolhouse import DuckDBConfig, managed_pool
@@ -70,6 +78,8 @@ with managed_pool(DuckDBConfig(database="/tmp/test.db")) as pool:
         cursor.execute("SELECT 1")
 # pool is automatically closed when the with block exits
 ```
+
+Not every use case suits a context manager; a pool tied to your app's lifetime does not. But for the cases that do fit a scope, `managed_pool` is the preferred option: it guarantees `close_pool` runs on exit, including when the block raises, so you cannot leak the source connection by forgetting to close it or by hitting an early return.
 
 ## Pytest fixture pattern
 
@@ -134,7 +144,7 @@ The pool will exhaust its connections and subsequent `pool.connect()` calls will
 
 ## Catching errors
 
-adbc-poolhouse's own exceptions both subclass [`PoolhouseError`][adbc_poolhouse.PoolhouseError]: [`ConfigurationError`][adbc_poolhouse.ConfigurationError] for invalid configuration and [`ConnectionBusyError`][adbc_poolhouse.ConnectionBusyError] for concurrent use of one async connection. Catch `PoolhouseError` to handle any library-specific error in one place. A saturated-pool checkout instead raises `sqlalchemy.exc.TimeoutError` — SQLAlchemy's own class, which does not subclass the builtin `TimeoutError`, so catch it separately from this hierarchy.
+adbc-poolhouse's own exceptions both subclass [`PoolhouseError`][adbc_poolhouse.PoolhouseError]: [`ConfigurationError`][adbc_poolhouse.ConfigurationError] for invalid configuration and [`ConnectionBusyError`][adbc_poolhouse.ConnectionBusyError] for concurrent use of one async connection. Catch `PoolhouseError` to handle any library-specific error in one place. A saturated-pool checkout instead raises `sqlalchemy.exc.TimeoutError`, SQLAlchemy's own class, which does not subclass the builtin `TimeoutError`, so catch it separately from this hierarchy.
 
 ## See also
 

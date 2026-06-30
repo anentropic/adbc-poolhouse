@@ -69,7 +69,6 @@ The sync path is unchanged and gains no async dependency: installing without the
 - Bump adbc-driver-manager floor to >=1.8.0
 - Add duckdb extra to dev dependency group
 - Pass --group docs to uv run in Justfile build/serve recipes
-- Close Phase 10 — update roadmap, state, and planning artifacts
 - Remove synthetic cassette files
 - Bump version to 1.1.0
 

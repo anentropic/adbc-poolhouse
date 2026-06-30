@@ -4,7 +4,7 @@ Patterns for integrating adbc-poolhouse into an application.
 
 ## FastAPI with SQLAlchemy ORM
 
-`create_pool` returns a SQLAlchemy `QueuePool`. To use it with the SQLAlchemy ORM, pass `creator=pool.connect` to `create_engine`. SQLAlchemy calls `creator()` whenever it needs a new raw connection.
+[`create_pool`][adbc_poolhouse.create_pool] returns a SQLAlchemy `QueuePool`. To use it with the SQLAlchemy ORM, pass `creator=pool.connect` to `create_engine`. SQLAlchemy calls `creator()` whenever it needs a new raw connection.
 
 Create the pool at application startup and dispose it at shutdown using FastAPI's lifespan context:
 
