@@ -16,7 +16,7 @@ uv add "adbc-poolhouse[duckdb]"
 
 [`DuckDBConfig`][adbc_poolhouse.DuckDBConfig] supports file-backed and in-memory databases.
 
-For a pool with more than one connection, use a file path. Each in-memory connection gets its own isolated database — sharing state across connections is not possible with `:memory:`.
+For a pool with more than one connection, use a file path. Each in-memory connection gets its own isolated database, so sharing state across connections is not possible with `:memory:`.
 
 ### File-backed
 

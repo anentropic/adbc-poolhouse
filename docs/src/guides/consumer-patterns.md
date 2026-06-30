@@ -4,7 +4,7 @@ Patterns for integrating adbc-poolhouse into an application.
 
 ## FastAPI with SQLAlchemy ORM
 
-`create_pool` returns a SQLAlchemy `QueuePool`. To use it with the SQLAlchemy ORM, pass `creator=pool.connect` to `create_engine` — SQLAlchemy calls `creator()` whenever it needs a new raw connection.
+`create_pool` returns a SQLAlchemy `QueuePool`. To use it with the SQLAlchemy ORM, pass `creator=pool.connect` to `create_engine`. SQLAlchemy calls `creator()` whenever it needs a new raw connection.
 
 Create the pool at application startup and dispose it at shutdown using FastAPI's lifespan context:
 
@@ -28,7 +28,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 ```
 
-To wire the pool into a SQLAlchemy session factory, use `creator=pool.connect` when calling `create_engine`. Keep in mind that `adbc_poolhouse` manages the connection pool itself — pass `poolclass=NullPool` to SQLAlchemy so it does not add a second pool on top:
+To wire the pool into a SQLAlchemy session factory, use `creator=pool.connect` when calling `create_engine`. Keep in mind that `adbc_poolhouse` manages the connection pool itself, so pass `poolclass=NullPool` to SQLAlchemy to stop it adding a second pool on top:
 
 ```python
 from sqlalchemy import create_engine
@@ -41,7 +41,7 @@ For Snowflake or other warehouses, replace [`DuckDBConfig`][adbc_poolhouse.DuckD
 
 ## Loading credentials from dbt
 
-If your project has a dbt `profiles.yml`, you can load credentials from it using dbt-core's profile API. This handles Jinja templating — including `env_var()` calls — so it works correctly where plain YAML parsing would not.
+If your project has a dbt `profiles.yml`, you can load credentials from it using dbt-core's profile API. This handles Jinja templating, including `env_var()` calls, so it works correctly where plain YAML parsing would not.
 
 ```python
 from dbt.config.profile import Profile, read_profile
@@ -80,7 +80,7 @@ pip install dbt-core
 pip install dbt-snowflake
 ```
 
-For production deployments, load credentials from environment variables instead of from the profiles file. [`SnowflakeConfig`][adbc_poolhouse.SnowflakeConfig] reads all fields from environment variables using the `SNOWFLAKE_` prefix — see [Configuration reference](configuration.md) for details.
+For production deployments, load credentials from environment variables instead of from the profiles file. [`SnowflakeConfig`][adbc_poolhouse.SnowflakeConfig] reads all fields from environment variables using the `SNOWFLAKE_` prefix. See [Configuration reference](configuration.md) for details.
 
 ## See also
 

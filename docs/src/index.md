@@ -1,6 +1,6 @@
 # adbc-poolhouse
 
-adbc-poolhouse creates a SQLAlchemy `QueuePool` from a typed warehouse config. One config in, one pool out — no boilerplate around driver detection or connection string assembly.
+adbc-poolhouse creates a SQLAlchemy `QueuePool` from a typed warehouse config. One config in, one pool out, with no boilerplate around driver detection or connection string assembly.
 
 ## Installation
 
@@ -44,7 +44,7 @@ PyPI-installed: `BigQueryConfig`, `DuckDBConfig`, `FlightSQLConfig`, `PostgreSQL
 
 Foundry-distributed: `ClickHouseConfig`, `DatabricksConfig`, `MSSQLConfig`, `MySQLConfig`, `RedshiftConfig`, `TrinoConfig`.
 
-The example below uses DuckDB — no credentials or running server required.
+The example below uses DuckDB, which needs no credentials or running server.
 
 ```python
 from adbc_poolhouse import DuckDBConfig, create_pool, close_pool
@@ -68,7 +68,7 @@ close_pool(pool)
 
 For asyncio or trio code, `create_async_pool`, `managed_async_pool`, and `close_async_pool` mirror the sync entry points and run each blocking ADBC call on a worker thread. Install the `[async]` extra (`pip install adbc-poolhouse[async]`) and see the [async pool guide](guides/async.md).
 
-The async API is experimental and incomplete — its surface may change between minor releases, and several features (Arrow streaming, `adbc_ingest`, DataFrame fetches, async metadata, and prepared statements) are not available yet. See the [async pool guide](guides/async.md) for the full caveat.
+The async API is experimental and incomplete. Its surface may change between minor releases, and several features (Arrow streaming, `adbc_ingest`, DataFrame fetches, async metadata, and prepared statements) are not available yet. See the [async pool guide](guides/async.md) for the full caveat.
 
 ```python
 import anyio
@@ -98,6 +98,7 @@ anyio.run(main)
 - [Configuration reference](guides/configuration.md) — environment variable prefixes, pool tuning, and secret handling
 - [Snowflake guide](guides/snowflake.md) — supported auth methods and private key variants
 - [Warehouse guides](guides/duckdb.md) — per-warehouse install commands, auth examples, and env var prefixes
+- [Custom backends](guides/custom-backends.md) — raw driver arguments and writing a reusable config class for an unsupported warehouse
 
 ## See also
 

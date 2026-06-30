@@ -44,7 +44,7 @@ config = MySQLConfig(
 pool = create_pool(config)
 ```
 
-`password` is optional — MySQL supports passwordless connections. `port` defaults to `3306`.
+`password` is optional, since MySQL supports passwordless connections. `port` defaults to `3306`.
 
 ## Loading from environment variables
 

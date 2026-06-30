@@ -68,12 +68,12 @@ pool = create_pool(config)
 
 With this config, `SELECT * FROM orders` resolves to `main.sales.orders`. Both
 fields are optional: set one, the other, or neither. In URI mode, put the
-namespace in the DSN yourself — `adbc-poolhouse` returns the URI untouched.
+namespace in the DSN yourself, and `adbc-poolhouse` returns the URI untouched.
 
 ## Loading from environment variables
 
 [`DatabricksConfig`][adbc_poolhouse.DatabricksConfig] reads all fields from environment variables with the `DATABRICKS_` prefix.
-For individual field mode, all three variables must be set at the same time — setting only
+For individual field mode, all three variables must be set at the same time. Setting only
 `DATABRICKS_HOST` or `DATABRICKS_TOKEN` alone causes [`ConfigurationError`][adbc_poolhouse.ConfigurationError] at construction.
 
 ```bash

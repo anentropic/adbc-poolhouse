@@ -33,7 +33,7 @@ pool = create_pool(config)
 
 ### JWT private key
 
-Use either a file path or PEM content — not both. Providing both raises [`ConfigurationError`][adbc_poolhouse.ConfigurationError].
+Use either a file path or PEM content, not both. Providing both raises [`ConfigurationError`][adbc_poolhouse.ConfigurationError].
 
 ```python
 from pathlib import Path
@@ -59,7 +59,7 @@ config = SnowflakeConfig(
 )
 ```
 
-`private_key_pem` is a `SecretStr` — the PEM content is masked in repr output. Pass the raw string with `.get_secret_value()` if you need to inspect it.
+`private_key_pem` is a `SecretStr`, so the PEM content is masked in repr output. Pass the raw string with `.get_secret_value()` if you need to inspect it.
 
 ### OAuth
 

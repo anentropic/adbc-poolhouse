@@ -1,6 +1,6 @@
 # Pool lifecycle
 
-`create_pool` returns a SQLAlchemy `QueuePool`. Internally it holds one ADBC source connection plus a pool of cloned connections derived from it.
+[`create_pool`][adbc_poolhouse.create_pool] returns a SQLAlchemy `QueuePool`. Internally it holds one ADBC source connection plus a pool of cloned connections derived from it.
 
 ## Create a pool
 
@@ -12,7 +12,7 @@ from adbc_poolhouse import DuckDBConfig, create_pool
 pool = create_pool(DuckDBConfig(database="/tmp/warehouse.db"))
 ```
 
-adbc-poolhouse ships config classes for 12 backends:
+adbc-poolhouse ships config classes for 13 backends:
 [`BigQueryConfig`][adbc_poolhouse.BigQueryConfig],
 [`ClickHouseConfig`][adbc_poolhouse.ClickHouseConfig],
 [`DatabricksConfig`][adbc_poolhouse.DatabricksConfig],
@@ -21,6 +21,7 @@ adbc-poolhouse ships config classes for 12 backends:
 [`MSSQLConfig`][adbc_poolhouse.MSSQLConfig],
 [`MySQLConfig`][adbc_poolhouse.MySQLConfig],
 [`PostgreSQLConfig`][adbc_poolhouse.PostgreSQLConfig],
+[`QuackConfig`][adbc_poolhouse.QuackConfig],
 [`RedshiftConfig`][adbc_poolhouse.RedshiftConfig],
 [`SnowflakeConfig`][adbc_poolhouse.SnowflakeConfig],
 [`SQLiteConfig`][adbc_poolhouse.SQLiteConfig],
@@ -44,9 +45,11 @@ with pool.connect() as conn:
 
 Do not hold a connection outside a `with` block. Connections held past the `with` block are never returned to the pool and the pool will run out of available connections once they are all checked out.
 
+`QueuePool` is thread-safe, so one pool can serve many concurrent workers: call `pool.connect()` from each request handler or worker thread and every checkout returns a distinct connection. Keep to one connection per thread. A checked-out connection should be used by a single thread at a time, never shared across concurrent tasks. The pool hands out at most `pool_size + max_overflow` connections at once; when they are all checked out, the next `pool.connect()` waits up to `timeout` seconds and then raises `sqlalchemy.exc.TimeoutError`. Size the pool against the connections you expect to be in use at the same time (see [Sizing under load](configuration.md#sizing-under-load)).
+
 ## Disposing the pool
 
-To shut down cleanly, call `close_pool`:
+To shut down cleanly, call [`close_pool`][adbc_poolhouse.close_pool]:
 
 ```python
 from adbc_poolhouse import close_pool
@@ -56,7 +59,7 @@ close_pool(pool)
 
 `close_pool` drains the pool, closes each pooled connection, and releases the ADBC source connection in one call. Calling `pool.dispose()` alone leaves a file handle or network socket open until the process exits.
 
-For scripts and short-lived processes, use `managed_pool` as a context manager instead:
+For scripts and short-lived processes, use [`managed_pool`][adbc_poolhouse.managed_pool] as a context manager instead:
 
 ```python
 from adbc_poolhouse import DuckDBConfig, managed_pool
@@ -96,7 +99,7 @@ Using `scope="session"` creates one pool for the entire test session. If your te
 |---|---|---|
 | `pool_size` | `5` | Connections kept in the pool at all times (DuckDB defaults to `1`) |
 | `max_overflow` | `3` | Extra connections allowed above `pool_size` when demand is high |
-| `timeout` | `30` | Seconds to wait for a connection before raising `TimeoutError` |
+| `timeout` | `30` | Seconds to wait for a connection before raising `sqlalchemy.exc.TimeoutError` |
 | `recycle` | `3600` | Seconds before a connection is closed and replaced |
 | `pre_ping` | `False` | Ping connections before checkout (disabled: does not function on standalone `QueuePool` without a SQLAlchemy dialect; use `recycle` instead) |
 
@@ -114,7 +117,7 @@ pool = create_pool(config, pool_size=10, recycle=7200)
 
 **Using `database=":memory:"` with `pool_size > 1`**
 
-Each DuckDB connection cloned from an in-memory source gets its own isolated empty database. `create_pool` raises `ValueError` if you pass `pool_size > 1` with an in-memory database to prevent this silent data-loss bug. Use a file-backed database when you need multiple connections.
+Each DuckDB connection cloned from an in-memory source gets its own isolated empty database. `DuckDBConfig` raises `ValidationError` at construction if you pass `pool_size > 1` with an in-memory database, which prevents this silent data-loss bug. Use a file-backed database when you need multiple connections.
 
 **Holding connections outside the `with` block**
 
@@ -128,6 +131,10 @@ cursor.execute("SELECT 1")
 ```
 
 The pool will exhaust its connections and subsequent `pool.connect()` calls will block until the timeout.
+
+## Catching errors
+
+adbc-poolhouse's own exceptions both subclass [`PoolhouseError`][adbc_poolhouse.PoolhouseError]: [`ConfigurationError`][adbc_poolhouse.ConfigurationError] for invalid configuration and [`ConnectionBusyError`][adbc_poolhouse.ConnectionBusyError] for concurrent use of one async connection. Catch `PoolhouseError` to handle any library-specific error in one place. A saturated-pool checkout instead raises `sqlalchemy.exc.TimeoutError` — SQLAlchemy's own class, which does not subclass the builtin `TimeoutError`, so catch it separately from this hierarchy.
 
 ## See also
 

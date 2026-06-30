@@ -90,8 +90,7 @@ async with managed_async_pool(DuckDBConfig(database="/tmp/warehouse.db")) as poo
 
 ## What actually runs in parallel
 
-Be honest with yourself about where the concurrency win is, because it is not
-uniform across the call surface.
+The concurrency win is not uniform across the call surface.
 
 Each blocking call is offloaded to a worker thread. ADBC releases the GIL during
 its C calls, so the `execute` step of several queries can run at the same time on
@@ -193,7 +192,7 @@ A blocking ADBC call runs on a worker thread that the event loop cannot interrup
 on its own. When the deadline fires while the query is in flight, the pool aborts
 it cooperatively. It calls the driver's thread-safe `adbc_cancel` to unblock the
 worker, joins that worker, then drops the now-poisoned connection from the pool
-with [`AsyncConnection.invalidate`](#see-also) rather than returning it. The
+with [`AsyncConnection.invalidate`][adbc_poolhouse._async._connection.AsyncConnection.invalidate] rather than returning it. The
 connection count stays correct, so the pool's checked-out count never includes a
 connection that the pool has already reclaimed. Your task sees its own exception and nothing
 from the driver: `fail_after` raises `TimeoutError`, `move_on_after` returns
@@ -215,5 +214,5 @@ anyio's scope, not from anything the pool does.
 - [Configuration reference](configuration.md) for env var loading and pool tuning
 - [API Reference](../reference/) for the generated `AsyncPool`,
   `AsyncConnection`, and `AsyncCursor` docs, including
-  [`AsyncConnection.invalidate`](../reference/) (the poison-recovery drop the
-  cancellation path uses)
+  [`AsyncConnection.invalidate`][adbc_poolhouse._async._connection.AsyncConnection.invalidate]
+  (the poison-recovery drop the cancellation path uses)
