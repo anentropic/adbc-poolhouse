@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.5.0
 milestone_name: Async Cursor Completion
 status: executing
-stopped_at: Completed 30-01-PLAN.md — Wave-0 RED scaffolding for async bulk write (blockable BlockingStubCursor.adbc_ingest gate + four RED test files, 20 asyncio×trio cases pinning INGEST-01..04; all fail solely on the missing AsyncCursor.adbc_ingest — the GREEN target for 30-02).
-last_updated: "2026-07-01T21:04:20Z"
-last_activity: 2026-07-01 -- Completed 30-01-PLAN.md (Wave-0 RED bulk-write scaffolding)
+stopped_at: Completed 30-02-PLAN.md — GREEN implementation of async bulk write (AsyncCursor.adbc_ingest as a fetch_arrow_table clone with functools.partial arg binding + -> int; _SyncCursor Protocol extension; all 20 asyncio×trio RED cases from 30-01 now GREEN, cancel parity 20/20 looped). Phase 30 complete.
+last_updated: "2026-07-01T21:15:30Z"
+last_activity: 2026-07-01 -- Completed 30-02-PLAN.md (GREEN async bulk-write; Phase 30 complete)
 progress:
   total_phases: 5
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 6
-  completed_plans: 5
-  percent: 20
+  completed_plans: 6
+  percent: 40
 ---
 
 # Project State
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-01)
 
 **Core value:** One config in, one pool out — `create_pool(SnowflakeConfig(...))` returns a ready-to-use SQLAlchemy QueuePool in a single call.
-**Current focus:** Phase 30 — async-bulk-write
+**Current focus:** Phase 30 complete — next is Phase 31 (DataFrame Convenience)
 
 ## Current Position
 
-Phase: 30 (async-bulk-write) — EXECUTING
-Plan: 2 of 2 (30-01 complete; 30-02 GREEN next)
-Status: Executing Phase 30
-Last activity: 2026-07-01 -- Completed 30-01-PLAN.md (Wave-0 RED bulk-write scaffolding)
+Phase: 30 (async-bulk-write) — COMPLETE (both plans landed)
+Plan: 2 of 2 (30-01 RED + 30-02 GREEN both complete)
+Status: Phase 30 complete; ready for Phase 31
+Last activity: 2026-07-01 -- Completed 30-02-PLAN.md (GREEN async bulk-write; Phase 30 complete)
 
-Progress: [█████░░░░░] 50% (Phase 30 plans: 1 of 2)
+Progress: [████████░░] 40% (2 of 5 phases complete: 29, 30)
 
 ## Accumulated Context
 
@@ -65,7 +65,7 @@ Five phases, numbered 29–33 (monotonic continuation from v1.4.0's Phase 28). D
 
 - **`fetch_record_batch` returns a LIVE reader** (confirmed use-after-free/`ArrowInvalid` on read-after-checkin, DuckDB-probed): the entire Phase 29 design rests on binding the reader lifetime to the checked-out connection and forbidding checkin-while-live. This is the milestone's one real risk — the closed-before-checkin ordering is pinned by `test_reader_lifetime.py` on DuckDB (mandatory). **Snowflake cassette leg is NOT available** (see A1 below).
 - **A1 RESOLVED (Plan 29-01): the Snowflake cassette cannot replay a streaming `fetch_record_batch`.** `pytest-adbc-replay`'s `ReplayCursor` implements only `fetch_arrow_table` + row fetches (no `fetch_record_batch`); the cassette stores one materialized Arrow result. Both Snowflake reader legs in `test_reader_lifetime.py` are skipped (`@pytest.mark.snowflake` + class-level skip) and documented as a MANUAL-ONLY re-record follow-up (29-VALIDATION §Manual-Only). DuckDB carries mandatory EDGE-33 coverage and is not gated on Snowflake. `test_reader_cassette_smoke.py` fails loudly if a future replay plugin gains streaming support (the signal to re-enable). Green-wave TODO: delete the file-level pyright pragma block from the six RED test files once production symbols land.
-- **Keyword-only args across the TypeVarTuple offload boundary** (Phase 30): not a blocker, but resolve the explicit-arm-vs-partial pattern in phase planning.
+- **Keyword-only args across the TypeVarTuple offload boundary** (Phase 30): RESOLVED (Plan 30-02). `functools.partial(self._cursor.adbc_ingest, table_name, data, mode=..., ...)` binds all six args into a zero-positional-arg callable that satisfies `Callable[[Unpack[_Ts]], _T]` with `_Ts` empty — strict-clean, runtime-correct, guard-clean. This is now the milestone-general answer for any future keyword-bearing offload (e.g. Phase 31 DataFrame fetches). No chokepoint widening was needed (D-30-04).
 
 ## Deferred Items
 
@@ -88,6 +88,6 @@ Pre-v1.4.0 tracking cruft plus one non-functional docstring; run `/gsd-cleanup` 
 
 ## Session Continuity
 
-Last session: 2026-07-01T21:04:20Z
-Stopped at: Completed 30-01-PLAN.md — Wave-0 RED scaffolding for async bulk write (blockable `BlockingStubCursor.adbc_ingest` gate + `ingest_call_count` counter, plus four RED test files: round-trip/pass-through, modes, cancel/invalidate parity, signature; 20 asyncio×trio cases pinning INGEST-01..04, all failing solely on the missing `AsyncCursor.adbc_ingest`).
-Next step: Execute 30-02-PLAN.md (GREEN wave — `AsyncCursor.adbc_ingest` as a `fetch_arrow_table` clone with a `functools.partial`-bound callable + `-> int`, `_SyncCursor` Protocol extension, `import functools` + `CapsuleType`/`Literal` under `TYPE_CHECKING`) to turn the RED tests GREEN. Green-wave cleanup: delete the file-level Wave-0 pyright pragma blocks from the four RED test files once `adbc_ingest` exists, and loop `test_ingest_cancel.py` under a high `ADBC_ASYNC_REPEAT` (both backends) to prove zero hangs.
+Last session: 2026-07-01T21:15:30Z
+Stopped at: Completed 30-02-PLAN.md — GREEN implementation of async bulk write. `AsyncCursor.adbc_ingest` landed as a `fetch_arrow_table` clone (only deltas: the `functools.partial(self._cursor.adbc_ingest, ...)` callable, the `-> int` return, and the docstring); `_SyncCursor` Protocol extended; `import functools` runtime + `Literal`/`CapsuleType` under `TYPE_CHECKING`. All 20 asyncio×trio RED cases from 30-01 are GREEN (round-trip/modes/signature 14 passed; cancel/invalidate 20/20 looped, 0 hangs — INGEST-04/T-30-01). The four RED pyright pragma blocks are deleted (replaced by targeted inline `# type: ignore[index]` for the permanent object-fetch typing). Import-lint guard re-passes with `functools` present (T-30-02). Docs gate satisfied: async guide documents `adbc_ingest` with the `replace`-drops-table warning; `mkdocs build --strict` exit 0. Full async suite 162 passed / 4 skipped. Phase 30 complete (INGEST-01..04 done).
+Next step: Phase 30 is complete. Proceed to Phase 31 (DataFrame Convenience — `fetch_df`/`fetch_polars`, PKG-02), which can reuse this phase's whole-op offload shape and the `functools.partial` keyword-binding pattern.

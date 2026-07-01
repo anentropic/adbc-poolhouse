@@ -26,10 +26,10 @@ Scope constraints (maintainer-confirmed):
 
 ### Async Bulk Write
 
-- [ ] **INGEST-01**: User can `await cursor.adbc_ingest(table_name, data, *, mode=..., catalog_name=None, db_schema_name=None, temporary=False)` returning the affected row count (single whole-operation offload)
-- [ ] **INGEST-02**: `mode` is a typed `Literal["create", "append", "replace", "create_append"]` forwarded verbatim to the driver; the docs warn explicitly that `replace` **drops** the existing table
-- [ ] **INGEST-03**: `data` accepts the Arrow inputs the driver accepts (`pyarrow.Table` / `RecordBatch` / `RecordBatchReader` / Arrow C-stream capsule) without conversion by poolhouse
-- [ ] **INGEST-04**: A cancelled or timed-out ingest fires `adbc_cancel` and **invalidates** the connection (a partially-applied write poisons it — `on_abort=invalidate`); `pool.checkedout() == 0`, asyncio and trio parity
+- [x] **INGEST-01**: User can `await cursor.adbc_ingest(table_name, data, *, mode=..., catalog_name=None, db_schema_name=None, temporary=False)` returning the affected row count (single whole-operation offload)
+- [x] **INGEST-02**: `mode` is a typed `Literal["create", "append", "replace", "create_append"]` forwarded verbatim to the driver; the docs warn explicitly that `replace` **drops** the existing table
+- [x] **INGEST-03**: `data` accepts the Arrow inputs the driver accepts (`pyarrow.Table` / `RecordBatch` / `RecordBatchReader` / Arrow C-stream capsule) without conversion by poolhouse
+- [x] **INGEST-04**: A cancelled or timed-out ingest fires `adbc_cancel` and **invalidates** the connection (a partially-applied write poisons it — `on_abort=invalidate`); `pool.checkedout() == 0`, asyncio and trio parity
 
 ### DataFrame Convenience
 
@@ -93,10 +93,10 @@ Every v1.5.0 requirement maps to exactly one phase (Phases 29–33). PKG-* are c
 | STREAM-04 | Phase 29 | Complete (29-03) |
 | STREAM-05 | Phase 29 | Complete (29-03) |
 | STREAM-06 | Phase 29 | Complete (29-03) |
-| INGEST-01 | Phase 30 | RED pinned (30-01); GREEN in 30-02 |
-| INGEST-02 | Phase 30 | RED pinned (30-01); GREEN in 30-02 |
-| INGEST-03 | Phase 30 | RED pinned (30-01); GREEN in 30-02 |
-| INGEST-04 | Phase 30 | RED pinned (30-01); GREEN in 30-02 |
+| INGEST-01 | Phase 30 | ✅ Complete (30-01 RED → 30-02 GREEN) |
+| INGEST-02 | Phase 30 | ✅ Complete (30-01 RED → 30-02 GREEN) |
+| INGEST-03 | Phase 30 | ✅ Complete (30-01 RED → 30-02 GREEN) |
+| INGEST-04 | Phase 30 | ✅ Complete (30-01 RED → 30-02 GREEN) |
 | DF-01 | Phase 31 | Pending |
 | DF-02 | Phase 31 | Pending |
 | DF-03 | Phase 31 | Pending |

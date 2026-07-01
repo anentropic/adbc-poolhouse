@@ -15,7 +15,7 @@
 **Milestone Goal:** Complete the async cursor surface by offloading the four v1.4.0-deferred ADBC cursor methods (`fetch_record_batch` Arrow streaming, `adbc_ingest` bulk write, `fetch_df`/`fetch_polars` DataFrame convenience) and land the deferred P2 async edge-case hardening suite. Every new method is a pure offload wrapper over a method that already exists on the wrapped sync `dbapi.Cursor`, routed through the existing v1.4.0 `offload`/`cancellable_offload` chokepoint and per-pool `CapacityLimiter` — no new runtime deps, no new extras, no sync-core change. Async methods mirror the underlying sync method's behavior: no invented async-specific error types, no `find_spec` pre-checks, no bespoke wrapping.
 
 - [x] **Phase 29: Arrow Streaming** — `await cursor.fetch_record_batch()` → `AsyncRecordBatchReader` with per-batch offloaded `async for`, reader-lifetime bound to checkout, read-after-checkin surfaces the driver's native closed-stream error — completed 2026-07-01
-- [ ] **Phase 30: Async Bulk Write** — `await cursor.adbc_ingest(table, data, mode=...)`, single whole-op offload, typed `Literal` mode, `on_abort=invalidate` on cancel
+- [x] **Phase 30: Async Bulk Write** — `await cursor.adbc_ingest(table, data, mode=...)`, single whole-op offload, typed `Literal` mode, `on_abort=invalidate` on cancel (2/2 plans) — completed 2026-07-01
 - [ ] **Phase 31: DataFrame Convenience** — `await cursor.fetch_df()` / `await cursor.fetch_polars()`, single-offload wrappers returning self-owning frames; pandas/polars user-supplied
 - [ ] **Phase 32: P2 Edge Hardening** — remaining deferred P2 edge cases (contextvars, trio-checkpoint, timeout precision, loop-shutdown, finalizers) extended across the new streaming/ingest/DataFrame paths
 - [ ] **Phase 33: Documentation** — streaming guide, ingest mode table + replace warning, DataFrame user-supplied note, API reference for the new symbols, `mkdocs build --strict` gate, humanizer pass
@@ -126,7 +126,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 30-02-PLAN.md — GREEN: AsyncCursor.adbc_ingest (fetch_arrow_table clone + functools.partial arg binding) + _SyncCursor Protocol member + docs quality gate
+- [x] 30-02-PLAN.md — GREEN: AsyncCursor.adbc_ingest (fetch_arrow_table clone + functools.partial arg binding) + _SyncCursor Protocol member + docs quality gate — completed 2026-07-01
 
 **UI hint**: no
 
