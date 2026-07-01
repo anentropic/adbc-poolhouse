@@ -1,225 +1,302 @@
 # Pitfalls Research
 
-**Domain:** Adding an optional anyio thread-offload async API over a sync ADBC + SQLAlchemy QueuePool library (adbc-poolhouse v1.4.0)
-**Researched:** 2026-06-25
-**Confidence:** HIGH on the ADBC thread-safety + cancellation facts (official ADBC concurrency spec + dbapi reference), HIGH on anyio cancellation/limiter semantics (official anyio docs), MEDIUM on the GIL-release premise (load-bearing for the milestone, but not explicitly documented per-method — must be validated empirically).
+**Domain:** Adding four deferred async cursor methods (`fetch_record_batch` Arrow streaming, `adbc_ingest` bulk write, `fetch_df` / `fetch_polars` DataFrame convenience) plus the P2 async edge-case hardening suite to the existing v1.4.0 anyio thread-offload async layer over sync ADBC + SQLAlchemy `QueuePool` (adbc-poolhouse v1.5.0)
+**Researched:** 2026-07-01
+**Confidence:** HIGH on ADBC dbapi semantics (verified against the official `adbc_driver_manager` reference and the upstream `dbapi.py` source read directly — see Sources), HIGH on the v1.4.0 offload/cancel/limiter machinery (read from source: `_offload.py`, `_cancel.py`, `_cursor.py`, `_connection.py`, `guard.py`), HIGH on anyio semantics (carried from the v1.4.0 ASYNC-EDGE-CASES verification). MEDIUM on per-backend `adbc_ingest` transactional recovery (driver-dependent, empirically bounded, not spec-guaranteed).
 
-This document is opinionated and specific to *this* change: wrapping `create_pool()` / `QueuePool.connect()` / cursor `execute`/`fetch*`/`fetch_arrow_table` with `anyio.to_thread.run_sync`, behind an `[async]` extra, generic across all 13 backends. Pitfalls are ordered by threat to **correctness** first (cancellation, thread-affinity, leaks), then concurrency throughput, then cosmetics (typing, testing).
+> This document **extends** the v1.4.0 `PITFALLS.md` (the five headline risks — cancellation-leak, 40-token limiter, GIL/materialization, Arrow allocator leak, asyncio-only idioms). It does **not** restate them. It is scoped to what changes when the four new methods and the P2 edge tests are added to an *already-shipped* offload wrapper: the streaming-reader-lifetime cluster (the #1 new risk), ingest, DataFrame convenience, each P2 edge failure mode, and integration with the v1.4.0 chokepoint / limiter / cancel / lazy-import / guard machinery.
 
-## The Two Load-Bearing Facts (read first)
+## The Load-Bearing New Fact (read first)
 
-Everything below rests on two verified facts from the ADBC spec:
+Read directly from upstream `adbc_driver_manager/dbapi.py` (Sources):
 
-1. **ADBC objects are NOT thread-safe.** Official wording: *"Objects allow serialized access from multiple threads: one thread may make a call, and once finished, another thread may make a call. They do not allow concurrent access from multiple threads."* and *"Connections are not thread-safe... clients should take care to serialize accesses to a connection."* — [ADBC concurrency](https://arrow.apache.org/adbc/main/cpp/concurrency.html), [dbapi reference](https://arrow.apache.org/adbc/main/python/api/adbc_driver_manager.html). **Serialized cross-thread access is allowed; concurrent access is not.** This is the difference between "safe" and "unsafe" for the whole design.
+- **`fetch_record_batch()` returns `self._results.reader._reader` — a `pyarrow.RecordBatchReader` bound to the live ADBC statement handle**, not a self-owning buffer. Its docstring: *"This can only be called once. It must be called before any other method that consume data."* Unlike `fetch_arrow_table()` (which fully materializes a self-owning `pyarrow.Table`, safe after checkin — EDGE-21), a reader is a **cursor to C-side result state**. Every unread batch is native memory whose lifetime is the statement's. This single fact is the root of the entire streaming-reader pitfall cluster below and is the reason v1.4.0 deliberately shipped `fetch_arrow_table` and deferred `fetch_record_batch`.
 
-2. **`adbc_cancel` is the single documented exception** — it *is* thread-safe and is explicitly designed to be called from another thread to interrupt an in-progress query: *"Cancel execution of an in-progress query. This can be called during AdbcStatementExecuteQuery... This must always be thread-safe (other operations are not)."* — [ADBC statement API](https://arrow.apache.org/adbc/main/cpp/api/group__adbc-statement.html). This is what makes cooperative cancellation over `to_thread` viable at all.
+Two corollaries that shape the design:
+
+- **The v1.4.0 offload model is transient-token, one-offload-per-call.** `offload()` borrows a limiter token for the duration of one call and releases it (`_offload.py` docstring: "A token is borrowed only for the duration of this one call … so a connection holds no token between calls"). A streaming reader consumed batch-by-batch across many awaits does **not** fit that model without care — each `next(reader)` is a separate blocking C pull that must be its own offload.
+- **ADBC's own `fetch_df`/`fetch_polars`/`fetch_record_batch` internally call `_blocking_call(..., self._stmt.cancel)`** — they already wire the driver's cancel. When we offload them we bypass that inner loop (it needs a running asyncio loop it will not have on a worker thread), so **our** `cancellable_offload` + `adbc_cancel` is what provides cancellation, exactly as for `execute`/`fetch_arrow_table`.
 
 ---
 
 ## Critical Pitfalls
 
-### Pitfall 1: Cancelled await leaves the query running and the connection mid-operation (silent pool corruption)
+### Pitfall 1: Streaming reader read after checkin — use-after-free of C-side result state (THE headline risk)
 
 **What goes wrong:**
-A caller does `with anyio.fail_after(5): await acur.execute(slow_sql)` (or the surrounding task is cancelled). The await unblocks immediately, but **the ADBC call keeps running on its worker thread**. anyio is explicit: with `abandon_on_cancel=True`, *"the thread will still continue running – only its outcome will be ignored"* ([anyio threads](https://anyio.readthedocs.io/en/stable/threads.html)). The connection is now mid-`execute`. If the async wrapper's `finally` returns it to the QueuePool, the next checkout gets a connection with a live query on it → concurrent access from two threads → exactly the undefined behaviour ADBC forbids. If instead the wrapper closes/discards it, you leak the in-flight statement until the query finishes.
+A consumer does `reader = await cursor.fetch_record_batch()` inside `async with await pool.connect() as conn:`, the block exits (connection checks in → the `reset` event `_release_arrow_allocators` closes the cursor and its statement), and *then* the consumer iterates `async for batch in reader`. The reader points at a statement handle that no longer exists. Best case: an ADBC error. Worst case: a read of freed native memory → segfault or corrupted Arrow buffers. This is the streaming analogue of the use-after-checkin that EDGE-21 proves is *safe* for the materialized `Table` — but for a reader it is **unsafe**, because the reader is not self-owning.
 
 **Why it happens:**
-Developers assume async cancellation == OS-thread interruption (true for native-async drivers like asyncpg, false for thread-offloaded sync code). The default `to_thread.run_sync` actually *shields* the thread from cancellation entirely, so a naïve wrapper makes timeouts silently not work; switching to `abandon_on_cancel=True` makes the await cancellable but abandons a still-running thread holding a pool connection.
+v1.4.0 taught users (and the codebase, via the `AsyncCursor` module docstring) that "fetch results survive checkin." That is only true for `fetch_arrow_table`'s materialized `Table`. Developers pattern-match the streaming method to the same lifetime rule. The offload boundary makes it worse: the `await` invites the consumer to "grab the reader and deal with it later," across arbitrary suspension points including the `async with` exit.
 
 **How to avoid:**
-Wire `adbc_cancel` to the anyio cancel scope. The correct shape:
-- Run the blocking call in the worker thread.
-- In the event-loop task, race it against cancellation; on cancel, call `connection.adbc_cancel()` / `cursor.adbc_cancel()` from the loop thread (legal — cancel is the thread-safe exception). The native call then returns `ADBC_STATUS_CANCELLED` and the worker thread unwinds.
-- Only after the worker thread has actually returned (cancelled or not) may the connection be returned to the pool. Use anyio structured concurrency so the offloaded call is *joined* before the scope exits, rather than abandoned.
-- If `adbc_cancel` is unavailable or the join times out, **invalidate** the connection (`connection_record.invalidate()` / detach it) instead of returning a possibly-busy connection to the pool.
-Concretely: prefer NOT using `abandon_on_cancel=True` blindly; instead structure a task group where one task runs the sync call and a cancellation handler calls `adbc_cancel`, then await the worker's completion.
+- **Do not hand a bare `pyarrow.RecordBatchReader` back across the await boundary.** Wrap it in an `AsyncRecordBatchReader` that (a) owns a reference to the `AsyncCursor`/`AsyncConnection` so the connection cannot be checked in while the reader is live, and (b) exposes `__aiter__`/`__anext__` where each `__anext__` offloads a single `reader.read_next_batch()` (or `next(reader)`) through the pool limiter with `cancellable_offload`.
+- **Tie the reader's lifetime to an explicit async context manager**: `async with await cursor.fetch_record_batch() as reader: async for batch in reader:`. The reader's `__aexit__` drains/closes the reader (offloaded, shielded) *before* the connection is allowed to check in. Document that the connection stays checked out for the stream's lifetime (see Pitfall 3 — that is a real cost, not a bug).
+- **Guard against checkin-while-live:** the `AsyncConnection.close`/`__aexit__` path must not silently strand an open reader. Either the reader holds the `_in_use` guard for its lifetime (rejecting a concurrent `close` with `ConnectionBusyError`), or checkin closes any straggler reader first (routing through the existing reset symmetry).
+- **Never store the raw reader on a plain attribute a user can reach.** The only sanctioned exit is the wrapped async iterator.
 
 **Warning signs:**
-Timeouts that "work" (await returns fast) but warehouse query logs show the query ran to completion; intermittent "connection is busy"/concurrent-access errors after a timeout; pool slowly losing capacity under load with cancellations; tests that cancel and immediately reuse a connection passing only because the underlying op was fast.
+Segfaults / `ADBC_STATUS_INTERNAL` / "statement is closed" errors that appear only when the stream is consumed *after* the `async with` block; tests that "pass" because they consume the reader fully inside the block (the dangerous path — post-checkin consumption — is never exercised); DuckDB tolerates it, a networked backend crashes ("works on DuckDB, segfaults on Snowflake").
 
-**Phase to address:** Cancellation phase (dedicated, after the basic offload wrapper exists). This is the single highest-risk item; it deserves its own phase with deterministic cancellation tests (see Pitfall 12). Recovery cost if shipped wrong: HIGH (data races, intermittent corruption in production).
+**Phase to address:**
+Dedicated **Arrow-streaming phase** (the first new-method phase; it is the highest-risk item and its lifetime design gates the other three methods' patterns). Ship the `AsyncRecordBatchReader` wrapper + lifetime CM from day one. Verify with a DuckDB test that consumes the reader *after* the connection has checked in and asserts a clear, typed error (not a segfault) — plus a happy-path test that consumes fully inside the CM.
 
 ---
 
-### Pitfall 2: Treating ADBC connection/cursor as thread-affine OR as concurrently-shareable — both are wrong
+### Pitfall 2: Streaming reader not drained/closed before the `_release_arrow_allocators` reset fires → native Arrow allocator leak
 
 **What goes wrong:**
-Two opposite mistakes, both fatal:
-- *Over-strict:* assuming an ADBC connection is pinned to one OS thread (like SQLite default or some embedded drivers), and therefore trying to build per-thread connection affinity on top of `to_thread` (which deliberately reuses a pool of ~40 threads and gives no per-call thread guarantee).
-- *Over-loose:* assuming "the GIL makes it safe" and letting two awaited offloads touch the *same* connection concurrently (e.g. two coroutines sharing one `AsyncConnection` both calling `execute`). ADBC explicitly forbids concurrent access; the GIL does **not** save you because the driver releases the GIL during the native call, so two threads genuinely run in the driver at once.
+A reader is partially consumed (or never consumed) and abandoned. The unread batches are native Arrow memory pinned by the open statement. If the cursor is closed and the connection reset *without* the reader being drained/closed, the sync `_release_arrow_allocators` reset listener closes the cursor — but a reader still referenced elsewhere (or GC'd late) can leave allocators alive, and repeated across many short-lived streams this grows RSS invisibly to the Python GC. This is v1.4.0 Pitfall 5 (Arrow leak), sharpened: `fetch_arrow_table` fully drains in one offload, so there is nothing to leak; a *reader* is leak-prone by construction.
 
 **Why it happens:**
-The "objects allow serialized access from multiple threads" wording is subtle. It means: a connection *can* legally move between threads as long as calls never overlap. `to_thread` satisfies this *only if you also serialize calls per connection*. Developers conflate "thread-safe" with "concurrency-safe."
+Streaming's whole point is *not* draining eagerly, so "partially consumed then abandoned" is the normal, expected shape (a `LIMIT`-style early break, an exception mid-loop). `__del__` can't reliably run the offloaded close (no loop, or loop gone — see EDGE-22). The reset listener only fires on connection checkin, which the reader deliberately delays.
 
 **How to avoid:**
-- Treat ADBC objects as **migratable but strictly serialized**: never pin to a thread (that fights `to_thread`), but enforce one-in-flight-call-per-connection.
-- Put a per-connection **anyio.Lock** inside the `AsyncConnection`/`AsyncCursor` wrapper. Every offloaded method acquires the lock before `to_thread.run_sync` and releases after. This guarantees serialized access regardless of which worker thread runs the call. (The cancellation handler calling `adbc_cancel` is the deliberate exception — it must NOT take the lock, since it runs concurrently by design.)
-- Document that an `AsyncConnection` is single-logical-owner: one task uses it at a time; share the *pool*, not the connection.
+- The `AsyncRecordBatchReader.__aexit__` must **close the underlying reader** (offloaded, shielded, `CancelScope(shield=True)`, mirroring `AsyncCursor.close`) whether or not iteration finished — draining is not required, but *closing* is, so the C-side allocators are released promptly, not at some later reset.
+- On the **exception/partial-iteration path**, `__aexit__` still closes the reader (the `async with` guarantees it); the body exception propagates, the close error (if any) is chained via `__context__`, never masks it (ties to EDGE-20).
+- Keep the existing reset symmetry as the **safety net, not the primary path**: the connection checkin still fires `_release_arrow_allocators`, but the reader CM should have already closed things — the reset must never be the *only* thing that frees a stream.
+- Add a `ResourceWarning` on `__del__` of an un-closed `AsyncRecordBatchReader` (EDGE-22 pattern) so a forgotten stream is surfaced in tests, not silently leaked.
 
 **Warning signs:**
-Sporadic segfaults / `ADBC_STATUS_INTERNAL` / corrupted Arrow buffers under concurrency; failures that vanish when `pool_size=1` or when tests run serially; "works on DuckDB, crashes on Snowflake" (driver-dependent tolerance to the violation).
+RSS climbing under sustained streaming load while the Python heap stays flat; `pyarrow` allocator stats growing across many `fetch_record_batch` lifecycles; leaks that vanish only on `pool.dispose()`; the memory-stability test (TEST-03 analogue) passing for `fetch_arrow_table` but not for the streaming path.
 
-**Phase to address:** Core async wrapper phase (the connection/cursor wrapper must ship the per-connection lock from day one, not bolt it on later).
+**Phase to address:**
+Arrow-streaming phase (reader CM + close-in-`__aexit__`). Verify in the Testing phase with a streaming memory-stability loop (extend TEST-03) that partially-consumes-then-abandons the reader ×N and asserts allocator stats stabilize.
 
 ---
 
-### Pitfall 3: The GIL-release premise is unvalidated for the operations that matter
+### Pitfall 3: The stream holds a pool connection (and its offload budget) for the entire iteration → limiter starvation / backpressure
 
 **What goes wrong:**
-The milestone's entire justification is *"ADBC releases the GIL, so thread-offload yields real concurrency."* This is true for the native query execution in the Rust/C/Go drivers, but **result materialization on the Python side may not release it**: building Python row tuples in `fetchall()`, and especially pyarrow's construction of `RecordBatch`/`Table` objects in `fetch_arrow_table()`, run Python/C-API code that re-acquires the GIL. If a workload is fetch-heavy (large result sets converted to Arrow), the "parallel" offloads serialize on the GIL during materialization and you get little speedup while paying thread-hop overhead.
+Unlike `fetch_arrow_table` (one offload, token borrowed then released, connection idle-able), a streaming read **pins the connection for the whole consume duration** — the connection cannot check in until the reader is closed. If a consumer opens N long-lived streams on a pool sized to `pool_size + max_overflow == N`, all N connections are held; the N+1th `await pool.connect()` blocks (offloaded, but the checkout itself borrows a token and waits). Worse: because each `__anext__` batch-pull is its own offload borrowing a token, a task that holds a connection *and* is mid-stream is doing exactly the "hold a connection while awaiting another offload" pattern EDGE-11 exists to keep safe — a real hold-and-wait risk if the reader's per-batch offload contends for a token the held connection's own budget doesn't cover.
 
 **Why it happens:**
-"ADBC releases the GIL" gets over-generalized to "every ADBC method is parallel." The blocking *I/O/compute in the driver* releases it; the *Python object construction* around it does not, and that's often where the time goes for analytical result sets.
+`fetch_arrow_table` trained the mental model "an offload is a brief blip." Streaming inverts it: the "offload" is spread across the entire result set with the connection pinned throughout. Developers size pools for point queries and are surprised when a handful of slow streams exhausts the pool.
 
 **How to avoid:**
-- Validate empirically **before** building the full surface: a micro-benchmark in an early phase running N concurrent slow queries vs. N concurrent large-fetches, measuring wall-clock vs. ideal. Confirm execute/network-bound ops parallelize; measure how much fetch/Arrow-conversion ops do.
-- Set honest expectations in docs: async wins are largest for **latency-bound / I/O-bound** queries (round-trips to Snowflake/BigQuery/Databricks), smaller for **CPU-bound large-result materialization**.
-- Do NOT claim blanket parallelism in the async guide. Qualify per-operation.
+- **Document the cost explicitly:** a `fetch_record_batch` stream holds its connection from `fetch_record_batch()` until the reader is closed. Streams are for backpressured consumption; they are not free the way a materialized fetch is. Advise consumers to size the pool for *concurrent open streams*, not just concurrent point queries.
+- **Reuse the transient-token model per batch** — each `__anext__` offloads one `read_next_batch` through the pool limiter and releases the token between batches (the connection is held, but the *token* is not held between batches), so the reader does not permanently consume a limiter token, only the batch-pull does. This keeps the reader compatible with EDGE-11's "connection you hold already owns a token via its checkout" invariant — verify no second permanent token is needed.
+- **Do not offload the whole `for batch in reader` loop as one mega-offload** — that would (a) defeat backpressure (the whole stream drains in one worker call), (b) make mid-stream cancellation impossible, and (c) is the "one mega-offload" tech-debt shortcut the v1.4.0 pitfalls already ban.
 
 **Warning signs:**
-Benchmarks showing async no faster (or slower) than sync for `fetch_arrow_table` on big results; CPU pinned at one core during "concurrent" fetches; thread-hop overhead dominating for tiny queries.
+`QueuePool limit … timed out` under a workload with several concurrent streams; pool `checkedout()` staying high for the stream's whole duration; a watchdog `fail_after` around a second checkout tripping while streams are open; throughput that collapses when point queries and streams share a pool.
 
-**Phase to address:** Feasibility/spike phase at the very start of the milestone — this premise gates whether the design needs adjusting (e.g. documenting limits, or offloading in coarser chunks). MEDIUM confidence; treat as a must-verify.
+**Phase to address:**
+Arrow-streaming phase (per-batch transient-token design + the hold-and-wait check). Verify by extending EDGE-11 to the streaming path: hold a connection mid-stream, attempt another offload, assert no watchdog-tripping deadlock. Document in the async guide (Docs phase).
 
 ---
 
-### Pitfall 4: Connection not returned/invalidated on exception or cancellation (pool starvation)
+### Pitfall 4: Cancellation mid-stream leaves the C statement live — `adbc_cancel` + invalidate must still fire per batch
 
 **What goes wrong:**
-The sync API returns connections via SQLAlchemy's `reset` event (the existing `_release_arrow_allocators` listener closes open cursors on every checkin/invalidate path). An async wrapper that does the checkout in `to_thread` but the cleanup in Python `finally` can desynchronize: an exception or cancellation between "checked out" and "wrapped in async context manager" leaks the raw `_ConnectionFairy` — it never returns to the pool. After `pool_size + max_overflow` such leaks, every `await pool.connect()` blocks for `timeout` then raises `TimeoutError`. Cancellation makes this worse because the `finally` may itself be interrupted if not shielded.
+A `fail_after`/`move_on_after`/`scope.cancel` lands while a batch-pull (`read_next_batch`) is blocked in the driver. If the per-batch offload is a bare `offload()` (no `adbc_cancel` wiring), the worker is shielded by default (`abandon_on_cancel=False`) and the await hangs until the batch arrives — cancellation is a no-op, the classic v1.4.0 Pitfall 1. If instead the code abandons the worker, the statement keeps streaming on the warehouse and the connection is poisoned. Either way the connection must be **invalidated**, not returned busy, and the partially-consumed reader must be treated as dead.
 
 **Why it happens:**
-There's a gap between the offloaded checkout completing and control returning to the event loop where the `async with` is established. Cancellation can land in that gap. Naïve `try/finally` in async code can have its cleanup cancelled.
+Streaming has *many* cancellation points (one per batch), not one. It is easy to wire `cancellable_offload` on the initial `fetch_record_batch()` call and forget that each subsequent `__anext__` is an equally-blocking C call needing the same treatment. The reader-close in `__aexit__` is also a cancellation point (must be shielded, like `AsyncCursor.close`).
 
 **How to avoid:**
-- Mirror the sync ownership model exactly: the `AsyncConnection.__aexit__` must call the same return path that the sync `_ConnectionFairy.close()` triggers, so the existing `reset` event (and thus `_release_arrow_allocators`) still fires. Async cleanup must be **symmetric** with the sync reset event, not a parallel ad-hoc path.
-- Shield checkin/close from cancellation: wrap the return-to-pool in `with anyio.CancelScope(shield=True):` so a cancellation during `__aexit__` cannot abandon the connection.
-- On any exception during async use, prefer `invalidate()` over `close()` if the connection may be mid-operation (ties into Pitfall 1).
-- Provide `managed_async_pool()` / `acquire()` context managers so consumers can't forget cleanup; make the raw `await pool.connect()` return an object whose `__aexit__` is the only sanctioned return path.
+- **Route every batch-pull through `cancellable_offload`** with the cursor's `_adbc_cancel` hook and `on_abort=self._owner.invalidate` — identical to how `execute`/`fetch_arrow_table` already work in `_cursor.py`. A cancelled batch-pull fires `adbc_cancel` once (shielded), invalidates the connection, re-raises the cancellation.
+- **A cancelled stream poisons the connection**: after mid-stream cancel, the connection is invalidated (`checkedout() == 0`), the reader is dead, and `__aexit__` must not try to re-close a reader on an already-invalidated connection (a `close` after `invalidate` is a probe-confirmed safe no-op per `_connection.py`, but the reader wrapper must not double-cancel).
+- **Shield the reader-close in `__aexit__`** in `anyio.CancelScope(shield=True)`, mirroring `AsyncCursor.close`, so a cancellation arriving during stream teardown cannot abandon an open reader/statement.
 
 **Warning signs:**
-`QueuePool limit ... overflow ... reached, connection timed out` after running for a while; pool `.checkedout()` count never returning to 0; leaks appearing only on the error/cancel paths in tests, not the happy path.
+A timed-out stream whose warehouse query keeps running (visible in warehouse query logs); `checkedout()` not returning to 0 after a mid-stream cancel; a hang under trio when a batch-pull is cancelled (proves the per-batch `adbc_cancel` wiring is missing — the same load-bearing-hang signal as v1.4.0 EDGE-02); double `adbc_cancel` errors on drivers that reject it.
 
-**Phase to address:** Core async wrapper phase for the happy/exception path; the cancellation-shield aspect lands with the Cancellation phase.
+**Phase to address:**
+Arrow-streaming phase (per-batch `cancellable_offload` + shielded reader-close). Verify with the `BlockingStubCursor` extended to a blocking `read_next_batch`: cancel mid-stream, assert `adbc_cancel` fired once, connection invalidated, `checkedout() == 0`, cancel propagates — under both backends.
 
 ---
 
-### Pitfall 5: Arrow record batches / readers not freed → unbounded native memory growth
+### Pitfall 5: `adbc_ingest` offloaded as one blocking call — GIL-release and cancellation semantics differ from execute
 
 **What goes wrong:**
-ADBC streams results through Arrow `RecordBatchReader`s held by open cursors (the sync code already knows this — `_release_arrow_allocators` iterates `dbapi_conn._cursors` and closes them on reset). In the async layer, if an `AsyncCursor` is GC'd without its `close()` being awaited/run, or if a partially-consumed `fetch_arrow_table` reader isn't released, native Arrow allocators stay alive. Across many short-lived async cursors this leaks C++/Rust-side memory invisible to Python's GC.
+`adbc_ingest(table, data, mode=...)` bulk-writes a `RecordBatch`/`Table`/`RecordBatchReader`/Arrow capsule. It is offloaded as one blocking call, which is correct *shape*, but two hazards: (a) the **GIL-release premise** verified for `execute` (network I/O `with nogil:`) is not automatically true for the *write path* — feeding a large in-memory `Table` to the driver may spend real time in Python/C-API Arrow traversal that re-acquires the GIL, so concurrent ingests may serialize on the GIL exactly like large-result materialization (v1.4.0 SPIKE-02 showed materialization partially serializes; ingest is the write-side mirror and was **not** spiked). (b) A large ingest is a *long* single offload — cancellation mid-ingest hits the same `adbc_cancel` path, but the *recovery* is backend-specific (Pitfall 6).
 
 **Why it happens:**
-Python `__del__` on the async wrapper can't reliably run the offloaded `close()` (you can't `await` in `__del__`, and the event loop may be gone). The sync safety net (reset event closing cursors) only fires when the connection actually returns to the pool — if the async wrapper holds the connection open across many cursor operations, batches accumulate before reset.
+"ADBC releases the GIL" gets over-generalized to every method including writes. The spike measured reads, not writes. And ingest *looks* like just another offloaded cursor call, so it is easy to wire it as a plain `offload()` and inherit neither the cancel wiring nor honest concurrency expectations.
 
 **How to avoid:**
-- Make `AsyncCursor` an async context manager; close it in `__aexit__` via `to_thread`. Encourage `async with conn.cursor() as cur:`.
-- Ensure the connection-return path still triggers the existing `reset` listener so any straggler cursors are closed (don't bypass it).
-- For `fetch_arrow_table` / streaming readers, fully consume or explicitly close the reader inside the offloaded call; don't hand a live reader back across the await boundary unless you also give it an async-closing wrapper.
-- Add a fallback `del`-time warning (not cleanup) if a cursor is GC'd un-closed, to surface leaks in tests.
+- **Route ingest through `cancellable_offload`** (with `_adbc_cancel` + `on_abort=invalidate`), not bare `offload()` — a long ingest must be interruptible, and a cancelled ingest poisons the connection.
+- **Set honest concurrency expectations in docs:** do not claim concurrent ingests parallelize. Frame ingest wins as "off the event loop" (the loop stays responsive) rather than "N ingests run in parallel." If a cheap DuckDB micro-measurement is available, record write-side GIL behavior the way SPIKE-02 recorded read-side; otherwise disclaim explicitly.
+- **Pass a `RecordBatchReader` as `data` only with reader-lifetime care** (Pitfall 7) — the reader is consumed inside the single offload, on the worker thread, so it must be fully owned by that call and not touched from the loop concurrently.
 
 **Warning signs:**
-RSS climbing under sustained async load while Python heap stays flat; `pyarrow` allocator stats growing; leaks that disappear when forcing `pool.dispose()`.
+Concurrent ingests showing no speedup and one core pinned during "parallel" writes; the event loop *staying* responsive (good — that is the real win) but throughput not scaling with concurrency; a cancelled large ingest whose rows keep landing.
 
-**Phase to address:** Core async wrapper phase (cursor lifecycle), verified in the Testing phase with a memory-stability test.
+**Phase to address:**
+**Ingest phase** (after streaming establishes the reader-lifetime pattern). Wire `cancellable_offload`; document honest expectations (Docs phase). Optionally extend the spike micro-benchmark to the write path.
 
 ---
 
-### Pitfall 6: anyio default CapacityLimiter (40, process-wide) mismatched with pool size, plus deadlock from nested offloads
+### Pitfall 6: `adbc_ingest` mode misuse and partial-apply cancellation — silent wrong-table and non-transactional recovery
 
 **What goes wrong:**
-`to_thread.run_sync` defaults to a **single process-wide limiter of 40 tokens**, shared by *all* offloaded work in the app, not just this library ([anyio threads](https://anyio.readthedocs.io/en/stable/threads.html)). Three failure modes:
-- *Throughput cap:* if a consumer sets `pool_size + max_overflow > 40` expecting that many concurrent queries, they're silently throttled to 40 worker threads (minus whatever else in their app uses `to_thread`).
-- *Starvation:* unrelated `to_thread` usage elsewhere in the consumer's app competes for the same 40 tokens with this library's queries.
-- *Deadlock via nesting / hold-while-offload:* if an offloaded function itself calls back to the loop and awaits another offload, or a task holds a checked-out connection (which consumed a token) and then awaits a *second* offload that needs a token while all 40 are held by tasks each waiting on the first — classic limiter deadlock. Holding a connection while awaiting another offload that needs the limiter is the realistic trigger here.
+Two distinct traps. (a) **Mode confusion**: the four modes have sharp, easily-swapped semantics (verified from source): `append` = error if table absent; `create` = error if table exists (the default!); `create_append` = create-if-absent then insert; `replace` = **drop existing table** then create. A consumer expecting "insert into my table" who leaves the default `create` gets an error if the table exists; one who reaches for `replace` to "make sure it's there" silently **drops and recreates**, losing data. The async wrapper must forward `mode` verbatim and its default must match the sync ADBC default (`create`) — a divergent default is a data-loss footgun. (b) **Partial-apply on cancel**: a cancelled ingest is invalidated by our machinery, but whether the *already-written rows* roll back is **backend-specific** — some backends stage-and-commit (clean rollback), others stream rows (partial data remains). Our `invalidate` cleans the *pool*, not the *table*.
 
 **Why it happens:**
-The limiter is invisible and global. Pool sizing and thread-limiter sizing are two independent knobs that developers assume are the same. Nested offloads are easy to introduce accidentally (e.g. a cleanup that itself offloads).
+`mode` is a single keyword with severe consequences and a non-obvious default (`create`, not `append`). Developers assume async cancellation = transactional rollback (true for a native-async driver inside a transaction, not guaranteed for a mid-stream ADBC bulk write). The wrapper is a pure pass-through, so it is tempting to not document either hazard.
 
 **How to avoid:**
-- Give the library its **own dedicated `CapacityLimiter`** sized to `pool_size + max_overflow`, passed explicitly to every `to_thread.run_sync(..., limiter=self._limiter)`. This isolates the library from the global 40-token pool and aligns thread budget with connection budget so a checked-out connection always has a token to make its next call. Store it on the async pool wrapper.
-- Never nest offloads: an offloaded function must be pure sync (no re-entry into the loop, no second `to_thread`). Keep checkout, execute, and checkin as separate top-level offloads coordinated from the loop — not one mega-offload that internally offloads again.
-- Document the relationship and let advanced users override the limiter; warn against setting `pool_size` far above the limiter.
+- **Forward `mode` exactly and default to `create`** (the ADBC dbapi default), typed as `Literal['append', 'create', 'replace', 'create_append']` so basedpyright rejects a typo'd mode at call sites. Do not invent a "friendlier" default.
+- **Document the mode table verbatim** in the ingest docstring/guide (especially `replace` = drop) — this is a UX-safety requirement, not optional prose.
+- **Document that a cancelled ingest does NOT guarantee rollback** — the connection is invalidated and safe to discard, but the target table may hold partial data depending on the backend; consumers who need atomicity should wrap ingest in an explicit transaction (`commit`/`rollback`) on a backend that supports it, or ingest to a staging table.
 
 **Warning signs:**
-Concurrency plateauing at 40 regardless of `pool_size`; hangs that resolve when `pool_size` is reduced below ~40; deadlocks only under high concurrency with cleanup/cancellation in the mix; unrelated parts of the consumer app slowing when poolhouse is busy.
+"Table already exists" errors from the default `create` mode surprising users who wanted append; a `replace` that silently emptied a table; partial rows in the target after a timed-out ingest; tests that only exercise ingest into a fresh table (never the mode-collision or cancel-partial paths).
 
-**Phase to address:** Core async wrapper phase (introduce the dedicated limiter with the first offload), stress-tested in the Testing phase.
+**Phase to address:**
+Ingest phase (typed `Literal` mode, verbatim forwarding, mode-table docs). Verify with tests for each mode's error/success semantics against DuckDB, plus a documented (possibly xfail-annotated) note on partial-apply. Docs phase for the mode-safety and non-atomicity callouts.
 
 ---
 
-### Pitfall 7: Blocking checkout on an exhausted pool blocks the entire event loop
+### Pitfall 7: `fetch_df` / `fetch_polars` surface a raw `ModuleNotFoundError` from deep inside ADBC/pyarrow instead of an actionable error
 
 **What goes wrong:**
-SQLAlchemy `QueuePool.connect()` blocks (up to `timeout` seconds) when the pool is exhausted. If the async wrapper calls `pool.connect()` **directly** in a coroutine instead of via `to_thread`, that block freezes the whole event loop — every other coroutine (including ones that would release a connection) stalls, which can self-deadlock: the loop can't make progress to return a connection, so the blocking checkout never unblocks.
+Verified from upstream source: `fetch_df` delegates to `reader.read_pandas()`, which raises a raw `ModuleNotFoundError`/`ImportError` from **inside pyarrow's internals** when pandas is absent; `fetch_polars` does `import polars` inside the method and raises a bare `ModuleNotFoundError` from that line. Offloaded, this error crosses the worker→loop boundary *unchanged* (that is exactly what the `offload` chokepoint guarantees for `AdbcError` — EDGE-17 — and it applies equally to `ModuleNotFoundError`). The consumer gets `ModuleNotFoundError: No module named 'polars'` with a traceback pointing into ADBC/pyarrow, not into poolhouse, with no hint that pandas/polars is a user-supplied runtime dep they must install.
 
 **Why it happens:**
-`pool.connect()` looks cheap/instant in the common case (a free connection is available), so it's tempting to call it inline. The blocking only manifests under exhaustion, which is exactly the high-load case where it's catastrophic.
+The methods are pure pass-throughs; the natural implementation just offloads `self._cursor.fetch_df` and lets the error propagate (which the chokepoint faithfully does). Nobody adds a pre-check because "it's just a wrapper." The result is a confusing error for exactly the users this convenience method targets.
 
 **How to avoid:**
-- **Every** sync pool/connection/cursor call goes through `to_thread.run_sync` — no exceptions, including `connect()`, `close()`, `dispose()`. Audit for any bare sync call in async code.
-- Because checkout is offloaded, it consumes a limiter token while blocking — size the limiter so blocked checkouts don't starve in-flight queries (ties to Pitfall 6). Consider exposing the SQLAlchemy `timeout` so a blocked checkout fails fast rather than holding a token for 30s.
-- Add a lint/review rule: in the async module, importing or calling `QueuePool` methods outside a `to_thread` helper is forbidden.
+- **Pre-check the optional dependency before offloading** and raise a clear, actionable error naming the missing package — e.g. `find_spec("pandas") is None → raise ImportError("cursor.fetch_df() requires pandas; install it with `pip install pandas`")`. This mirrors how the library already treats drivers ("ADBC raises if absent") but upgrades the message from a raw deep import error to a one-line install instruction. Consistent with PKG-03's precedent (clear ImportError naming the missing piece).
+- **Do the check on the loop thread before the offload** (a `find_spec` is cheap, non-blocking) so the error is raised synchronously with a poolhouse-attributable frame, not from a worker thread deep in pyarrow.
+- **Do NOT catch-and-rewrap the offloaded error** as a fallback — that would risk clobbering a *genuine* runtime error from a partially-broken pandas install; the pre-check is the clean path, the chokepoint passes everything else through unchanged.
+- **`fetch_df` returns pandas via pyarrow's `read_pandas`; `fetch_polars` does `polars.from_arrow`** — both ultimately materialize (see Pitfall 8), so the same GIL caveat applies.
 
 **Warning signs:**
-Whole service goes unresponsive under load (not just slow — fully stalled); event-loop "task took N seconds" warnings; deadlock under exhaustion that a larger pool merely postpones.
+Users filing "No module named 'polars'" issues with tracebacks that never mention poolhouse; the convenience method being *less* friendly than raw ADBC; a test that only runs with pandas/polars installed (never asserts the clear-error path when absent).
 
-**Phase to address:** Core async wrapper phase (the offload helper that all calls route through is the prevention).
+**Phase to address:**
+**DataFrame-convenience phase.** Ship the pre-check + actionable `ImportError` from the first commit. Verify with a test that runs with pandas/polars *uninstalled* (or `find_spec` monkeypatched to `None`) and asserts the poolhouse-attributable error message names the extra/package.
 
 ---
 
-### Pitfall 8: asyncio-only idioms break under trio (the "anyio-neutral" promise is silently violated)
+### Pitfall 8: `fetch_df` / `fetch_polars` materialization partially serializes on the GIL — do not claim parallelism
 
 **What goes wrong:**
-The milestone promises asyncio+trio neutrality. Reaching for `loop.run_in_executor`, `asyncio.get_event_loop()`, `asyncio.Lock`, `asyncio.wait_for`, `asyncio.to_thread`, or `concurrent.futures` directly will work under asyncio tests and **raise or misbehave under trio** (no asyncio loop exists; `asyncio.Lock` isn't a trio synchronization primitive; `asyncio.to_thread` bypasses the anyio limiter entirely). Mixing `asyncio.to_thread` with anyio also escapes the dedicated limiter from Pitfall 6.
+SPIKE-02 (v1.4.0) established that pyarrow `Table` materialization partially serializes on the GIL. `fetch_df` (pyarrow → pandas) and `fetch_polars` (Arrow → polars via `from_arrow`) are *more* materialization, not less — a full Arrow pull plus a DataFrame conversion, both Python/C-API heavy. Concurrent `fetch_df` calls will serialize on the GIL during conversion and show little speedup, even though the underlying network pull parallelizes. The honest concurrency story is identical to `fetch_arrow_table`'s materialization caveat, arguably sharper.
 
 **Why it happens:**
-asyncio is the default mental model; its primitives are muscle memory. They appear to work because CI often runs asyncio first.
+DataFrame convenience *looks* like a fetch, and "async fetch = parallel fetch" is the over-generalized premise the v1.4.0 docs already had to walk back for `fetch_arrow_table`.
 
 **How to avoid:**
-- Use anyio primitives **exclusively**: `anyio.to_thread.run_sync`, `anyio.Lock`, `anyio.CancelScope`, `anyio.fail_after`, `anyio.from_thread` for any loop callback from a worker. No `import asyncio` in the library at all (enforce with a ruff/import-linter rule banning `asyncio` and `concurrent.futures` in the async module).
-- Parametrize the entire async test suite over both backends (`@pytest.mark.anyio` with params `["asyncio", "trio"]`) so a trio break fails CI immediately (see Pitfall 12).
-- Any cancellation/cancel-scope code must use anyio cancel scopes, not `asyncio.CancelledError` handling, since trio's cancellation exception differs.
+- **Reuse the v1.4.0 honest-concurrency framing verbatim**: async wins are largest for latency/I/O-bound work; DataFrame materialization is CPU/GIL-bound and partially serializes. Do not add a blanket "N concurrent DataFrames run in parallel" claim.
+- **Frame the win as loop-liveness**: `await cursor.fetch_df()` keeps the event loop responsive while a big DataFrame is built off-loop — that is the real, honest benefit, distinct from throughput parallelism.
 
 **Warning signs:**
-`RuntimeError: no running event loop`, `there is no current event loop`, or trio `TypeError`s only in the trio test leg; cancellation tests passing on asyncio but hanging on trio; `asyncio` appearing in the async module's imports.
+Benchmarks showing concurrent `fetch_df` no faster than serial; one core pinned during "concurrent" DataFrame builds; docs implying speedup that users don't observe.
 
-**Phase to address:** Core async wrapper phase (set the "anyio-only" rule + import ban up front); enforced continuously by the dual-backend test matrix.
+**Phase to address:**
+DataFrame-convenience phase (code is a thin wrapper; the deliverable is honest docs). Docs phase reflects the caveat, reusing the SPIKE-02 language.
 
 ---
 
-### Pitfall 9: Async wrappers typed loosely → basedpyright strict failures and a worse API than the sync side
+### Pitfall 9: pandas/polars accidentally enter poolhouse's runtime deps or import graph
 
 **What goes wrong:**
-Hand-typing each async wrapper as `async def execute(self, *args: Any, **kwargs: Any) -> Any` loses the precise signatures the sync API has and fails the project's basedpyright-strict gate (no implicit `Any`, no untyped returns). Conversely, a generic `to_thread` wrapper helper that returns the wrong awaitable type (`Awaitable` vs `Coroutine`, or losing `R`) produces cascading inference failures.
+Adding `fetch_df`/`fetch_polars` tempts a top-level `import pandas`/`import polars` (for a type annotation, an `isinstance` check, or a helper), or a new `[dataframe]` extra, or listing them in `[async]`/`[all]`. Any of these makes users who never touch DataFrames pay for pandas/polars — a heavy, transitive-dep-laden import — and breaks the "zero-cost for non-users" invariant the library holds for drivers. Even a `TYPE_CHECKING`-only import is fine; a *runtime* top-level import is the trap.
 
 **Why it happens:**
-Typing a function that turns `Callable[P, R]` into `Callable[P, Coroutine[Any, Any, R]]` needs `ParamSpec` + `Concatenate` and is unfamiliar. The 3-overload sync API (`config` / `driver_path` / `dbapi_module`) must be mirrored exactly on the async side, multiplying the surface.
+Type annotations want `-> pandas.DataFrame`; the natural reflex is a top-level import. The PEP 562 lazy-import machinery protects `import adbc_poolhouse` from pulling `anyio`, but does not automatically protect the `_async` submodule from pulling pandas once someone adds an import there.
 
 **How to avoid:**
-- Type the offload helper precisely: `async def _offload(fn: Callable[P, R], *args: P.args, **kwargs: P.kwargs) -> R` (Python ≥3.11 has `ParamSpec`/`Concatenate` natively — no `typing_extensions` needed). Use `Concatenate` when the helper injects `self`/limiter.
-- Return `R` from the helper (let `async def` make it a coroutine) rather than annotating a bare `Awaitable`; this preserves the result type for callers.
-- Mirror the sync `@overload` sets on `create_async_pool` / `managed_async_pool` one-for-one so the three call patterns keep precise types.
-- Run `basedpyright` in CI on the async module from the first commit; don't defer typing to a cleanup phase.
+- **Import pandas/polars ONLY under `TYPE_CHECKING`** for annotations (`if TYPE_CHECKING: import pandas`), returning `"pandas.DataFrame"` as a string forward-ref — exactly the pattern `_cursor.py` already uses for `pyarrow`.
+- **Never add pandas/polars to any extra.** They stay user-supplied runtime deps (charter: "pandas/polars stay user-supplied … consistent with how the library treats drivers"). `[async]` remains anyio-only (PKG-01).
+- **Add a guard-style test** asserting `import adbc_poolhouse` and even `import adbc_poolhouse._async` succeed with pandas AND polars uninstalled — the analogue of PKG-04's "sync suite passes with anyio absent." This is the zero-cost proof.
+- The optional-dep pre-check (Pitfall 7) uses `importlib.util.find_spec`, which does **not** import the module — so it is safe on the zero-cost path.
 
 **Warning signs:**
-`reportUnknownMemberType` / `reportAny` / `reportUnknownVariableType` from basedpyright on the async module; IDE autocomplete showing `Any` for awaited results; overloads on async functions not matching the sync ones.
+`import adbc_poolhouse` (or the async submodule) failing or slowing when pandas/polars is absent; pandas appearing in the dependency tree of a consumer who only uses `execute`; basedpyright resolving `pandas.DataFrame` via a runtime import rather than a `TYPE_CHECKING` block.
 
-**Phase to address:** Core async wrapper phase (typing is part of "done," per the project's strict gate). LOW correctness risk but HIGH gate-blocking risk.
+**Phase to address:**
+DataFrame-convenience phase (TYPE_CHECKING-only imports, no new extra). Verify with a no-pandas/no-polars import test in the Testing phase (extend the PKG-04 pattern).
 
 ---
 
-## Moderate Pitfalls
+## P2 Edge-Case Failure Modes (each test pins one; from ASYNC-EDGE-CASES.md)
 
-### Pitfall 10: `[async]` extra mis-scoped — sync users pay for anyio, or async import fails silently
+Each row: the mistake the test guards against, the warning sign, the prevention, and the owning phase. These are the deferred P2 items (EDGE-08, 13/14, 20, 22/23, 24, 31/32) plus the new streaming/ingest edge coverage. They cluster into an **Edge-hardening phase** unless noted, but several are cheapest to write *alongside* the method that motivates them.
 
-**What goes wrong:** anyio leaks into the always-installed import path (sync users now require anyio), or the async module imports at top level so `import adbc_poolhouse` fails when `[async]` isn't installed. **Avoid:** keep anyio imports inside the async submodule; guard the public async exports behind a lazy import / `try: import anyio` with a clear `ImportError("install adbc-poolhouse[async]")`; ensure the sync test job runs with anyio *not* installed to catch leakage. **Phase:** Packaging/extra phase.
+### EDGE-08 — trio checkpoint delivery at the offload boundary (no intervening checkpoint)
 
-### Pitfall 11: Async API drifts from sync API (parameters, defaults, behaviour diverge)
-**What goes wrong:** `create_async_pool` defaults (`pool_size=5`, `max_overflow=3`, `timeout=30`, `recycle=3600`, `pre_ping=False`) silently diverge from `create_pool`, or the async cursor exposes a different method set. **Avoid:** define the async signatures by referencing the sync defaults (single source of truth); add a test asserting the async public surface mirrors the sync one. **Phase:** Core async wrapper phase + Docs phase.
+- **Mistake:** Assuming a cancel set with no `await` between it and `await cursor.execute(...)` is delivered promptly under trio the way it is under asyncio. Trio delivers cancellation only at a checkpoint; if the wrapper did pure-sync work with no checkpoint, delivery would differ across backends.
+- **Warning sign:** A cancel-before-offload test passing on asyncio but the trio leg behaving differently (driver touched, or cancel not delivered at entry).
+- **Prevention:** The offload's limiter-acquire (`async with limiter`) is a checkpoint on both backends — verified in `_offload.py`. The test sets `scope.cancel()` then immediately `await execute(...)` with no intervening await and asserts on *both* backends the driver's `execute_call_count == 0` and the cancel class propagates. This proves anyio normalizes delivery; trio is the discriminating leg.
+- **Owning phase:** Edge-hardening phase (backend-parity guard; no production change expected, but it locks the invariant against future refactors of the offload entry).
 
-### Pitfall 12: Async concurrency tests that are flaky or don't actually test cancellation
-**What goes wrong:** Sleep-based "concurrency" tests pass/fail nondeterministically; cancellation tests that cancel an already-fast operation prove nothing (the op finished before the cancel). **Avoid:** use anyio's deterministic tools — `anyio.fail_after` with a driver/cassette that blocks predictably; for cancellation, assert the *driver* observed a cancel (`ADBC_STATUS_CANCELLED`) and the connection is cleanly back in the pool, not merely that the await returned. Run the existing pytest-adbc-replay cassettes under both asyncio and trio via `@pytest.mark.anyio` parametrization. Use anyio's `autojump_clock`/checkpoints rather than real `sleep` where possible. Avoid asserting on wall-clock timing for correctness. **Phase:** Testing phase.
+### EDGE-13 / EDGE-14 — contextvars copied into the worker; worker mutations do not leak back
+
+- **Mistake:** Building a bespoke thread (or reaching for `asyncio.to_thread`/`run_in_executor`) that drops the caller's `ContextVar` context, or a refactor that shares context so a worker's `cv.set(...)` bleeds back into the caller — cross-request contamination for consumers (dbt-open-sl, Semantic ORM) that set trace/request vars.
+- **Warning sign:** Structured logging in the driver layer losing trace correlation across the offload (EDGE-13); a caller's context var mysteriously changing after an `await` (EDGE-14).
+- **Prevention:** Keep using `anyio.to_thread.run_sync` (via the single `offload` chokepoint) — anyio copies the current context into the worker and does not propagate worker mutations back. EDGE-13 sets `cv` before an offload whose `fn` reads it and asserts the worker observed it; EDGE-14 has the worker `cv.set("inner")` and asserts the caller still reads `"outer"` after the await. The new methods route through the *same* `offload`, so they inherit this for free — the tests lock it in against a future non-anyio offload.
+- **Owning phase:** Edge-hardening phase (contextvar parity; cheap, backend-parametrized, no production change).
+
+### EDGE-20 — cleanup exception must not mask the body error (chain via `__context__`)
+
+- **Mistake:** In `__aexit__` (connection checkin, cursor close, or the new **reader `__aexit__`**), if the offloaded `close`/`invalidate` itself raises while the body already raised, letting the cleanup error *replace* the body error (hiding the root cause), or bailing on the cleanup error and *leaking* the connection/reader.
+- **Warning sign:** A `ValueError` from user code surfacing as an unrelated `AdbcError` from close; `checkedout()` not returning to 0 when both the body and cleanup raised.
+- **Prevention:** `__aexit__` closes/invalidates unconditionally (shielded) and lets the original body exception propagate with the cleanup error chained via `__context__` — never masking. `_cancel.py` already models the "surface the actionable error, don't mask" discipline (the `abort_error` handling). The **new reader `__aexit__` must follow the same rule** (this is Pitfall 2's exception path). Test: body raises `ValueError`, stub `close` raises `AdbcError`; assert `ValueError` escapes, close-error is in `__context__`, `checkedout() == 0`.
+- **Owning phase:** Owned by whichever `__aexit__` is newest — the **Arrow-streaming phase** for the reader CM (write the EDGE-20 test *with* the reader), plus the Edge-hardening phase for the existing connection/cursor `__aexit__`.
+
+### EDGE-22 / EDGE-23 — `__del__` warns, never "coroutine never awaited"; happy path emits no `RuntimeWarning`
+
+- **Mistake:** Giving the new `AsyncRecordBatchReader` (or any new wrapper) a `__del__` that tries to `await`/offload its close — impossible in `__del__` (no running loop, or loop gone), producing "coroutine was never awaited" / "no running event loop" noise, or crashing at interpreter shutdown. Or accidentally creating an un-awaited coroutine internally (e.g. a coroutine method called without `await` from a sync path).
+- **Warning sign:** `RuntimeWarning: coroutine '...' was never awaited` in logs from library code; exceptions escaping `__del__`; noise at interpreter shutdown for an un-closed reader.
+- **Prevention:** `__del__` must **only emit a `ResourceWarning`** (a clear leak signal) and rely on the pool reset to reclaim Arrow memory — never schedule an offload. The new reader wrapper especially needs this since a forgotten stream is the common leak (Pitfall 2). EDGE-23: run the full happy-path streaming/ingest/DataFrame lifecycle under `warnings.simplefilter("error", RuntimeWarning)` and assert no "coroutine never awaited" from library code (guards against a coroutine method accidentally called without `await`).
+- **Owning phase:** Arrow-streaming phase for the reader's `__del__` (it introduces the new un-closeable-in-`__del__` object); Edge-hardening phase for the happy-path `RuntimeWarning` sweep across all four new methods.
+
+### EDGE-24 — open pool / pending offload at loop shutdown raises no library-attributable noise
+
+- **Mistake:** A pending batch-pull or ingest offload (or an open stream holding a connection) at event-loop shutdown that tries to signal a dead loop (e.g. a `from_thread` bridge — note `cancellable_offload` uses `from_thread.run_sync` for the `on_dispatch` flag), raising "Task was destroyed but it is pending" / "no running event loop" attributable to poolhouse.
+- **Warning sign:** Stray `RuntimeError`/"Task was destroyed" at teardown when a stream or ingest was mid-flight; trio (stricter nursery semantics) surfacing it as the canary.
+- **Prevention:** The existing shutdown discipline (shielded checkin, non-abandoned workers) already covers `execute`/`fetch`; extend the EDGE-24 test to a **mid-stream** and **mid-ingest** shutdown — create the pool, start (don't complete) a blocked batch-pull/ingest, exit the test scope, assert no library-attributable exception. The `from_thread` bridge in `cancellable_offload` must tolerate a torn-down loop for the new long-running calls.
+- **Owning phase:** Edge-hardening phase, but the *scenarios* must cover the new streaming/ingest paths — so co-schedule after both methods exist.
+
+### EDGE-31 / EDGE-32 — `move_on_after(0)` boundary and deadline−ε over-cancellation
+
+- **Mistake:** EDGE-31: treating an already-expired `move_on_after(0)` as a no-op that skips the `adbc_cancel`/cleanup (leaving a blocked batch-pull/ingest live). EDGE-32: an off-by-one in deadline handling that cancels an op completing at deadline−ε, needlessly invalidating a healthy connection and churning the pool.
+- **Warning sign:** EDGE-31: a `move_on_after(0)` around a blocked stream that hangs or leaves `checkedout() != 0`. EDGE-32: fast streams/ingests spuriously invalidated under a timeout that they actually beat.
+- **Prevention:** The `cancellable_offload` design already keys cleanup off *actual* cancellation delivery (the `worker_started` + watcher model), not off "inside a timeout scope" — so a sub-deadline completion sets no `aborted_by_us` and skips `adbc_cancel`/invalidate (EDGE-32), and an expired `move_on_after(0)` delivers at the first checkpoint and runs the full `adbc_cancel`+invalidate (EDGE-31). The **new per-batch offloads and the ingest offload inherit this** — the tests must assert it for the streaming/ingest paths, not just `execute`. Use the virtual clock / event gating (EDGE-30 discipline; no positive-duration sleeps).
+- **Owning phase:** Edge-hardening phase, parametrized over the new methods (the machinery is unchanged; the coverage extends to streaming/ingest).
+
+---
+
+## Integration Pitfalls with v1.4.0 Machinery
+
+### Pitfall 10: Breaking the AST import-lint guard (accidental `asyncio` import or bare `to_thread`)
+
+- **What goes wrong:** A new-method implementation reaches for `asyncio` (e.g. `asyncio.to_thread` for the DataFrame conversion, or `asyncio.CancelledError` in a cancel handler), or calls `anyio.to_thread.run_sync` directly instead of routing through `offload()`, or uses `to_thread.run_sync(...)` without an explicit `limiter=`. `scan_async_package` (read from `guard.py`) flags `banned-asyncio-import`, `banned-asyncio-cancelled-error`, and `to_thread-without-limiter`, and the EDGE-25/28 meta-tests assert its findings list is empty.
+- **Prevention:** All four new methods offload **only** through the single `offload` / `cancellable_offload` chokepoint in `_offload.py`/`_cancel.py` — never call `to_thread.run_sync` directly (the guard's matcher is name-based; the one sanctioned literal lives in `_offload.py`). Use `anyio.get_cancelled_exc_class()`, never `asyncio.CancelledError`. Keep the `anyio.to_thread.run_sync` attribute chain un-aliased. Run `scan_async_package("src/adbc_poolhouse/_async/")` and assert `== []` as part of each new-method phase's gate.
+- **Warning sign:** The EDGE-25 meta-test failing with a `banned-asyncio-import` / `to_thread-without-limiter` finding pointing at a new-method file.
+- **Owning phase:** Every new-method phase (guard runs continuously); the guard itself is unchanged.
+
+### Pitfall 11: Bypassing the offload chokepoint / limiter for the new methods
+
+- **What goes wrong:** A per-batch streaming pull, an ingest, or a DataFrame conversion that does not route through `offload()` (borrowing the pool token) — e.g. a bare `to_thread`, an inline sync call on the loop, or a fresh un-limited `CapacityLimiter` — escapes the `pool_size + max_overflow` bound (CORE-02) and either blocks the loop (CORE-01) or over-admits concurrency.
+- **Prevention:** Every blocking call in the new methods goes through `offload`/`cancellable_offload` with the pool's `self._limiter` (the cursor already holds it). The streaming per-batch model borrows a transient token per `read_next_batch` and releases it between batches. Poison-recovery (`invalidate`) uses the dedicated 1-token teardown limiter (WR-03), not the pool limiter — so a cancelled stream/ingest recovery does not deadlock behind the worker it just aborted; the new reader wrapper must reuse `AsyncConnection.invalidate`, not roll its own.
+- **Warning sign:** EDGE-12 (strict-bound) failing when streams/ingests run; the thread-identity check (EDGE-25) showing a new-method call on the loop thread; a fresh limiter appearing in a new-method file.
+- **Owning phase:** Arrow-streaming and Ingest phases (get the offload routing right at construction); verified by extending EDGE-12/25 to the new methods.
+
+### Pitfall 12: Breaking the PEP 562 lazy-import zero-cost sync path
+
+- **What goes wrong:** A new import in the `_async` graph that pulls a heavy or optional dep eagerly (pandas/polars — Pitfall 9; or a top-level `pyarrow` where a `TYPE_CHECKING` ref suffices) so `import adbc_poolhouse` regresses from zero-cost, or the lazy `__getattr__`/`_LAZY_ASYNC_NAMES` set drifts if the new methods add public entry points at the package top level.
+- **Prevention:** The new methods are *cursor methods*, not new top-level entry points — they need **no** change to `__init__.py`'s `_LAZY_ASYNC_NAMES` or `__getattr__`. Keep pyarrow/pandas/polars imports `TYPE_CHECKING`-only. Preserve PKG-02/04: `import adbc_poolhouse` succeeds with anyio absent; the sync suite passes with anyio (and now pandas/polars) uninstalled.
+- **Warning sign:** The PKG-04 sync-without-anyio CI job failing; `import adbc_poolhouse` importing pandas; a new name leaking into the eager `__all__`.
+- **Owning phase:** DataFrame-convenience phase (highest risk — the DataFrame types tempt eager imports); guarded by the existing no-anyio import test extended to no-pandas/no-polars.
+
+### Pitfall 13: basedpyright-strict regressions from `RecordBatchReader` / DataFrame typing
+
+- **What goes wrong:** Typing the new surface loosely — `fetch_record_batch(self) -> Any`, an un-parameterized reader, `fetch_df() -> "pandas.DataFrame"` with pandas imported at runtime, or the `adbc_ingest` `data` param as `object` — trips basedpyright strict (`reportAny`, `reportUnknownMemberType`) or gives a worse API than the sync side. The `_SyncCursor` Protocol in `_cursor.py` must gain the four new method signatures (structurally typed, driver-agnostic).
+- **Prevention:** Extend the `_SyncCursor` Protocol with `fetch_record_batch() -> pyarrow.RecordBatchReader`, `fetch_df() -> pandas.DataFrame`, `fetch_polars() -> polars.DataFrame`, and `adbc_ingest(table_name, data, mode, ...) -> int`, all under `TYPE_CHECKING` string annotations. Type `mode` as the exact `Literal['append','create','replace','create_append']`. Type the `data` param as the ADBC union (`RecordBatch | Table | RecordBatchReader | <capsule>`). Return precise types (the `AsyncRecordBatchReader` wrapper, `pandas.DataFrame`, `polars.DataFrame`, `int`). Run `basedpyright` strict on the new files from the first commit (project gate).
+- **Warning sign:** `reportAny`/`reportUnknownMemberType` on the new methods; IDE showing `Any` for an awaited DataFrame; the `_SyncCursor` Protocol missing a new method (a `cast` papering over it). Note the MEMORY caveat: trust `.venv/bin/basedpyright` (0 errors) over harness Pyright's false import-resolution errors.
+- **Owning phase:** Each new-method phase (typing is part of "done"); the Protocol extension lands with the first new method.
+
+### Pitfall 14: mkdocs `--strict` autoref failures for new symbols
+
+- **What goes wrong:** New public symbols (`AsyncRecordBatchReader`, the four methods) with cross-references (`[...][adbc_poolhouse._async...]`) that don't resolve, missing from the API-reference nav, or docstrings with RST `:role:` syntax (the MEMORY-documented rogue-colon trap) — `uv run mkdocs build --strict` fails, and per CLAUDE.md docs are a completion requirement for every phase ≥ 7.
+- **Prevention:** Add each new public symbol to the mkdocstrings API reference; use Markdown (not RST) in docstrings; use `Example:` (singular) with fenced `python` blocks for the admonition (per MEMORY); verify every autoref resolves. Run `.venv/bin/mkdocs build --strict` (sandbox-safe per MEMORY) as a phase gate. Include the docs-author skill (`@.claude/skills/adbc-poolhouse-docs-author/SKILL.md`) in every phase ≥ 7 execution context.
+- **Warning sign:** `mkdocs build --strict` reporting an unresolved autoref or a symbol missing from the reference; rogue colons in rendered docstrings from RST `:func:` syntax.
+- **Owning phase:** Each new-method phase (docs are a per-phase completion gate); a consolidated Docs pass for the streaming guide + honest-concurrency updates.
 
 ---
 
@@ -227,103 +304,120 @@ Typing a function that turns `Callable[P, R]` into `Callable[P, Coroutine[Any, A
 
 | Shortcut | Immediate Benefit | Long-term Cost | When Acceptable |
 |----------|-------------------|----------------|-----------------|
-| One mega-offload (checkout+execute+fetch+checkin in a single `to_thread`) | Trivial to write; no per-call lock needed | Cancellation can't interrupt mid-way; no concurrency *within* a connection lifecycle; nested-offload deadlock risk if cleanup offloads | Never for the real API; OK only as a throwaway feasibility spike |
-| `abandon_on_cancel=True` everywhere instead of wiring `adbc_cancel` | Timeouts "work" immediately | Abandoned threads hold pool connections mid-query → corruption (Pitfall 1) | Never on connection-bearing calls; acceptable only for genuinely fire-and-forget pure-compute offloads |
-| Reuse anyio's default global 40-token limiter | One less object to manage | Throughput cap + cross-app starvation + sizing mismatch (Pitfall 6) | Only for a prototype with `pool_size` ≪ 40 and no other `to_thread` users |
-| `Any`-typed async wrappers to pass quickly | Fast to a green test run | basedpyright-strict gate fails; worse DX than sync API | Never (project gate forbids) |
-| Closing connections instead of invalidating on cancel | Simpler cleanup | Throws away healthy pooled connections on every timeout → pool churn | Acceptable as a conservative interim until `adbc_cancel` join is proven |
+| Return the bare `RecordBatchReader` across the await boundary | No wrapper to write; "just offload `fetch_record_batch`" | Use-after-checkin segfaults (Pitfall 1), native leak (Pitfall 2), no per-batch cancel (Pitfall 4) | **Never** — the reader wrapper is the feature |
+| Offload the whole `for batch in reader` loop as one mega-offload | Trivial; no per-batch plumbing | Defeats backpressure, un-cancellable mid-stream, holds the token for the whole drain | **Never** for the real API; only a throwaway spike |
+| Let `fetch_df`/`fetch_polars` surface the raw deep `ModuleNotFoundError` | Zero code — pure pass-through | Confusing error for exactly the target users (Pitfall 7) | Only until the pre-check lands — treat as a same-phase must-fix |
+| Top-level `import pandas`/`import polars` for the return annotation | `-> pandas.DataFrame` "just works" | Breaks zero-cost sync path; every user pays for pandas (Pitfall 9) | **Never** — use `TYPE_CHECKING` string refs |
+| Default `adbc_ingest` mode to `append` "because it's friendlier" | Fewer "table exists" errors | Diverges from ADBC default (`create`); silent behavior mismatch vs raw ADBC | **Never** — mirror the sync/ADBC default exactly |
+| Skip per-batch `cancellable_offload`; wire cancel only on the initial `fetch_record_batch` | Less plumbing | A mid-stream timeout hangs or leaves the statement live (Pitfall 4) | **Never** on a connection-bearing streaming call |
 
 ## Integration Gotchas
 
 | Integration | Common Mistake | Correct Approach |
 |-------------|----------------|------------------|
-| SQLAlchemy `QueuePool` | Reaching for `AsyncAdaptedQueuePool` as the foundation | It's asyncio-bound and does NOT provide thread-offload; use it only as a reference. Keep the sync `QueuePool` and offload around it (per PROJECT.md decision) |
-| SQLAlchemy `reset` event | Building a parallel async cleanup path that bypasses `_release_arrow_allocators` | Route async checkin through the same connection-return path so the existing `reset` listener fires — symmetric with sync |
-| ADBC `adbc_cancel` | Calling it under the per-connection lock (treating it like a normal op) | Cancel is the documented thread-safe exception — call it concurrently, WITHOUT the serialization lock, from the loop thread |
-| ADBC connection | Sharing one `AsyncConnection` across concurrent tasks "because GIL" | Concurrent access is UB even with the GIL (driver releases it); one logical owner per connection + per-connection lock |
-| anyio worker thread → loop | Using `asyncio.Event`/queues to signal from worker thread | Use `anyio.from_thread.run_sync`; raw asyncio primitives aren't trio-safe and aren't thread-safe to call into |
-| pytest-adbc-replay cassettes | Assuming cassette replay is thread-safe under concurrent offloads | The monkeypatched dbapi may not tolerate concurrent calls; serialize per-connection in tests too, and verify the replay layer under the dual-backend matrix |
+| ADBC `fetch_record_batch` | Treating the returned reader like `fetch_arrow_table`'s self-owning `Table` | It is bound to the live statement handle (`self._results.reader._reader`); wrap it, tie lifetime to the connection, close in `__aexit__` |
+| ADBC `_blocking_call(..., self._stmt.cancel)` inside `fetch_df`/`fetch_record_batch` | Assuming ADBC's own cancel loop works on the worker thread | It needs a running loop it won't have on the worker; **our** `cancellable_offload` + `adbc_cancel` is the cancellation path |
+| ADBC `adbc_ingest` mode | Using `replace` to "ensure the table exists" | `replace` **drops** the table first; use `create_append` for create-if-absent-then-insert |
+| pyarrow `read_pandas` (backing `fetch_df`) | Expecting a clear "install pandas" error | Raises a raw `ModuleNotFoundError` from pyarrow internals; pre-check with `find_spec` and raise an actionable error first |
+| v1.4.0 `offload` chokepoint | Calling `anyio.to_thread.run_sync` directly for a new method | Route through `offload`/`cancellable_offload` so the `scan_async_package` guard still audits one site and the limiter is honored |
+| v1.4.0 `AsyncConnection.invalidate` | Rolling a bespoke poison-recovery for a cancelled stream/ingest | Reuse `invalidate` (dedicated teardown limiter, WR-03) so recovery never deadlocks behind the aborted worker |
+| SQLAlchemy `reset` event (`_release_arrow_allocators`) | Relying on it as the *only* thing that frees a reader | It is the safety net; the reader `__aexit__` must close the reader promptly and symmetrically |
 
 ## Performance Traps
 
 | Trap | Symptoms | Prevention | When It Breaks |
 |------|----------|------------|----------------|
-| GIL re-acquired during Arrow/row materialization | "Concurrent" big-result fetches don't parallelize; one core pinned | Set expectations: async wins on I/O-bound queries; benchmark fetch paths (Pitfall 3) | Fetch-heavy workloads with large `fetch_arrow_table` results |
-| Thread-hop overhead on tiny queries | Async slower than sync for `SELECT 1`-style calls | Don't claim universal speedup; offload is for latency-bound work | Many tiny queries where round-trip ≪ thread-hop cost |
-| Limiter < pool concurrency | Throughput plateaus at 40; checkouts queue | Dedicated limiter sized to `pool_size + max_overflow` (Pitfall 6) | `pool_size + max_overflow > 40` or shared global limiter |
-| Holding connection while awaiting unrelated offload | Limiter tokens exhausted; deadlock under load | Don't await other offloads while holding a connection; keep offloads flat | High concurrency with nested async work |
+| Stream pins a connection for its whole lifetime | Pool exhausted with few concurrent streams; `checkedout()` stays high | Document the cost; size pool for concurrent open streams (Pitfall 3) | Several concurrent long-lived streams on a small pool |
+| Concurrent `adbc_ingest` serializes on the GIL during Arrow traversal | "Parallel" ingests no faster; one core pinned | Frame the win as loop-liveness, not throughput; don't claim parallelism (Pitfall 5) | Write-heavy workloads with large in-memory tables |
+| Concurrent `fetch_df`/`fetch_polars` serialize on GIL during DataFrame conversion | Concurrent DataFrame builds no faster than serial | Reuse the SPIKE-02 materialization caveat; document honestly (Pitfall 8) | Fetch-heavy DataFrame workloads |
+| Per-batch offload overhead on a fine-grained stream | Streaming slower than a single `fetch_arrow_table` for small results | Note that `fetch_arrow_table` is better for results that fit in memory; streaming is for backpressure | Many tiny batches where thread-hop ≫ pull cost |
 
 ## Security Mistakes
 
 | Mistake | Risk | Prevention |
 |---------|------|------------|
-| Logging `db_kwargs` / connection strings when surfacing async errors | Credential leak in async stack traces | Reuse the sync error-handling discipline; never log resolved kwargs in the async layer |
-| Returning a possibly-busy connection to the pool after cancel | Next task (possibly different tenant/credentials context) inherits a connection in an unknown state | Invalidate-on-uncertain-cancel (Pitfall 1/4); never return a connection whose worker thread hasn't joined |
+| Logging `data` contents or `table_name` when surfacing an `adbc_ingest` error | Leaking ingested row data / schema into stack traces | Reuse the sync error-handling discipline; the chokepoint passes the error through un-augmented — do not add logging of the payload |
+| Returning a poisoned connection after a cancelled ingest/stream | Next task inherits a connection with an aborted transaction / partial ingest | Invalidate-on-cancel (existing machinery); never return a connection whose worker hasn't joined |
+| Partial-apply ingest leaving rows in a shared table after a timeout | Downstream reads see half-written data across tenants | Document non-atomicity (Pitfall 6); advise staging-table or explicit-transaction ingest for atomic needs |
 
 ## UX Pitfalls
 
 | Pitfall | User Impact | Better Approach |
 |---------|-------------|-----------------|
-| Async guide implies blanket parallelism | Users expect CPU-bound fetch speedups they won't get | Document I/O-bound vs materialization honestly (Pitfall 3) |
-| No `managed_async_pool()` / `async with` for connections | Users leak connections on the error path | Ship async context managers as the primary, sanctioned API |
-| Unclear that one `AsyncConnection` = one task | Users share connections, hit UB | Document single-owner rule prominently in the async guide |
-| Cancellation appears to work but query keeps running on the warehouse | Surprise warehouse costs / locks held | Make `adbc_cancel` wiring real and documented; note the cost of cancellation |
+| Reader dangles after `async with` exit | Segfault / opaque "statement closed" on post-block consumption | Reader is its own `async with`; document that the stream holds the connection |
+| Raw `ModuleNotFoundError` from `fetch_df`/`fetch_polars` | User can't tell pandas/polars is a user-supplied dep | Pre-check + actionable `ImportError` naming the package (Pitfall 7) |
+| `adbc_ingest(mode='replace')` silently drops a table | Data loss | Document the mode table verbatim (esp. `replace` = drop); typed `Literal` |
+| Docs imply concurrent ingests / DataFrames parallelize | Users expect throughput they won't get | Honest per-operation concurrency framing (Pitfalls 5, 8) |
+| Cancellation of a stream/ingest appears clean but the warehouse op ran / partial rows remain | Surprise cost / partial data | Real `adbc_cancel` wiring per batch (Pitfall 4) + non-atomicity note (Pitfall 6) |
 
 ## "Looks Done But Isn't" Checklist
 
-- [ ] **Cancellation:** await returns on timeout — but verify the *warehouse-side query actually stops* (not just the await). Check via a driver that reports `ADBC_STATUS_CANCELLED`.
-- [ ] **Connection return on cancel:** happy-path checkin works — but verify checkin on the cancel and exception paths, with `pool.checkedout() == 0` afterwards.
-- [ ] **trio leg:** asyncio tests green — but run the *same* suite under trio; cancellation especially diverges.
-- [ ] **Limiter:** offloads work — but verify a *dedicated* limiter is used (not the global 40) and is sized to the pool.
-- [ ] **Per-connection serialization:** single-task tests pass — but add a test that two coroutines sharing one connection are serialized (or rejected), not racing.
-- [ ] **Arrow memory:** functional fetch works — but run a sustained loop and assert RSS/allocator stats stabilize.
-- [ ] **Sync untouched:** async added — but run the sync suite with anyio *not installed* to prove zero impact and correct `[async]` gating.
-- [ ] **Typing:** code runs — but `basedpyright` strict passes on the async module with no new `Any`.
-- [ ] **Reset symmetry:** async cleanup runs — but confirm the existing `reset` listener (`_release_arrow_allocators`) still fires on async checkin.
+- [ ] **fetch_record_batch:** reader returned and iterable — but verify consuming it *after* the `async with` block raises a clear typed error, not a segfault (Pitfall 1).
+- [ ] **fetch_record_batch:** happy stream drains — but verify a *partially-consumed-then-abandoned* reader releases Arrow allocators (memory-stability loop, Pitfall 2).
+- [ ] **fetch_record_batch:** cancel works on the first pull — but verify a mid-stream (Nth batch) cancel fires `adbc_cancel` once, invalidates, `checkedout()==0`, under **both** backends (Pitfall 4).
+- [ ] **fetch_record_batch:** stream works on one connection — but verify holding it mid-stream while awaiting another offload doesn't self-deadlock at the bound (EDGE-11 extension, Pitfall 3).
+- [ ] **adbc_ingest:** ingests into a fresh table — but verify each `mode` (append/create/replace/create_append) does the documented thing, and `replace` really drops (Pitfall 6).
+- [ ] **adbc_ingest:** default mode set — but verify it is `create` (the ADBC default), not a divergent "friendlier" default (Pitfall 6).
+- [ ] **adbc_ingest:** cancellation invalidates the connection — but document that partial rows may remain (backend-specific; not transactional) (Pitfall 6).
+- [ ] **fetch_df / fetch_polars:** works with pandas/polars installed — but verify the *absent* case raises a poolhouse-attributable `ImportError` naming the package, not a raw deep `ModuleNotFoundError` (Pitfall 7).
+- [ ] **fetch_df / fetch_polars:** methods added — but verify `import adbc_poolhouse` (and `_async`) still succeed with pandas AND polars uninstalled (Pitfall 9).
+- [ ] **All four:** offloaded — but verify each routes through `offload`/`cancellable_offload` with the pool limiter (thread-id check EDGE-25; strict-bound EDGE-12) (Pitfall 11).
+- [ ] **All four:** typed — but verify `basedpyright` strict (via `.venv/bin/basedpyright`) passes and the `_SyncCursor` Protocol gained the new signatures (Pitfall 13).
+- [ ] **All four:** documented — but verify `mkdocs build --strict` passes with the new autorefs and the honest-concurrency framing (Pitfall 14).
+- [ ] **Guard:** new code merged — but verify `scan_async_package("src/adbc_poolhouse/_async/") == []` (no asyncio import, no bare to_thread) (Pitfall 10).
 
 ## Recovery Strategies
 
 | Pitfall | Recovery Cost | Recovery Steps |
 |---------|---------------|----------------|
-| Cancelled query keeps running / pool corruption (1) | HIGH | Add `adbc_cancel` wiring + join-before-return; invalidate-on-uncertain; reproduce with a deterministic slow-query cassette/driver |
-| Concurrent connection access (2) | HIGH | Add per-connection `anyio.Lock`; document single-owner; audit for shared `AsyncConnection` usage |
-| GIL premise wrong for fetch (3) | MEDIUM | Re-scope docs/expectations; possibly chunk fetches; no code rewrite if offload still helps I/O-bound paths |
-| Connection leak on error/cancel (4) | MEDIUM | Shield checkin; route through sync return path; add `checkedout()==0` assertions to tests |
-| Arrow leak (5) | MEDIUM | Make cursor an async CM; ensure reset listener fires; add memory-stability test |
-| Limiter mismatch/deadlock (6) | MEDIUM | Introduce dedicated limiter sized to pool; flatten nested offloads |
-| Event-loop block on checkout (7) | LOW | Route `connect()` through `to_thread`; add import-ban lint |
-| trio breakage (8) | LOW–MEDIUM | Replace asyncio primitives with anyio; add trio test leg |
-| Typing gate (9) | LOW | Add `ParamSpec`/`Concatenate` helper; mirror overloads |
+| Reader use-after-checkin (1) | HIGH | Add the `AsyncRecordBatchReader` lifetime wrapper; tie to connection; add post-checkin-consumption test; reproduce segfault on a networked backend |
+| Reader Arrow allocator leak (2) | MEDIUM | Close reader in `__aexit__`; add streaming memory-stability loop; `ResourceWarning` on `__del__` |
+| Stream connection starvation (3) | MEDIUM | Document the hold cost; per-batch transient-token; extend EDGE-11 to streaming |
+| Mid-stream cancel leaves statement live (4) | HIGH | Wire per-batch `cancellable_offload` + `adbc_cancel` + invalidate; shield reader-close; reproduce with a blocking `read_next_batch` stub |
+| Ingest GIL / cancel framing (5) | LOW–MEDIUM | Route ingest through `cancellable_offload`; re-scope docs; optional write-side micro-benchmark |
+| Ingest mode misuse / partial-apply (6) | MEDIUM | Typed `Literal` mode; verbatim default; document `replace`=drop and non-atomicity |
+| Raw ModuleNotFoundError from DataFrame methods (7) | LOW | Add `find_spec` pre-check + actionable ImportError; test the absent path |
+| DataFrame materialization framing (8) | LOW | Reuse SPIKE-02 caveat in docs |
+| pandas/polars in import graph (9) | LOW | Move to `TYPE_CHECKING`; drop any new extra; add no-pandas/no-polars import test |
+| Guard / chokepoint / lazy-import / typing / docs regressions (10–14) | LOW | Route through existing chokepoint; TYPE_CHECKING imports; run guard + basedpyright + mkdocs --strict as phase gates |
 
 ## Pitfall-to-Phase Mapping
 
-Recommended phase order puts the feasibility spike first (validate the GIL premise), then the core wrapper (which must ship the lock, dedicated limiter, offload-everything rule, typing, and symmetric cleanup together), then a dedicated cancellation phase (highest correctness risk), then testing, then packaging/docs.
+Recommended phase order: **Arrow-streaming first** (highest risk; its reader-lifetime design informs the ingest/DataFrame patterns and introduces the new `__aexit__`/`__del__` edge surfaces), then **Ingest**, then **DataFrame-convenience**, then a consolidated **Edge-hardening** phase for the remaining P2 items, then **Docs** (honest-concurrency + streaming guide). Several P2 edge tests are cheapest to write *inside* the method phase that motivates them (noted below).
 
 | Pitfall | Prevention Phase | Verification |
 |---------|------------------|--------------|
-| 3. GIL premise unvalidated | Phase A — Feasibility spike (first) | Benchmark: concurrent slow-query vs large-fetch wall-clock vs ideal |
-| 2. Thread-affinity / concurrent access | Phase B — Core async wrapper | Test: two coroutines on one connection are serialized; stress on Snowflake-replay |
-| 4. Leak on error path | Phase B — Core async wrapper | Test: exception during use → `pool.checkedout()==0` |
-| 5. Arrow leak | Phase B — Core async wrapper | Sustained-load memory-stability test; reset listener fires on async checkin |
-| 6. Limiter mismatch/deadlock | Phase B — Core async wrapper | Assert dedicated limiter sized to pool; high-concurrency stress without deadlock |
-| 7. Event-loop block on checkout | Phase B — Core async wrapper | Import-ban lint; exhausted-pool test doesn't stall the loop |
-| 8. trio divergence | Phase B — Core async wrapper | Dual-backend (asyncio+trio) test matrix green |
-| 9. Typing under strict | Phase B — Core async wrapper | `basedpyright` strict passes; overloads mirror sync |
-| 1. Cancellation correctness | Phase C — Cancellation (dedicated) | Deterministic test: cancel → warehouse query actually stops + clean checkin |
-| 11. API drift | Phase B + Docs phase | Test asserting async surface mirrors sync defaults/methods |
-| 10. `[async]` extra scoping | Phase D — Packaging/extra | Sync suite passes with anyio uninstalled; async import errors cleanly without extra |
-| 12. Flaky/non-deterministic async tests | Phase E — Testing | Deterministic anyio clocks; dual-backend cassette replay; assert real cancellation |
+| 1. Reader use-after-checkin | Arrow-streaming | Post-checkin consumption raises a clear typed error (DuckDB), not a segfault |
+| 2. Reader Arrow leak | Arrow-streaming (verify: Testing) | Partial-consume-then-abandon ×N; allocator stats stabilize |
+| 3. Stream connection starvation | Arrow-streaming | EDGE-11 extended to a held mid-stream connection; watchdog never trips |
+| 4. Mid-stream cancel | Arrow-streaming | Blocking `read_next_batch` stub; Nth-batch cancel → one `adbc_cancel`, invalidate, `checkedout()==0`, both backends |
+| EDGE-20 (reader `__aexit__` chain) | Arrow-streaming | Body `ValueError` + reader-close `AdbcError` → `ValueError` escapes, chained, `checkedout()==0` |
+| EDGE-22/23 (reader `__del__`) | Arrow-streaming | Un-closed reader → `ResourceWarning`, no "coroutine never awaited", no crash |
+| 5. Ingest GIL / cancel | Ingest | Ingest routed through `cancellable_offload`; honest docs; optional write micro-benchmark |
+| 6. Ingest mode / partial-apply | Ingest | Per-mode semantics test (esp. `replace`=drop); documented non-atomicity |
+| 7. DataFrame raw ImportError | DataFrame-convenience | Absent-pandas/polars path raises poolhouse-attributable ImportError |
+| 8. DataFrame materialization framing | DataFrame-convenience (verify: Docs) | Docs reflect the GIL caveat |
+| 9. pandas/polars in import graph | DataFrame-convenience | `import adbc_poolhouse`/`_async` succeed with pandas+polars absent |
+| EDGE-08 (trio checkpoint delivery) | Edge-hardening | Cancel-before-offload; driver untouched on both backends |
+| EDGE-13/14 (contextvars) | Edge-hardening | Worker sees caller's cv; worker mutation doesn't leak back |
+| EDGE-24 (loop-shutdown noise) | Edge-hardening (scenarios cover streaming+ingest) | Mid-stream / mid-ingest teardown raises no library-attributable exception |
+| EDGE-31/32 (deadline boundary) | Edge-hardening (extended to new methods) | `move_on_after(0)` cancels a blocked pull cleanly; deadline−ε not over-cancelled |
+| 10. Import-lint guard | every new-method phase | `scan_async_package(_async/) == []` |
+| 11. Bypassing chokepoint/limiter | Arrow-streaming + Ingest | EDGE-12/25 extended to new methods |
+| 12. Lazy-import zero-cost path | DataFrame-convenience | PKG-04 job extended to no-pandas/no-polars |
+| 13. basedpyright-strict typing | every new-method phase | `.venv/bin/basedpyright` strict = 0 errors; `_SyncCursor` Protocol extended |
+| 14. mkdocs --strict autoref | every new-method phase + Docs | `mkdocs build --strict` passes |
 
 ## Sources
 
-- [ADBC Concurrency and Thread Safety](https://arrow.apache.org/adbc/main/cpp/concurrency.html) — authoritative serialization rule: *"serialized access from multiple threads... do not allow concurrent access."* (HIGH)
-- [adbc_driver_manager (Python dbapi reference)](https://arrow.apache.org/adbc/main/python/api/adbc_driver_manager.html) — *"Connections are not thread-safe... serialize accesses"*; `Connection.adbc_cancel()` / `Cursor.adbc_cancel()`; close-or-leak note. (HIGH)
-- [ADBC Statement API — Cancel](https://arrow.apache.org/adbc/main/cpp/api/group__adbc-statement.html) — *"Cancel execution of an in-progress query... This must always be thread-safe (other operations are not)."* (HIGH)
-- [anyio — Working with threads](https://anyio.readthedocs.io/en/stable/threads.html) — default 40-token process-wide limiter; `abandon_on_cancel`: *"the thread will still continue running – only its outcome will be ignored"*; `from_thread`. (HIGH)
-- [PEP 612 — ParamSpec / Concatenate](https://peps.python.org/pep-0612/) and [typing docs](https://docs.python.org/3/library/typing.html) — typing sync→async wrappers. (HIGH)
-- adbc-poolhouse source: `_pool_factory.py` (`_release_arrow_allocators` reset listener, `close_pool`, defaults), `_driver_api.py` (dbapi connect shapes) — basis for "symmetric cleanup" and per-backend genericity. (HIGH, direct read)
-- ADBC GIL-release per operation: not explicitly documented per-method — premise inferred from native (Rust/C/Go) drivers releasing the GIL around blocking calls; flagged for empirical validation in Phase A. (MEDIUM)
+- [adbc_driver_manager (Python dbapi reference)](https://arrow.apache.org/adbc/main/python/api/adbc_driver_manager.html) — `fetch_record_batch() -> RecordBatchReader`, `fetch_df() -> pandas.DataFrame`, `adbc_ingest(table_name, data, mode=Literal['append','create','replace','create_append'], *, catalog_name, db_schema_name, temporary) -> int`; mode semantics (append=error-if-absent, create=error-if-exists, create_append=create-if-absent-then-insert, replace=drop-then-create); returns rows inserted or -1. (HIGH)
+- Upstream `apache/arrow-adbc` `python/adbc_driver_manager/adbc_driver_manager/dbapi.py` read directly: `fetch_record_batch` returns `self._results.reader._reader` (bound to the statement, "can only be called once"); `fetch_df` delegates to `read_pandas` via `_blocking_call(..., self._stmt.cancel)` → raw `ModuleNotFoundError` from pyarrow if pandas absent; `fetch_polars` does an in-method `import polars` → raw `ModuleNotFoundError`; `adbc_ingest` maps `mode` to `_lib.INGEST_OPTION_MODE_*` and calls `set_options`. (HIGH)
+- adbc-poolhouse source read directly: `_async/_offload.py` (single chokepoint, transient-token model, `on_dispatch` CR-01), `_async/_cancel.py` (`cancellable_offload`, watcher/worker task group, `worker_started`, `aborted_by_us`, `on_abort=invalidate`, shielded `adbc_cancel`), `_async/_cursor.py` (`_SyncCursor` Protocol, `fetch_arrow_table` materialized-Table pattern, shielded `close`), `_async/_connection.py` (`_in_use` guard, `invalidate` with dedicated teardown limiter WR-03, shielded checkin), `tests/_async_harness/guard.py` (`scan_async_package` rules: banned-asyncio-import, to_thread-without-limiter, banned-asyncio-cancelled-error), `__init__.py` (PEP 562 `__getattr__` / `_LAZY_ASYNC_NAMES`). (HIGH)
+- `.planning/research/ASYNC-EDGE-CASES.md` — P2 edge designs (EDGE-08, 13/14, 20, 22/23, 24, 31/32) and the verified anyio/trio semantics they rest on. (HIGH)
+- v1.4.0 `.planning/milestones/v1.4.0-research/PITFALLS.md` + `SUMMARY.md` — SPIKE-02 finding that pyarrow materialization partially serializes on the GIL (basis for the ingest/DataFrame honest-concurrency caveats); the five headline v1.4.0 risks this document extends. (HIGH)
+- v1.4.0 `REQUIREMENTS.md` — shipped invariants the new methods must not break: EDGE-21 (result-valid-after-checkin, materialized only), ACONN-06 (reset symmetry), CORE-01/02/03 (offload discipline), PKG-01/02/04 (extra scoping + zero-cost sync path). (HIGH)
+- Project `MEMORY.md` / `CLAUDE.md` — basedpyright via `.venv/bin/basedpyright` (harness Pyright false import errors), `mkdocs build --strict` via `.venv/bin/mkdocs`, Google-style Markdown docstrings (no RST roles), docs-author skill as a per-phase completion gate ≥ Phase 7. (HIGH)
 
 ---
-*Pitfalls research for: anyio thread-offload async layer over sync ADBC + SQLAlchemy QueuePool (adbc-poolhouse v1.4.0)*
-*Researched: 2026-06-25*
+*Pitfalls research for: v1.5.0 async cursor completion (fetch_record_batch, adbc_ingest, fetch_df, fetch_polars + P2 async edge-case tests) over the v1.4.0 anyio thread-offload async layer of adbc-poolhouse.*
+*Researched: 2026-07-01*
