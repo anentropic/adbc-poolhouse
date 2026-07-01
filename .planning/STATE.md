@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.5.0
 milestone_name: Async Cursor Completion
 status: executing
-stopped_at: Completed 29-02-PLAN.md — AsyncConnection two-tier reader guard (persistent _reader_open lifetime flag + keyword-only from_reader exemption on _enter_offload/_offloading, D-29-09/10/11). Foreign callers rejected on _in_use OR _reader_open; reader pulls exempt from the _reader_open tier only. Every existing call site unchanged (from_reader defaults False). Guard proven by tests/async/test_reader_guard.py (9 GREEN); end-to-end test_reader_busy.py stays RED until plan 03's fetch_record_batch.
-last_updated: "2026-07-01T16:52:00Z"
-last_activity: 2026-07-01 -- Completed Phase 29 Plan 02 (AsyncConnection two-tier reader guard)
+stopped_at: Completed 29-03-PLAN.md — AsyncRecordBatchReader (composition over the sync pyarrow.RecordBatchReader, D-29-01) + AsyncCursor.fetch_record_batch. Per-pull cancellable_offload(from_reader=True); worker-side StopIteration→_EXHAUSTED sentinel (D-29-05); shielded idempotent close clearing _reader_open in finally (EDGE-20); warn-only __del__ (D-29-15); _reader_open set success-only OUTSIDE the creation span (Pitfall 5); cursor's own _adbc_cancel threaded in (Pitfall 4). All reader tests GREEN on asyncio+trio (Snowflake A1-skipped), looped x15 = 0 hangs. Rule-1 fix: AsyncConnection.invalidate now clears _reader_open. basedpyright strict 0 errors; import-lint + pkg-import guards green; mkdocs --strict clean.
+last_updated: "2026-07-01T17:50:00Z"
+last_activity: 2026-07-01 -- Completed Phase 29 Plan 03 (AsyncRecordBatchReader + fetch_record_batch)
 progress:
   total_phases: 5
   completed_phases: 0
   total_plans: 4
-  completed_plans: 2
-  percent: 50
+  completed_plans: 3
+  percent: 75
 ---
 
 # Project State
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-07-01)
 ## Current Position
 
 Phase: 29 (arrow-streaming) — EXECUTING
-Plan: 3 of 4
-Status: Executing Phase 29 (Plan 02 complete — AsyncConnection two-tier reader guard)
-Last activity: 2026-07-01 -- Completed Phase 29 Plan 02 (AsyncConnection two-tier reader guard)
+Plan: 4 of 4
+Status: Executing Phase 29 (Plan 03 complete — AsyncRecordBatchReader + fetch_record_batch)
+Last activity: 2026-07-01 -- Completed Phase 29 Plan 03 (AsyncRecordBatchReader + fetch_record_batch)
 
-Progress: [█████░░░░░] 50%
+Progress: [███████░░░] 75%
 
 ## Accumulated Context
 

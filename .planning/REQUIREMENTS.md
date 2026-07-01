@@ -17,11 +17,11 @@ Scope constraints (maintainer-confirmed):
 
 ### Arrow Streaming
 
-- [ ] **STREAM-01**: User can `await cursor.fetch_record_batch()` to obtain an `AsyncRecordBatchReader` (reader creation offloaded through the pool limiter)
-- [ ] **STREAM-02**: User can `async for batch in reader:` to iterate `pyarrow.RecordBatch` chunks, where each `read_next_batch()` pull is offloaded individually through the limiter
-- [ ] **STREAM-03**: `AsyncRecordBatchReader` is an async context manager; `await reader.close()` / `__aexit__` closes the reader offloaded and shielded, freeing Arrow resources before the connection can check in
-- [ ] **STREAM-04**: The reader's lifetime is bound to its checked-out connection; the reset-event checkin closes the reader first, so a read after checkin (or after `close`) surfaces the driver's native closed-stream error (as the sync method would) — a clean Python exception, never a use-after-free / segfault. poolhouse adds no bespoke error type
-- [ ] **STREAM-05**: Cancelling or timing out a batch pull fires `cursor.adbc_cancel()` once from the loop thread and invalidates the connection, so `pool.checkedout() == 0` and the pool is never poisoned — identical under asyncio and trio
+- [x] **STREAM-01**: User can `await cursor.fetch_record_batch()` to obtain an `AsyncRecordBatchReader` (reader creation offloaded through the pool limiter)
+- [x] **STREAM-02**: User can `async for batch in reader:` to iterate `pyarrow.RecordBatch` chunks, where each `read_next_batch()` pull is offloaded individually through the limiter
+- [x] **STREAM-03**: `AsyncRecordBatchReader` is an async context manager; `await reader.close()` / `__aexit__` closes the reader offloaded and shielded, freeing Arrow resources before the connection can check in
+- [x] **STREAM-04**: The reader's lifetime is bound to its checked-out connection; the reset-event checkin closes the reader first, so a read after checkin (or after `close`) surfaces the driver's native closed-stream error (as the sync method would) — a clean Python exception, never a use-after-free / segfault. poolhouse adds no bespoke error type
+- [x] **STREAM-05**: Cancelling or timing out a batch pull fires `cursor.adbc_cancel()` once from the loop thread and invalidates the connection, so `pool.checkedout() == 0` and the pool is never poisoned — identical under asyncio and trio
 - [ ] **STREAM-06**: A second in-flight operation on the parent cursor/connection while a reader is live raises `ConnectionBusyError` (reuses the `_in_use` guard) — never silent serialization or concurrent C access
 
 ### Async Bulk Write
@@ -40,9 +40,9 @@ Scope constraints (maintainer-confirmed):
 
 ### Packaging & Type Safety
 
-- [ ] **PKG-01**: The internal `_SyncCursor` structural Protocol gains signatures for `fetch_record_batch`, `adbc_ingest`, `fetch_df`, and `fetch_polars`; all new async public API is fully typed under basedpyright strict (0 errors)
+- [x] **PKG-01**: The internal `_SyncCursor` structural Protocol gains signatures for `fetch_record_batch`, `adbc_ingest`, `fetch_df`, and `fetch_polars`; all new async public API is fully typed under basedpyright strict (0 errors)
 - [ ] **PKG-02**: pandas and polars are added to the **dev dependency group only** (positive tests guarded by `importorskip`); `[project.dependencies]`, `[project.optional-dependencies]`, and the `__init__.py` lazy-import surface are unchanged — `import adbc_poolhouse` with pandas/polars absent is unaffected
-- [ ] **PKG-03**: The AST import-lint guard still passes over `_async/` — the four new methods route through the offload chokepoint with the pool limiter, no `import asyncio`, no bare `to_thread`
+- [x] **PKG-03**: The AST import-lint guard still passes over `_async/` — the four new methods route through the offload chokepoint with the pool limiter, no `import asyncio`, no bare `to_thread`
 
 ### Async Edge-Case Hardening (deferred P2 suite)
 
@@ -51,13 +51,13 @@ Deterministic arrange/trigger/assert tests, each run under **both** asyncio and 
 - [ ] **EDGE-08**: A trio checkpoint is delivered at the offload boundary even with no intervening checkpoint — no starvation, no missing cancellation point
 - [ ] **EDGE-13**: contextvars set before an offload are visible to the worker thread (copied in), asserted on a new-method offload
 - [ ] **EDGE-14**: Mutations a worker makes to contextvars do not leak back to the calling task after the offload returns
-- [ ] **EDGE-20**: An exception during shielded cleanup does not mask the body error — the body exception is chained via `__context__` and the connection is still released/invalidated
-- [ ] **EDGE-22**: `__del__` of an un-closed `AsyncCursor` / `AsyncRecordBatchReader` emits a `ResourceWarning`, never a "coroutine was never awaited" `RuntimeWarning`
-- [ ] **EDGE-23**: The happy path (properly closed via context manager) emits no `ResourceWarning` and no `RuntimeWarning`
+- [x] **EDGE-20**: An exception during shielded cleanup does not mask the body error — the body exception is chained via `__context__` and the connection is still released/invalidated
+- [x] **EDGE-22**: `__del__` of an un-closed `AsyncCursor` / `AsyncRecordBatchReader` emits a `ResourceWarning`, never a "coroutine was never awaited" `RuntimeWarning`
+- [x] **EDGE-23**: The happy path (properly closed via context manager) emits no `ResourceWarning` and no `RuntimeWarning`
 - [ ] **EDGE-24**: An open pool or a pending offload at event-loop shutdown raises no library-attributable exception
 - [ ] **EDGE-31**: `move_on_after(0)` still cancels a blocked `execute`/streaming pull cleanly — `adbc_cancel` fires, connection invalidates
 - [ ] **EDGE-32**: An operation that completes at deadline−ε is not over-cancelled — no spurious `adbc_cancel`, no invalidate, connection returns clean
-- [ ] **EDGE-33**: (extends EDGE-21) On an `AsyncRecordBatchReader`, a read after checkin surfaces the driver's native closed-stream error (a clean exception, not a crash); drain-then-checkin yields the correct rows — proven on both DuckDB and the Snowflake cassette
+- [x] **EDGE-33**: (extends EDGE-21) On an `AsyncRecordBatchReader`, a read after checkin surfaces the driver's native closed-stream error (a clean exception, not a crash); drain-then-checkin yields the correct rows — proven on both DuckDB and the Snowflake cassette
 
 ### Documentation
 
@@ -87,11 +87,11 @@ Every v1.5.0 requirement maps to exactly one phase (Phases 29–33). PKG-* are c
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| STREAM-01 | Phase 29 | RED-pinned (29-01) |
-| STREAM-02 | Phase 29 | RED-pinned (29-01) |
-| STREAM-03 | Phase 29 | RED-pinned (29-01) |
-| STREAM-04 | Phase 29 | RED-pinned (29-01) |
-| STREAM-05 | Phase 29 | RED-pinned (29-01) |
+| STREAM-01 | Phase 29 | Complete (29-03) |
+| STREAM-02 | Phase 29 | Complete (29-03) |
+| STREAM-03 | Phase 29 | Complete (29-03) |
+| STREAM-04 | Phase 29 | Complete (29-03) |
+| STREAM-05 | Phase 29 | Complete (29-03) |
 | STREAM-06 | Phase 29 | Guard GREEN (29-02: two-tier `_reader_open`/`from_reader`); e2e pending 29-03 |
 | INGEST-01 | Phase 30 | Pending |
 | INGEST-02 | Phase 30 | Pending |
@@ -101,19 +101,19 @@ Every v1.5.0 requirement maps to exactly one phase (Phases 29–33). PKG-* are c
 | DF-02 | Phase 31 | Pending |
 | DF-03 | Phase 31 | Pending |
 | DF-04 | Phase 31 | Pending |
-| PKG-01 | Phase 29 | Pending |
+| PKG-01 | Phase 29 | Complete (29-03) |
 | PKG-02 | Phase 31 | Pending |
-| PKG-03 | Phase 29 | Guard passes over `_async/` (29-02); re-verified each phase |
+| PKG-03 | Phase 29 | Complete (29-03); guard passes over `_async/`, re-verified each phase |
 | EDGE-08 | Phase 32 | Pending |
 | EDGE-13 | Phase 32 | Pending |
 | EDGE-14 | Phase 32 | Pending |
-| EDGE-20 | Phase 29 | RED-pinned (29-01) |
-| EDGE-22 | Phase 29 | RED-pinned (29-01) |
-| EDGE-23 | Phase 29 | RED-pinned (29-01) |
+| EDGE-20 | Phase 29 | Complete (29-03) |
+| EDGE-22 | Phase 29 | Complete (29-03) |
+| EDGE-23 | Phase 29 | Complete (29-03) |
 | EDGE-24 | Phase 32 | Pending |
 | EDGE-31 | Phase 32 | Pending |
 | EDGE-32 | Phase 32 | Pending |
-| EDGE-33 | Phase 29 | RED-pinned (29-01, DuckDB; Snowflake leg manual-only per A1) |
+| EDGE-33 | Phase 29 | Complete (29-03, DuckDB; Snowflake leg manual-only per A1) |
 | DOCS-01 | Phase 33 | Pending |
 | DOCS-02 | Phase 33 | Pending |
 | DOCS-03 | Phase 33 | Pending |

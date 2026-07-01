@@ -98,7 +98,7 @@ Full detail: `milestones/v1.4.0-ROADMAP.md` · Audit: `milestones/v1.4.0-MILESTO
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 29-03-PLAN.md — `AsyncRecordBatchReader` + `AsyncCursor.fetch_record_batch` + `_SyncReader`/`_SyncCursor` Protocols
+- [x] 29-03-PLAN.md — `AsyncRecordBatchReader` + `AsyncCursor.fetch_record_batch` + `_SyncReader`/`_SyncCursor` Protocols — completed 2026-07-01
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
@@ -173,7 +173,7 @@ Phases execute in numeric order: 29 → 30 → 31 → 32 → 33
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
-| 29. Arrow Streaming | v1.5.0 | 2/4 | In progress | - |
+| 29. Arrow Streaming | v1.5.0 | 3/4 | In progress | - |
 | 30. Async Bulk Write | v1.5.0 | 0/TBD | Not started | - |
 | 31. DataFrame Convenience | v1.5.0 | 0/TBD | Not started | - |
 | 32. P2 Edge Hardening | v1.5.0 | 0/TBD | Not started | - |
