@@ -14,7 +14,7 @@
 
 **Milestone Goal:** Complete the async cursor surface by offloading the four v1.4.0-deferred ADBC cursor methods (`fetch_record_batch` Arrow streaming, `adbc_ingest` bulk write, `fetch_df`/`fetch_polars` DataFrame convenience) and land the deferred P2 async edge-case hardening suite. Every new method is a pure offload wrapper over a method that already exists on the wrapped sync `dbapi.Cursor`, routed through the existing v1.4.0 `offload`/`cancellable_offload` chokepoint and per-pool `CapacityLimiter` — no new runtime deps, no new extras, no sync-core change. Async methods mirror the underlying sync method's behavior: no invented async-specific error types, no `find_spec` pre-checks, no bespoke wrapping.
 
-- [ ] **Phase 29: Arrow Streaming** — `await cursor.fetch_record_batch()` → `AsyncRecordBatchReader` with per-batch offloaded `async for`, reader-lifetime bound to checkout, read-after-checkin surfaces the driver's native closed-stream error
+- [x] **Phase 29: Arrow Streaming** — `await cursor.fetch_record_batch()` → `AsyncRecordBatchReader` with per-batch offloaded `async for`, reader-lifetime bound to checkout, read-after-checkin surfaces the driver's native closed-stream error — completed 2026-07-01
 - [ ] **Phase 30: Async Bulk Write** — `await cursor.adbc_ingest(table, data, mode=...)`, single whole-op offload, typed `Literal` mode, `on_abort=invalidate` on cancel
 - [ ] **Phase 31: DataFrame Convenience** — `await cursor.fetch_df()` / `await cursor.fetch_polars()`, single-offload wrappers returning self-owning frames; pandas/polars user-supplied
 - [ ] **Phase 32: P2 Edge Hardening** — remaining deferred P2 edge cases (contextvars, trio-checkpoint, timeout precision, loop-shutdown, finalizers) extended across the new streaming/ingest/DataFrame paths
@@ -102,7 +102,7 @@ Full detail: `milestones/v1.4.0-ROADMAP.md` · Audit: `milestones/v1.4.0-MILESTO
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 29-04-PLAN.md — Arrow-streaming docs (async guide + API reference + strict build + humanizer)
+- [x] 29-04-PLAN.md — Arrow-streaming docs (async guide streaming section + AsyncRecordBatchReader/fetch_record_batch API reference + strict build + humanizer; human-verify checkpoint auto-approved under --auto) — completed 2026-07-01
 
 **UI hint**: no
 
@@ -173,7 +173,7 @@ Phases execute in numeric order: 29 → 30 → 31 → 32 → 33
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
-| 29. Arrow Streaming | v1.5.0 | 3/4 | In progress | - |
+| 29. Arrow Streaming | v1.5.0 | 4/4 | Complete | 2026-07-01 |
 | 30. Async Bulk Write | v1.5.0 | 0/TBD | Not started | - |
 | 31. DataFrame Convenience | v1.5.0 | 0/TBD | Not started | - |
 | 32. P2 Edge Hardening | v1.5.0 | 0/TBD | Not started | - |

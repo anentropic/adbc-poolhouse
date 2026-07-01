@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.5.0
 milestone_name: Async Cursor Completion
 status: executing
-stopped_at: Completed 29-03-PLAN.md — AsyncRecordBatchReader (composition over the sync pyarrow.RecordBatchReader, D-29-01) + AsyncCursor.fetch_record_batch. Per-pull cancellable_offload(from_reader=True); worker-side StopIteration→_EXHAUSTED sentinel (D-29-05); shielded idempotent close clearing _reader_open in finally (EDGE-20); warn-only __del__ (D-29-15); _reader_open set success-only OUTSIDE the creation span (Pitfall 5); cursor's own _adbc_cancel threaded in (Pitfall 4). All reader tests GREEN on asyncio+trio (Snowflake A1-skipped), looped x15 = 0 hangs. Rule-1 fix: AsyncConnection.invalidate now clears _reader_open. basedpyright strict 0 errors; import-lint + pkg-import guards green; mkdocs --strict clean.
-last_updated: "2026-07-01T17:50:00Z"
-last_activity: 2026-07-01 -- Completed Phase 29 Plan 03 (AsyncRecordBatchReader + fetch_record_batch)
+stopped_at: Completed 29-04-PLAN.md — Arrow-streaming documentation. Added the "Streaming a result set batch by batch" how-to section to docs/src/guides/async.md (canonical async with await cursor.fetch_record_batch() usage D-29-18; the always-close reader-lifetime contract — whole-lifetime connection lock, drain ≠ close, read-after-checkin surfaces native pyarrow.lib.ArrowInvalid with no bespoke type, T-29-07 mitigation; honest per-batch-offload / GIL-reacquired concurrency framing). Registered AsyncRecordBatchReader as a fourth explicit async reference block in gen_ref_pages.py so it + fetch_record_batch render in the API reference. Dropped Arrow streaming from the experimental "not available yet" list. mkdocs build --strict exits 0; humanizer pass applied. The human-verify checkpoint was AUTO-APPROVED under the --auto chain (all automated verification performed by the executor). Phase 29 (Arrow Streaming) is now COMPLETE — 4/4 plans.
+last_updated: "2026-07-01T18:00:00Z"
+last_activity: 2026-07-01 -- Completed Phase 29 Plan 04 (Arrow-streaming docs) — Phase 29 complete
 progress:
   total_phases: 5
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 4
-  completed_plans: 3
-  percent: 75
+  completed_plans: 4
+  percent: 100
 ---
 
 # Project State
@@ -25,12 +25,12 @@ See: .planning/PROJECT.md (updated 2026-07-01)
 
 ## Current Position
 
-Phase: 29 (arrow-streaming) — EXECUTING
-Plan: 4 of 4
-Status: Executing Phase 29 (Plan 03 complete — AsyncRecordBatchReader + fetch_record_batch)
-Last activity: 2026-07-01 -- Completed Phase 29 Plan 03 (AsyncRecordBatchReader + fetch_record_batch)
+Phase: 29 (arrow-streaming) — COMPLETE (4/4 plans)
+Plan: 4 of 4 (complete)
+Status: Phase 29 complete — Arrow streaming shipped and documented; ready to advance to Phase 30 (Async Bulk Write)
+Last activity: 2026-07-01 -- Completed Phase 29 Plan 04 (Arrow-streaming docs) — Phase 29 complete
 
-Progress: [███████░░░] 75%
+Progress: [██████████] 100% (Phase 29 plans)
 
 ## Accumulated Context
 
