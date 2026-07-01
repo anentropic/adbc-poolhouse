@@ -139,8 +139,29 @@ class TestEdge33ReadAfterCheckin:
                 await reader.__anext__()
 
 
+# A1 RESOLVED (see test_reader_cassette_smoke.py): the checked-in Snowflake
+# cassette CANNOT replay a streaming `fetch_record_batch`. The `pytest-adbc-replay`
+# replay cursor implements only `fetch_arrow_table` (a materialized `pyarrow.Table`)
+# plus row-based fetch methods --- it has NO `fetch_record_batch`, and the cassette
+# stores a single materialized Arrow result, not a streaming reader interaction. So
+# NEITHER Snowflake reader leg below can run offline against the cassette; both are
+# scoped to a MANUAL-ONLY re-record follow-up (29-VALIDATION §Manual-Only
+# Verifications). They carry `@pytest.mark.snowflake` (CI runs `-m "not snowflake"`,
+# so they never run in the offline gate) AND a module-level skip so a stray local
+# run does not fail on the missing streaming interaction. DuckDB carries the
+# mandatory EDGE-33 coverage and is NOT gated on this result. Remove the skip and
+# re-record the cassette with a streaming reader once the replay plugin supports it
+# (the smoke test fails loudly when it does).
+_A1_SNOWFLAKE_SKIP = pytest.mark.skip(
+    reason="A1: Snowflake cassette cannot replay streaming fetch_record_batch "
+    "(replay cursor has no fetch_record_batch); manual-only re-record follow-up. "
+    "See test_reader_cassette_smoke.py + 29-01-SUMMARY.md."
+)
+
+
+@_A1_SNOWFLAKE_SKIP
 class TestEdge33Snowflake:
-    """EDGE-33 Snowflake-cassette leg --- scope resolved by the A1 cassette smoke."""
+    """EDGE-33 Snowflake-cassette leg --- A1: cassette lacks streaming replay (skipped)."""
 
     @pytest.mark.anyio
     @pytest.mark.snowflake
@@ -149,16 +170,14 @@ class TestEdge33Snowflake:
         self, snowflake_async_pool: AsyncPool
     ) -> None:
         """
-        Snowflake read-after-checkin raises native `ArrowInvalid` (cassette replay).
+        Snowflake read-after-checkin raises native `ArrowInvalid` (manual-only).
 
-        The read-after-checkin `ArrowInvalid` path does NOT require live streaming
-        rows --- it only requires opening then closing a reader --- so it holds even
-        if the cassette cannot replay a full streaming drain (assumption A1). The
-        `snowflake_async_pool` fixture `importorskip`s cleanly when the Snowflake
-        driver/cassette is absent, so this SKIPS rather than fails in a minimal env.
-
-        Wave-0 note: production `fetch_record_batch` is absent, so this FAILS (RED)
-        when the cassette IS present.
+        Would prove the read-after-checkin `ArrowInvalid` path on the Snowflake
+        driver, but A1 resolved that the cassette cannot serve `fetch_record_batch`
+        offline (the replay cursor has no such method), so this leg is a MANUAL-ONLY
+        re-record follow-up and is skipped in the automated gate. DuckDB's
+        `test_read_after_checkin_raises_arrow_invalid_duckdb` carries the mandatory
+        EDGE-33 coverage.
         """
         async with await snowflake_async_pool.connect() as conn:
             cur = conn.cursor()
@@ -173,16 +192,13 @@ class TestEdge33Snowflake:
     @pytest.mark.adbc_cassette("snowflake_arrow_round_trip")
     async def test_drain_then_checkin_rows_snowflake(self, snowflake_async_pool: AsyncPool) -> None:
         """
-        Snowflake drain-then-checkin yields correct rows (cassette replay).
+        Snowflake drain-then-checkin yields correct rows (manual-only).
 
-        Gated on the A1 cassette smoke: this row-drain leg needs the cassette to
-        replay a streaming `fetch_record_batch`. If the smoke (see
-        `test_reader_cassette_smoke.py`) determines the cassette lacks the streaming
-        interaction, this test is expected to `skip`/`xfail` with the recorded
-        reason and the Snowflake leg is scoped to the `ArrowInvalid` path above.
-
-        Wave-0 note: production `fetch_record_batch` is absent, so this FAILS (RED)
-        when the cassette IS present and replays streaming.
+        Needs the cassette to replay a streaming `fetch_record_batch`, which A1
+        resolved it CANNOT (the replay cursor lacks the method). Scoped to a
+        MANUAL-ONLY re-record follow-up and skipped in the automated gate; DuckDB's
+        `test_drain_then_checkin_rows_duckdb` carries the mandatory row-drain
+        coverage.
         """
         rows = 0
         async with await snowflake_async_pool.connect() as conn:
