@@ -41,9 +41,11 @@ from adbc_poolhouse._async._reader import AsyncRecordBatchReader
 if TYPE_CHECKING:
     from collections.abc import Sequence
     from types import TracebackType
+    from typing import Literal
 
     import pyarrow
     from anyio import CapacityLimiter
+    from typing_extensions import CapsuleType
 
     from adbc_poolhouse._async._connection import AsyncConnection
 
@@ -72,6 +74,16 @@ class _SyncCursor(Protocol):
     def fetchall(self) -> Sequence[object]: ...
     def fetch_arrow_table(self) -> pyarrow.Table: ...
     def fetch_record_batch(self) -> pyarrow.RecordBatchReader: ...
+    def adbc_ingest(
+        self,
+        table_name: str,
+        data: pyarrow.RecordBatch | pyarrow.Table | pyarrow.RecordBatchReader | CapsuleType,
+        mode: Literal["append", "create", "replace", "create_append"] = ...,
+        *,
+        catalog_name: str | None = ...,
+        db_schema_name: str | None = ...,
+        temporary: bool = ...,
+    ) -> int: ...
     def adbc_cancel(self) -> None: ...
     def close(self) -> None: ...
 
