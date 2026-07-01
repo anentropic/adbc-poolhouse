@@ -19,17 +19,6 @@ EDGE-23 runs both backends. Wave-0 status: `AsyncRecordBatchReader` /
 
 from __future__ import annotations
 
-# Wave-0 RED scaffolding: `AsyncCursor.fetch_record_batch` and
-# `adbc_poolhouse._async._reader.AsyncRecordBatchReader` do not exist until plans
-# 02/03 land, so every reference to them is statically "unknown" / "unresolved".
-# These pragmas suppress ONLY the errors that are a direct consequence of those
-# not-yet-existing symbols; delete this block once the production symbols land and
-# the file type-checks cleanly under the strict whole-project gate (PKG-01).
-# pyright: reportMissingImports=false
-# pyright: reportAttributeAccessIssue=false
-# pyright: reportUnknownVariableType=false
-# pyright: reportUnknownMemberType=false
-# pyright: reportUnknownArgumentType=false
 import gc
 import warnings
 from typing import TYPE_CHECKING

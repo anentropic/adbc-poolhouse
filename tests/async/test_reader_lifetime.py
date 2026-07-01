@@ -26,22 +26,10 @@ structure is copied from `test_edge_resource.py`.
 
 from __future__ import annotations
 
-# Wave-0 RED scaffolding: `AsyncCursor.fetch_record_batch` and
-# `adbc_poolhouse._async._reader.AsyncRecordBatchReader` do not exist until plans
-# 02/03 land, so every reference to them is statically "unknown" / "unresolved".
-# These pragmas suppress ONLY the errors that are a direct consequence of those
-# not-yet-existing symbols; delete this block once the production symbols land and
-# the file type-checks cleanly under the strict whole-project gate (PKG-01).
-# pyright: reportMissingImports=false
-# pyright: reportAttributeAccessIssue=false
-# pyright: reportUnknownVariableType=false
-# pyright: reportUnknownMemberType=false
-# pyright: reportUnknownArgumentType=false
 import importlib
 from typing import TYPE_CHECKING
 
 import pyarrow
-import pyarrow.lib
 import pytest
 
 if TYPE_CHECKING:
@@ -110,7 +98,7 @@ class TestEdge33ReadAfterCheckin:
                 reader = await cur.fetch_record_batch()
                 await reader.__anext__()  # pull one batch to open the stream
                 await reader.close()
-                with pytest.raises(pyarrow.lib.ArrowInvalid, match=_CLOSED_STREAM_MSG):
+                with pytest.raises(pyarrow.ArrowInvalid, match=_CLOSED_STREAM_MSG):
                     await reader.__anext__()
 
     @pytest.mark.anyio
@@ -135,7 +123,7 @@ class TestEdge33ReadAfterCheckin:
                 await reader.__anext__()  # open the stream with one pull
             # Connection checked back in --- the reset handler closed the cursor.
             assert duckdb_async_pool._pool.checkedout() == 0  # noqa: SLF001
-            with pytest.raises(pyarrow.lib.ArrowInvalid, match=_CLOSED_STREAM_MSG):
+            with pytest.raises(pyarrow.ArrowInvalid, match=_CLOSED_STREAM_MSG):
                 await reader.__anext__()
 
 
@@ -184,7 +172,7 @@ class TestEdge33Snowflake:
             await cur.execute(_SNOWFLAKE_QUERY)
             reader = await cur.fetch_record_batch()
         # Checked back in; the reset handler closed the stream.
-        with pytest.raises(pyarrow.lib.ArrowInvalid, match=_CLOSED_STREAM_MSG):
+        with pytest.raises(pyarrow.ArrowInvalid, match=_CLOSED_STREAM_MSG):
             await reader.__anext__()
 
     @pytest.mark.anyio

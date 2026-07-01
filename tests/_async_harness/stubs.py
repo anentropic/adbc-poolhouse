@@ -171,6 +171,18 @@ class BlockingStubCursor:
         # alone allowed -- it surfaced as a Linux-only hang in the EDGE cancel
         # tests where the worker thread reaches `_block` after the cancel fires).
         self._cancelled: bool = False
+        # Readers handed out by `fetch_record_batch`. The reader wraps a SEPARATE
+        # blocking gate (Pitfall 4: the reader has no `adbc_cancel` of its own --- a
+        # cancelled pull fires THIS cursor's `adbc_cancel`), so a cancel/close/release
+        # on the cursor must reach through to release any reader blocked in a pull.
+        self._readers: list[BlockingStubReader] = []
+        # Default batches handed to readers created via the ZERO-ARG
+        # `fetch_record_batch()` path (the one the real `AsyncCursor.fetch_record_batch`
+        # drives --- it calls the sync method with no args). A test that needs a
+        # BLOCKED, cancellable pull through the real async path sets this to a
+        # non-empty list BEFORE `await cur.fetch_record_batch()`, so the handed-out
+        # reader blocks on its first pull; the default (empty) exhausts immediately.
+        self.record_batch_batches: list[object] = []
 
     @property
     def closed(self) -> bool:
@@ -316,7 +328,14 @@ class BlockingStubCursor:
             # `_block` AFTER this cancel still aborts instead of re-arming and
             # hanging. The `_event.set()` below covers the worker already waiting.
             self._cancelled = True
+            readers = list(self._readers)
         self._event.set()
+        # Pitfall 4: a cancelled reader pull fires THIS cursor's `adbc_cancel`, but the
+        # worker is blocked on the READER's own gate --- release it here (terminally,
+        # via `close`) so the blocked pull returns and the offload can join. Mirrors a
+        # real driver where cancelling the cursor unblocks its in-flight reader read.
+        for reader in readers:
+            reader.close()
 
     def close(self) -> None:
         """
@@ -331,18 +350,34 @@ class BlockingStubCursor:
         with self._lock:
             self.close_call_count += 1
             self._closed = True
+            readers = list(self._readers)
         self._event.set()
+        # Terminal: closing the cursor closes its readers' streams too (a real driver
+        # closes the reader when its cursor closes), releasing any blocked pull.
+        for reader in readers:
+            reader.close()
 
     def release(self) -> None:
         """
         Test-only: unblock a waiting worker WITHOUT cancelling (happy path).
 
         Leaves `observed_cancel` `False` -- use this to model a query that
-        completes normally, as opposed to `adbc_cancel`.
+        completes normally, as opposed to `adbc_cancel`. Also releases any reader
+        blocked in a pull (the reader's gate is separate from the cursor's), so a
+        test that releases the cursor unblocks a gated `read_next_batch` too.
         """
+        with self._lock:
+            readers = list(self._readers)
         self._event.set()
+        for reader in readers:
+            reader.release()
 
-    def fetch_record_batch(self) -> BlockingStubReader:
+    def fetch_record_batch(
+        self,
+        *,
+        batches: list[object] | None = None,
+        schema: object = None,
+    ) -> BlockingStubReader:
         """
         Return a fresh `BlockingStubReader` (the Phase 29 streaming stub).
 
@@ -359,15 +394,32 @@ class BlockingStubCursor:
         The reader has NO `adbc_cancel` of its own (Pitfall 4): a cancelled pull
         fires the OWNING cursor's `adbc_cancel`, so a test drives cancellation
         through this cursor and reads `self.adbc_cancel_call_count`, not the
-        reader's. The reader is created unblocked-by-default; a test configures
-        blocking by leaving its batch sequence pending and gating on `entered`.
+        reader's. The reader is RETAINED (`self._readers`) so this cursor's
+        `adbc_cancel` / `close` / `release` reach through and unblock a reader blocked
+        in a pull --- the reader's blocking gate is separate from the cursor's.
+
+        A default (no-batch) reader exhausts on the first pull WITHOUT blocking, so a
+        happy-path `async for batch in reader:` drains in one pull with no external
+        release. A test that wants a BLOCKED, cancellable pull passes `batches=[...]`
+        (or a `schema`): a reader with a pending batch blocks per-pull on its gate,
+        so the cancel/timeout tests can gate on `entered` and then cancel.
+
+        Args:
+            batches: Optional pending batches for the reader to deliver; passing at
+                least one makes the first pull BLOCK (the gated-cancel path). Defaults
+                to `None` (an empty reader that exhausts on the first pull).
+            schema: Optional schema stand-in for the reader's `schema` property.
 
         Returns:
-            A fresh `BlockingStubReader` bound to no batches and a `None` schema.
+            A fresh `BlockingStubReader`, retained in `self._readers` so the cursor's
+            release/cancel/close reach it.
         """
+        effective_batches = batches if batches is not None else list(self.record_batch_batches)
+        reader = BlockingStubReader(batches=effective_batches, schema=schema)
         with self._lock:
             self.fetch_call_count += 1
-        return BlockingStubReader()
+            self._readers.append(reader)
+        return reader
 
 
 class BlockingStubReader:
@@ -573,32 +625,44 @@ class BlockingStubReader:
 
     def read_next_batch(self) -> object:
         """
-        Record the call, block until released, then return the next batch.
+        Record the call, block until released (only while batches remain), then return one.
 
-        Blocks on the internal event (via `_block`) exactly like the cursor stub's
-        `execute`/`fetch_arrow_table`, then pops and returns the next configured
-        batch. Once the configured sequence is drained, raises a BARE `StopIteration`
-        (`args == ()`) --- the end-of-stream signal the real
+        A pull that has a configured batch to deliver blocks on the internal event
+        (via `_block`) --- exactly like the cursor stub's `execute`/`fetch_arrow_table`
+        --- so a test can gate on `entered` and drive a cancel/close/release before the
+        batch is handed back. A pull on an ALREADY-DRAINED reader (no batches left)
+        does NOT block: it raises a BARE `StopIteration` (`args == ()`) immediately ---
+        the end-of-stream signal the real
         `pyarrow.RecordBatchReader.read_next_batch()` raises, which the async layer's
-        worker-side catch converts to its `_EXHAUSTED` sentinel (D-29-05). The
-        `StopIteration` is raised AFTER `_block` returns, so a test can still gate on
-        `entered` for the exhausting pull.
+        worker-side catch converts to its `_EXHAUSTED` sentinel (D-29-05).
+
+        Exhausting without blocking is what lets the default empty reader (handed out
+        by `BlockingStubCursor.fetch_record_batch`) drain in one pull, so a
+        happy-path `async for batch in reader:` completes with no external release ---
+        while a reader configured WITH pending batches still blocks per-pull for the
+        gated cancel/close tests.
 
         Returns:
             The next configured batch object.
 
         Raises:
             StopIteration: Bare (`args == ()`) once the configured batch sequence is
-                exhausted --- the driver's end-of-stream contract.
+                exhausted --- the driver's end-of-stream contract. Raised without
+                blocking on the drained reader.
         """
         with self._lock:
             self.read_call_count += 1
             self.read_thread_ids.append(threading.get_ident())
+            has_batch = bool(self._batches)
+        if not has_batch:
+            # Drained: exhaust immediately, no block. The default (empty) reader
+            # therefore drains in one pull with no external release.
+            raise StopIteration  # bare (args == ()): end-of-stream, per the real driver
         self._block()
         with self._lock:
             if self._batches:
                 return self._batches.pop(0)
-        raise StopIteration  # bare (args == ()): end-of-stream, per the real driver
+        raise StopIteration  # bare (args == ()): drained while blocked (close/cancel)
 
     def close(self) -> None:
         """

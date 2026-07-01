@@ -23,17 +23,6 @@ exist yet, so these FAIL (RED).
 
 from __future__ import annotations
 
-# Wave-0 RED scaffolding: `AsyncCursor.fetch_record_batch` and
-# `adbc_poolhouse._async._reader.AsyncRecordBatchReader` do not exist until plans
-# 02/03 land, so every reference to them is statically "unknown" / "unresolved".
-# These pragmas suppress ONLY the errors that are a direct consequence of those
-# not-yet-existing symbols; delete this block once the production symbols land and
-# the file type-checks cleanly under the strict whole-project gate (PKG-01).
-# pyright: reportMissingImports=false
-# pyright: reportAttributeAccessIssue=false
-# pyright: reportUnknownVariableType=false
-# pyright: reportUnknownMemberType=false
-# pyright: reportUnknownArgumentType=false
 import functools
 import importlib
 from collections.abc import Callable
@@ -45,6 +34,7 @@ import pytest
 if TYPE_CHECKING:
     from adbc_poolhouse._async._connection import AsyncConnection
     from adbc_poolhouse._async._pool import AsyncPool
+    from adbc_poolhouse._async._reader import AsyncRecordBatchReader
     from tests._async_harness.stubs import BlockingStubConnection
 
 # `tests/async/` cannot be imported with a dotted path (`async` is a reserved
@@ -80,6 +70,10 @@ class TestStream05CancelPull:
         del anyio_backend_name
         async_conn, stub_conn = make_stub_async_connection()
         cur = async_conn.cursor()
+        # Arm the stub cursor to hand out a reader with a PENDING batch, so its first
+        # pull BLOCKS on the reader gate (the cancellable window). The default empty
+        # reader would exhaust immediately with no window to cancel.
+        stub_conn.cursors[-1].record_batch_batches = [object()]
         with real_clock_watchdog(stub_conn.cursors) as tripped:
             reader = await cur.fetch_record_batch()
             stub_cursor = stub_conn.cursors[-1]
@@ -112,6 +106,9 @@ class TestStream05CancelPull:
         """
         async_conn, stub_conn = make_stub_async_connection()
         cur = async_conn.cursor()
+        # Arm a pending batch so the first pull BLOCKS on the reader gate (the window
+        # the deadline fires in); the default empty reader would exhaust immediately.
+        stub_conn.cursors[-1].record_batch_batches = [object()]
         timed_out = False
         with (
             real_clock_watchdog(stub_conn.cursors) as tripped,
@@ -162,7 +159,7 @@ class TestStream05CancelDrainsPool:
         assert duckdb_async_pool._pool.checkedout() == 0  # noqa: SLF001
 
 
-async def _drain_one(reader: object) -> None:
+async def _drain_one(reader: AsyncRecordBatchReader) -> None:
     """Pull a single batch from the reader (the cancellable unit under test)."""
     await reader.__anext__()
 

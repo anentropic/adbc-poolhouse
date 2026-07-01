@@ -360,8 +360,8 @@ class AsyncCursor:
 
         Offloads the dbapi `fetch_record_batch` through the pool limiter to create
         the sync `pyarrow.RecordBatchReader`, then wraps it in an
-        [`AsyncRecordBatchReader`][adbc_poolhouse._async._reader.AsyncRecordBatchReader]
-        whose every batch pull is itself offloaded (D-29-03). Unlike
+        `AsyncRecordBatchReader` whose every batch pull is itself offloaded (D-29-03).
+        Unlike
         `fetch_arrow_table`, the result is a live stream bound to this connection's C
         Arrow stream, so the reader locks the connection for its WHOLE lifetime: a
         foreign op raises `ConnectionBusyError` until the reader is closed (STREAM-06),
