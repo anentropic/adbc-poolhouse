@@ -95,7 +95,7 @@ class TestEdge20ShieldedCleanupChains:
         Wave-0 note: `AsyncRecordBatchReader` does not exist yet, so this FAILS (RED).
         """
         del anyio_backend_name
-        async_conn, stub_conn = make_stub_async_connection()
+        async_conn, _stub_conn = make_stub_async_connection()
         cur = async_conn.cursor()
         reader = await cur.fetch_record_batch()
 
@@ -109,7 +109,9 @@ class TestEdge20ShieldedCleanupChains:
         def _raising_close() -> None:
             raise _CloseBoom("close failed")
 
-        stub_conn.cursors[-1].fetch_record_batch().close = _raising_close  # type: ignore[method-assign]
+        # Patch the close of the reader WE hold (reader._reader), not a fresh reader,
+        # so the shielded-close-raises path is actually exercised (EDGE-20).
+        reader._reader.close = _raising_close  # type: ignore[method-assign]
 
         surfaced: BaseException | None = None
         try:

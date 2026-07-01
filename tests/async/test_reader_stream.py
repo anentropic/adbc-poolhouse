@@ -131,13 +131,21 @@ class TestStream02IteratesBatchesOffLoop:
         """
         del anyio_backend_name
         loop_thread_id = threading.get_ident()
-        async_conn, stub_conn = make_stub_async_connection()
+        async_conn, _stub_conn = make_stub_async_connection()
         cur = async_conn.cursor()
-        # The stub cursor is the last one handed out by the stub connection.
-        stub_cursor = stub_conn.cursors[-1]
+        # The default stub reader has no configured batches, so it exhausts in a single
+        # non-blocking pull --- that pull is still dispatched through the offload
+        # chokepoint and records its worker thread id.
         async with await cur.fetch_record_batch() as reader:
             async for _batch in reader:
                 pass
-        # The stub reader created by the LAST fetch_record_batch recorded its pulls.
-        stub_reader = stub_cursor.fetch_record_batch()  # a fresh reader exposes the contract
+        # Assert over the reader WE actually drained (not a fresh one). Narrow the
+        # structural `_SyncReader` to the concrete stub to reach its `read_thread_ids`.
+        from tests._async_harness.stubs import BlockingStubReader
+
+        stub_reader = reader._reader
+        assert isinstance(stub_reader, BlockingStubReader)
+        # Non-empty guards against a vacuous `all([])`; every recorded pull ran off the
+        # loop thread --- the deterministic STREAM-02 off-loop proof.
+        assert stub_reader.read_thread_ids, "expected the pull to be recorded"
         assert all(tid != loop_thread_id for tid in stub_reader.read_thread_ids)
