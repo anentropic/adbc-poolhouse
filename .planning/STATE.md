@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.5.0
 milestone_name: Async Cursor Completion
 status: executing
-stopped_at: Completed 29-01-PLAN.md — Wave-0 RED scaffolding (BlockingStubReader harness stub + six RED reader test files, 46 asyncio×trio cases pinning STREAM-01..06 + EDGE-20/22/23/33; A1 resolved = no Snowflake streaming cassette replay).
-last_updated: "2026-07-01T20:56:15.234Z"
-last_activity: 2026-07-01 -- Phase 30 planning complete
+stopped_at: Completed 30-01-PLAN.md — Wave-0 RED scaffolding for async bulk write (blockable BlockingStubCursor.adbc_ingest gate + four RED test files, 20 asyncio×trio cases pinning INGEST-01..04; all fail solely on the missing AsyncCursor.adbc_ingest — the GREEN target for 30-02).
+last_updated: "2026-07-01T21:04:20Z"
+last_activity: 2026-07-01 -- Completed 30-01-PLAN.md (Wave-0 RED bulk-write scaffolding)
 progress:
   total_phases: 5
   completed_phases: 1
-  total_plans: 4
-  completed_plans: 4
+  total_plans: 6
+  completed_plans: 5
   percent: 20
 ---
 
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-01)
 
 **Core value:** One config in, one pool out — `create_pool(SnowflakeConfig(...))` returns a ready-to-use SQLAlchemy QueuePool in a single call.
-**Current focus:** Phase 29 — arrow-streaming
+**Current focus:** Phase 30 — async-bulk-write
 
 ## Current Position
 
-Phase: 30
-Plan: Not started
-Status: Ready to execute
-Last activity: 2026-07-01 -- Phase 30 planning complete
+Phase: 30 (async-bulk-write) — EXECUTING
+Plan: 2 of 2 (30-01 complete; 30-02 GREEN next)
+Status: Executing Phase 30
+Last activity: 2026-07-01 -- Completed 30-01-PLAN.md (Wave-0 RED bulk-write scaffolding)
 
-Progress: [██████████] 100% (Phase 29 plans)
+Progress: [█████░░░░░] 50% (Phase 30 plans: 1 of 2)
 
 ## Accumulated Context
 
@@ -88,6 +88,6 @@ Pre-v1.4.0 tracking cruft plus one non-functional docstring; run `/gsd-cleanup` 
 
 ## Session Continuity
 
-Last session: 2026-07-01T15:42:14Z
-Stopped at: Completed 29-01-PLAN.md — Wave-0 RED scaffolding (BlockingStubReader harness stub + six RED reader test files, 46 asyncio×trio cases pinning STREAM-01..06 + EDGE-20/22/23/33; A1 resolved = no Snowflake streaming cassette replay).
-Next step: Execute 29-02-PLAN.md (next wave — production `_reader.py`, `AsyncCursor.fetch_record_batch`, `_SyncReader` Protocol, `_reader_open` two-tier guard) to turn the RED tests GREEN. Remember the green-wave cleanup: delete the file-level pyright pragma block from the six RED test files once production symbols exist.
+Last session: 2026-07-01T21:04:20Z
+Stopped at: Completed 30-01-PLAN.md — Wave-0 RED scaffolding for async bulk write (blockable `BlockingStubCursor.adbc_ingest` gate + `ingest_call_count` counter, plus four RED test files: round-trip/pass-through, modes, cancel/invalidate parity, signature; 20 asyncio×trio cases pinning INGEST-01..04, all failing solely on the missing `AsyncCursor.adbc_ingest`).
+Next step: Execute 30-02-PLAN.md (GREEN wave — `AsyncCursor.adbc_ingest` as a `fetch_arrow_table` clone with a `functools.partial`-bound callable + `-> int`, `_SyncCursor` Protocol extension, `import functools` + `CapsuleType`/`Literal` under `TYPE_CHECKING`) to turn the RED tests GREEN. Green-wave cleanup: delete the file-level Wave-0 pyright pragma blocks from the four RED test files once `adbc_ingest` exists, and loop `test_ingest_cancel.py` under a high `ADBC_ASYNC_REPEAT` (both backends) to prove zero hangs.

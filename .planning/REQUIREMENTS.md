@@ -93,10 +93,10 @@ Every v1.5.0 requirement maps to exactly one phase (Phases 29–33). PKG-* are c
 | STREAM-04 | Phase 29 | Complete (29-03) |
 | STREAM-05 | Phase 29 | Complete (29-03) |
 | STREAM-06 | Phase 29 | Complete (29-03) |
-| INGEST-01 | Phase 30 | Pending |
-| INGEST-02 | Phase 30 | Pending |
-| INGEST-03 | Phase 30 | Pending |
-| INGEST-04 | Phase 30 | Pending |
+| INGEST-01 | Phase 30 | RED pinned (30-01); GREEN in 30-02 |
+| INGEST-02 | Phase 30 | RED pinned (30-01); GREEN in 30-02 |
+| INGEST-03 | Phase 30 | RED pinned (30-01); GREEN in 30-02 |
+| INGEST-04 | Phase 30 | RED pinned (30-01); GREEN in 30-02 |
 | DF-01 | Phase 31 | Pending |
 | DF-02 | Phase 31 | Pending |
 | DF-03 | Phase 31 | Pending |

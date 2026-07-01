@@ -122,7 +122,7 @@ Full detail: `milestones/v1.4.0-ROADMAP.md` · Audit: `milestones/v1.4.0-MILESTO
 Plans:
 **Wave 1**
 
-- [ ] 30-01-PLAN.md — Wave 0 RED scaffolding: BlockingStubCursor.adbc_ingest stub + four failing tests (round-trip, modes, cancel/parity, signature) pinning INGEST-01..04
+- [x] 30-01-PLAN.md — Wave 0 RED scaffolding: BlockingStubCursor.adbc_ingest stub + four failing tests (round-trip, modes, cancel/parity, signature) pinning INGEST-01..04
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -183,7 +183,7 @@ Phases execute in numeric order: 29 → 30 → 31 → 32 → 33
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
 | 29. Arrow Streaming | v1.5.0 | 4/4 | Complete    | 2026-07-01 |
-| 30. Async Bulk Write | v1.5.0 | 0/2 | Not started | - |
+| 30. Async Bulk Write | v1.5.0 | 1/2 | In progress | 30-01 RED complete |
 | 31. DataFrame Convenience | v1.5.0 | 0/TBD | Not started | - |
 | 32. P2 Edge Hardening | v1.5.0 | 0/TBD | Not started | - |
 | 33. Documentation | v1.5.0 | 0/TBD | Not started | - |
