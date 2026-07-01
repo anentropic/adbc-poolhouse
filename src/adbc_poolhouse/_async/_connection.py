@@ -326,7 +326,18 @@ class AsyncConnection:
         It is the poison-recovery counterpart to `close`: invalidate is the cancel
         path, `close` the normal check-in. A `close()` after an `invalidate()` is a
         safe no-op (probe-confirmed).
+
+        Releasing a live reader's lifetime lock (D-29-16): if a streaming
+        `AsyncRecordBatchReader` held this connection (`_reader_open == True`) when its
+        pull was cancelled, dropping the connection also clears `_reader_open`. The
+        connection is being detached from the pool, so its reader-lifetime lock is
+        meaningless --- and a subsequent explicit `close()` (which takes the foreign
+        tier) must stay the documented safe no-op rather than raise
+        `ConnectionBusyError` on the now-defunct lock. The per-`connect()` fresh
+        `AsyncConnection` is the ultimate backstop (D-29-13), but clearing it here
+        keeps close-after-invalidate correct on the same handle.
         """
+        self._reader_open = False
         with anyio.CancelScope(shield=True):
             await offload(self._fairy.invalidate, limiter=self._teardown_limiter)
 

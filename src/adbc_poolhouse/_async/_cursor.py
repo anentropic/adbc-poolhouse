@@ -36,6 +36,7 @@ import anyio
 
 from adbc_poolhouse._async._cancel import cancellable_offload
 from adbc_poolhouse._async._offload import offload
+from adbc_poolhouse._async._reader import AsyncRecordBatchReader
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -70,6 +71,7 @@ class _SyncCursor(Protocol):
     def fetchmany(self, size: int = ..., /) -> Sequence[object]: ...
     def fetchall(self) -> Sequence[object]: ...
     def fetch_arrow_table(self) -> pyarrow.Table: ...
+    def fetch_record_batch(self) -> pyarrow.RecordBatchReader: ...
     def adbc_cancel(self) -> None: ...
     def close(self) -> None: ...
 
@@ -351,6 +353,68 @@ class AsyncCursor:
                 limiter=self._limiter,
                 on_abort=self._owner.invalidate,  # poison recovery on a real abort (D-25-03)
             )
+
+    async def fetch_record_batch(self) -> AsyncRecordBatchReader:
+        """
+        Stream the result set as an `AsyncRecordBatchReader` off a worker thread.
+
+        Offloads the dbapi `fetch_record_batch` through the pool limiter to create
+        the sync `pyarrow.RecordBatchReader`, then wraps it in an
+        [`AsyncRecordBatchReader`][adbc_poolhouse._async._reader.AsyncRecordBatchReader]
+        whose every batch pull is itself offloaded (D-29-03). Unlike
+        `fetch_arrow_table`, the result is a live stream bound to this connection's C
+        Arrow stream, so the reader locks the connection for its WHOLE lifetime: a
+        foreign op raises `ConnectionBusyError` until the reader is closed (STREAM-06),
+        and a read after the reader is closed / the connection is checked in surfaces
+        the driver's native `pyarrow.lib.ArrowInvalid` (never a segfault, T-29-01).
+
+        The `_reader_open` lifetime lock is set AFTER the `_offloading()` span exits
+        (which already cleared the per-call `_in_use`) and ONLY on the success path,
+        so a cancelled or failed creation leaves the connection usable rather than
+        permanently busy (Pitfall 5).
+
+        If the surrounding scope is cancelled or times out while the reader is being
+        created, the in-flight C call is aborted with `cursor.adbc_cancel`, the
+        now-poisoned connection is invalidated (shielded), and the cancellation is
+        re-raised --- the connection never returns to the pool busy (CANCEL-01/02).
+
+        Returns:
+            An `AsyncRecordBatchReader` streaming the current result set, threaded
+            with this cursor's `adbc_cancel` so a cancelled pull aborts through the
+            cursor (the reader has no cancel of its own, Pitfall 4).
+
+        Raises:
+            ConnectionBusyError: If another offloaded call on the owning connection
+                is already in flight.
+
+        Example:
+            ```python
+            await cursor.execute("SELECT * FROM events")
+            async with await cursor.fetch_record_batch() as reader:
+                async for batch in reader:
+                    process(batch)  # a pyarrow.RecordBatch, each pull offloaded
+            ```
+        """
+        with self._owner._offloading():  # noqa: SLF001  foreign-tier guard: _in_use OR _reader_open
+            sync_reader = await cancellable_offload(
+                self._adbc_cancel,
+                self._cursor.fetch_record_batch,
+                limiter=self._limiter,
+                on_abort=self._owner.invalidate,  # poison recovery on a real abort (D-25-03)
+            )
+        # Lock the connection for the reader's WHOLE lifetime (D-29-08/09). Set AFTER
+        # the _offloading() span exits (it already cleared _in_use) and ONLY on the
+        # success path, so a cancelled/failed creation leaves _reader_open False and
+        # the connection usable (Pitfall 5).
+        self._owner._reader_open = True  # noqa: SLF001
+        # Pass this cursor's own `_adbc_cancel` as the 4th arg: a cancelled pull must
+        # abort through the cursor, since the reader has no cancel of its own (Pitfall 4).
+        return AsyncRecordBatchReader(
+            sync_reader,
+            self._limiter,
+            self._owner,
+            self._adbc_cancel,
+        )
 
     async def close(self) -> None:
         """
