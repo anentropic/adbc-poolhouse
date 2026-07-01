@@ -108,6 +108,8 @@ class BlockingStubCursor:
         observed_cancel: `True` once `adbc_cancel` has run; `False` otherwise.
         execute_call_count: Number of `execute` calls.
         fetch_call_count: Number of `fetch_arrow_table` calls.
+        ingest_call_count: Number of `adbc_ingest` calls --- the in-flight gate the
+            Phase 30 cancel test polls (`await_inside(... >= 1)`) before cancelling.
         adbc_cancel_call_count: Number of `adbc_cancel` calls.
         close_call_count: Number of `close` calls.
         execute_thread_ids: The `threading.get_ident()` of each `execute` caller,
@@ -157,6 +159,7 @@ class BlockingStubCursor:
         self.observed_cancel: bool = False
         self.execute_call_count: int = 0
         self.fetch_call_count: int = 0
+        self.ingest_call_count: int = 0
         self.adbc_cancel_call_count: int = 0
         self.close_call_count: int = 0
         self.execute_thread_ids: list[int] = []
@@ -310,6 +313,52 @@ class BlockingStubCursor:
             self.fetch_call_count += 1
         self._block()
         return None
+
+    def adbc_ingest(
+        self,
+        table_name: str,
+        data: object,
+        mode: str = "create",
+        *,
+        catalog_name: str | None = None,
+        db_schema_name: str | None = None,
+        temporary: bool = False,
+    ) -> int:
+        """
+        Record the ingest call, block until released/cancelled, then return a row count.
+
+        The blocking twin of `fetch_arrow_table` for the write path: it records the
+        call under the lock (bumping `ingest_call_count`), then parks on the same
+        sticky-release `_block` gate. That gives the Phase 30 INGEST-04 cancel test a
+        DETERMINISTIC in-flight window --- the test gates on `ingest_call_count >= 1`
+        (the worker is provably inside the blocked ingest) before cancelling, rather
+        than racing a real DuckDB ingest that might finish first.
+
+        No cancel wiring lives here: `adbc_cancel` / `close` / `release` already latch
+        the sticky `_cancelled` / `_closed` flags that `_block` honours, so a cancel
+        fired against this cursor unblocks the parked ingest through the existing
+        machinery. `mode` stays positional-or-keyword to match the driver and the
+        `_SyncCursor` Protocol; only the public `AsyncCursor.adbc_ingest` tightens it
+        to keyword-only.
+
+        Args:
+            table_name: The target table (recorded only by the call count; never run).
+            data: The Arrow payload to ingest (ignored by the fake).
+            mode: The ingest mode (`create` / `append` / `replace` / `create_append`);
+                ignored by the fake.
+            catalog_name: Optional target catalog (ignored by the fake).
+            db_schema_name: Optional target schema (ignored by the fake).
+            temporary: Whether the target is a temporary table (ignored by the fake).
+
+        Returns:
+            A fixed row count of `3`. Later phases assert only that this reaches the
+            caller unchanged; the fake does no real ingest.
+        """
+        del table_name, data, mode, catalog_name, db_schema_name, temporary
+        with self._lock:
+            self.ingest_call_count += 1
+        self._block()
+        return 3
 
     def adbc_cancel(self) -> None:
         """
