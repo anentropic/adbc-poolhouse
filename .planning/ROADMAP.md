@@ -118,7 +118,11 @@ Full detail: `milestones/v1.4.0-ROADMAP.md` · Audit: `milestones/v1.4.0-MILESTO
   3. `data` accepts the Arrow inputs the driver accepts (`pyarrow.Table` / `RecordBatch` / `RecordBatchReader` / Arrow C-stream capsule) with no conversion by poolhouse (INGEST-03)
   4. A cancelled or timed-out ingest fires `adbc_cancel` and invalidates the connection (`on_abort=invalidate`), leaving `pool.checkedout() == 0` with asyncio and trio parity (INGEST-04)
 
-**Plans**: TBD
+**Plans**: 2 plans
+
+Plans:
+- [ ] 30-01-PLAN.md — Wave 0 RED scaffolding: BlockingStubCursor.adbc_ingest stub + four failing tests (round-trip, modes, cancel/parity, signature) pinning INGEST-01..04
+- [ ] 30-02-PLAN.md — GREEN: AsyncCursor.adbc_ingest (fetch_arrow_table clone + functools.partial arg binding) + _SyncCursor Protocol member + docs quality gate
 **UI hint**: no
 
 ### Phase 31: DataFrame Convenience
@@ -174,7 +178,7 @@ Phases execute in numeric order: 29 → 30 → 31 → 32 → 33
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
 | 29. Arrow Streaming | v1.5.0 | 4/4 | Complete    | 2026-07-01 |
-| 30. Async Bulk Write | v1.5.0 | 0/TBD | Not started | - |
+| 30. Async Bulk Write | v1.5.0 | 0/2 | Not started | - |
 | 31. DataFrame Convenience | v1.5.0 | 0/TBD | Not started | - |
 | 32. P2 Edge Hardening | v1.5.0 | 0/TBD | Not started | - |
 | 33. Documentation | v1.5.0 | 0/TBD | Not started | - |
