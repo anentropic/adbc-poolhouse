@@ -3,10 +3,10 @@ gsd_state_version: 1.0
 milestone: v1.5.0
 milestone_name: Async Cursor Completion
 status: planning
-last_updated: "2026-07-01T10:23:05.083Z"
+last_updated: "2026-07-01T11:30:00.000Z"
 last_activity: 2026-07-01
 progress:
-  total_phases: 0
+  total_phases: 5
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -20,7 +20,50 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-01)
 
 **Core value:** One config in, one pool out — `create_pool(SnowflakeConfig(...))` returns a ready-to-use SQLAlchemy QueuePool in a single call.
-**Current focus:** v1.4.0 Async API shipped and archived 2026-07-01 — planning next milestone (`/gsd-new-milestone`)
+**Current focus:** v1.5.0 Async Cursor Completion — roadmap created (Phases 29–33). Next: `/gsd-plan-phase 29` (Arrow Streaming).
+
+## Current Position
+
+Phase: 29 of 33 (Arrow Streaming) — first phase of v1.5.0
+Plan: — (not yet planned)
+Status: Ready to plan
+Last activity: 2026-07-01 — Roadmap created for v1.5.0 (5 phases, 31/31 requirements mapped)
+
+Progress: [░░░░░░░░░░] 0%
+
+## Accumulated Context
+
+### Roadmap (v1.5.0)
+
+Five phases, numbered 29–33 (monotonic continuation from v1.4.0's Phase 28). Dependency-ordered per the research consensus: highest-risk streaming first, then the trivial wrappers, then edge hardening, then docs.
+
+- **Phase 29 — Arrow Streaming** (STREAM-01..06, EDGE-33/20/22/23, PKG-01, PKG-03): the headline and only genuine design risk. New `AsyncRecordBatchReader` wrapper; per-batch `cancellable_offload` in `__anext__`; reader lifetime bound to the checked-out connection; reset-event checkin closes the reader first so read-after-checkin surfaces the driver's native closed-stream error (no bespoke error type — D confirmed by maintainer). Introduces the `__aexit__`/`__del__` surface (EDGE-20/22/23) that later phases reuse. First `_SyncCursor` Protocol extension (PKG-01) and owns the import-lint gate (PKG-03).
+- **Phase 30 — Async Bulk Write** (INGEST-01..04): `adbc_ingest`, single whole-op offload, `on_abort=invalidate`, typed `Literal` mode with the `replace`-drops-table warning. Implementation note: keyword-only args through the PEP 646 TypeVarTuple offload boundary — resolve via the existing explicit-arm/partial pattern (spike in phase planning).
+- **Phase 31 — DataFrame Convenience** (DF-01..04, PKG-02): `fetch_df`/`fetch_polars`, trivial single-offload wrappers; native `ModuleNotFoundError` passes through unchanged; frames self-owning after checkin. PKG-02 (pandas/polars → dev group only) lands here — first phase needing them in tests.
+- **Phase 32 — P2 Edge Hardening** (EDGE-08/13/14/24/31/32): test-only additions extending existing chokepoint coverage across the new paths, plus `__del__` finalizers. Reuses the Phase 23 `BlockingStubCursor` harness.
+- **Phase 33 — Documentation** (DOCS-01..04): consolidation point — streaming guide, ingest mode table + replace warning, DataFrame user-supplied note, API reference for the new symbols, `mkdocs build --strict`, humanizer pass.
+
+### Roadmap Decisions (v1.5.0)
+
+- **Phase numbering continues monotonically from v1.4.0's Phase 28 → starts at Phase 29** (established project convention; no reset across milestones).
+- **Streaming front-loaded (Phase 29)** — the reader-lifetime design is the single novelty; every other method is a straightforward reuse of the existing chokepoint. Its `__aexit__`/`__del__`/`_detached`/per-batch-cancel patterns are copied by Phases 30–31, so it goes first (all four researchers converged on this order).
+- **No bespoke async error type** (maintainer governing principle): async methods mirror the sync method's native errors. The reset-event checkin already makes read-after-checkin a clean driver exception (STREAM-04), so no `ReaderClosedError` class ships. Likewise no `find_spec` pre-check for missing pandas/polars (DF-03) — the native `ModuleNotFoundError` propagates unchanged.
+- **PKG-* are cross-cutting gates but assigned to one phase each for coverage**: PKG-01 + PKG-03 → Phase 29 (first Protocol extension / import-lint owner); PKG-02 → Phase 31 (first pandas/polars test need). basedpyright-strict + AST import-lint are enforced in every phase regardless.
+- **Docs gate applies to every phase** (CLAUDE.md: docs-author skill in `<execution_context>` for all phases ≥ 7): per-method Google-style docstrings (Args/Returns/Raises + `Example:`) are a completion requirement in each phase, not just Phase 33. Phase 33 is the consolidation point (guides + API reference + strict build).
+- **Only P2 EDGE ids in scope** (EDGE-08/13/14/20/22/23/24/31/32/33); the P1 suite shipped in v1.4.0. EDGE-16 remains permanently DROPPED (D-24-03: connection aliasing rejected via `ConnectionBusyError`).
+
+### Carried-forward gotchas (from v1.4.0, still load-bearing)
+
+- **Real-clock watchdog, not `anyio.fail_after`, for concurrency bodies** — a virtual `fail_after` autojumps under the trio MockClock the instant the worker blocks off-loop. Release gated workers from a REAL thread.
+- **Loop-stability: run cancellation/concurrency tests ×20, assert 0 hangs** — single-shot missed a ~33% deadlock in Phase 23; DuckDB `adbc_cancel` intermittently wedges the C execute (~10–40% cold), so real-driver cancel legs prove the downstream invalidate invariant deterministically rather than racing the wedge.
+- **Every async test parametrized over asyncio AND trio** (`@pytest.mark.anyio`); DuckDB in-proc + Snowflake `pytest-adbc-replay` cassette (one recorded interaction per cassette). No positive-duration sleeps in timeout tests (source-scanned).
+- **`.venv/bin/<tool>` over `uv run <tool>`** for hooks/mkdocs under the sandbox; `.venv/bin/basedpyright` is authoritative (harness Pyright gives false import-resolution errors). `DISABLE_MKDOCS_2_WARNING=true` + exit-code (not grep) for the strict-build gate.
+- **gsd-tools lacks mutation handlers** — edit STATE/ROADMAP/REQUIREMENTS by hand, commit via `query commit --files`.
+
+### Blockers/Concerns
+
+- **`fetch_record_batch` returns a LIVE reader** (confirmed use-after-free/`ArrowInvalid` on read-after-checkin, DuckDB-probed): the entire Phase 29 design rests on binding the reader lifetime to the checked-out connection and forbidding checkin-while-live. This is the milestone's one real risk — verify the closed-before-checkin ordering on both DuckDB and the Snowflake cassette.
+- **Keyword-only args across the TypeVarTuple offload boundary** (Phase 30): not a blocker, but resolve the explicit-arm-vs-partial pattern in phase planning.
 
 ## Deferred Items
 
@@ -41,139 +84,8 @@ Items acknowledged and deferred at v1.4.0 milestone close on 2026-07-01:
 
 Pre-v1.4.0 tracking cruft plus one non-functional docstring; run `/gsd-cleanup` to triage.
 
-## Current Position
-
-Phase: Not started (defining requirements)
-Plan: —
-Status: Defining requirements
-Last activity: 2026-07-01 — Milestone v1.5.0 started
-
-## Performance Metrics
-
-| Metric | Value |
-|--------|-------|
-| Phases planned | 7 (22–28) |
-| Requirements | 63 (100% mapped) |
-| Plans complete | 0 |
-| Phase 22 P01 | 35min | 3 tasks | 5 files |
-| Phase 22 P02 | ~20min | 2 tasks | 1 files |
-| Phase 23 P01 | ~12min | 3 tasks | 4 files |
-| Phase 23 P02 | 4min | 3 tasks | 4 files |
-| Phase 23 P03 | 25m | 2 tasks | 2 files |
-| Phase 23 P04 | 10min | 3 tasks | 1 files |
-| Phase 24 P01 | 30min | 2 tasks | 3 files |
-| Phase 24 P02 | 7min | 2 tasks | 7 files |
-| Phase 24 P03 | 6min | 2 tasks | 2 files |
-| Phase 24 P04 | ~25min | 3 tasks | 10 files |
-| Phase 24 P05 | ~12min | 2 tasks | 4 files |
-| Phase 25 P01 | 9min | 2 tasks | 4 files |
-| Phase 25 P02 | 15min | 2 tasks | 4 files |
-| Phase 25 P03 | ~95min | 2 tasks | 3 files |
-| Phase 25 P04 | ~7min | 2 tasks | 2 files |
-| Phase 26 P01 | ~10min | 2 tasks | 3 files |
-| Phase 26 P02 | 5min | 2 tasks | 3 files |
-| Phase 26 P03 | ~6min | 1 tasks | 1 files |
-| Phase 26 P04 | ~30min | 1 tasks | 2 files |
-| Phase 27 P01 | ~20min | 3 tasks | 3 files |
-| Phase 27 P02 | ~15min | 1 tasks | 1 files |
-| Phase 27 P03 | ~5min | 1 tasks | 1 files |
-| Phase 27 P04 | ~15min | 1 tasks | 1 files |
-| Phase 28 P01 | ~12min | 2 tasks | 2 files |
-| Phase 28 P02 | ~20min | 2 tasks | 1 files |
-| Phase 28 P03 | ~10min | 2 tasks | 2 files |
-| Phase 28 P04 | ~12min | 2 tasks | 1 files |
-
-## Accumulated Context
-
-### Decisions
-
-All v1.0.0–v1.2.0 decisions recorded in PROJECT.md Key Decisions table.
-
-v1.4.0 roadmap decisions:
-
-- **Phase numbering continues monotonically from v1.3.0's Phase 21.1 → starts at Phase 22** (established project convention: monotonic across milestones).
-- **Feasibility spike is Phase 22 and gates the milestone** (research SUMMARY strong recommendation): the GIL-release premise for pyarrow `fetch_arrow_table` materialization is MEDIUM-confidence and must be validated before the full surface is built. SPIKE-03 go/no-go explicitly gates Phase 24.
-- **Test-harness foundation pulled forward to Phase 23** (before the wrappers): TEST-05's `BlockingStubCursor` + event-gating/virtual-clock helpers + import-lint guard are prerequisites for the EDGE suites in Phases 24–25, so the harness lands before the code it exercises to avoid churn.
-- **Cancellation is its own Phase 25** (research SUMMARY: #1 correctness risk by a margin — every surveyed async DB library shipped a cancel-leak bug). Dedicated phase for focused design review and explicit no-leak assertions under asyncio + trio.
-- **Structural EDGE tests co-located with the behaviour they test**: limiter/reentrancy/exception/lifetime/hygiene EDGE (09,10,11,12,15,17,18,21,25,26) → Phase 24 (Core); cancellation EDGE (01–07,19,28,29) → Phase 25; meta/test-infra EDGE (27,30) → Phase 27 (Testing).
-- **EDGE-19 (ExceptionGroup/task-group) → Cancellation (Phase 25)** rather than Core, because it pins keeping cancellation distinguishable from real ADBC errors in a task group — a cancellation-correctness concern tied to CANCEL-04.
-- **Only the 22 P1 EDGE ids are in scope**; P2 EDGE (08,13,14,16,20,22,23,24,31,32) are deferred to v1.4.x per REQUIREMENTS.md Future Requirements.
-- **Async layer lives in a new `src/adbc_poolhouse/_async/` package and reuses the sync core unchanged** (`_create_pool_impl`, config dispatch, 13-backend Protocol, `_release_arrow_allocators` reset event).
-- **Documentation is Phase 28 (consolidation point)**, but per-phase docstrings are a completion requirement throughout (CLAUDE.md docs gate applies to all phases ≥ 7; every v1.4.0 phase is well past that — include the docs-author skill in `<execution_context>`).
-- [Phase ?]: GIL spike measured: execute parallelizes (2.77x@N=4, eff 0.69); fetch_arrow_table partially serializes (1.67x@N=4, eff 0.42) — confirms execute>>fetch asymmetry, GO with materialization caveat
-- [Phase ?]: Benchmark uses raw threads only (Barrier+ThreadPoolExecutor), file-backed temp DuckDB, real create_pool checkout path; benchmarks/ stays outside src/
-- [Phase ?]: Phase 22 SPIKE-03 go/no-go: GO with a named fetch_arrow_table materialization caveat; gates Phase 24
-- [Phase ?]: Phase 24 offload granularity: whole-operation (one to_thread per execute, one per fetch); CapacityLimiter(pool_size+max_overflow) governs cross-query concurrency where the I/O-bound win is real
-- [Phase ?]: Spike proves GIL release / CPU parallelism but INFERS I/O concurrency (in-proc DuckDB has no network wait); Phase 27 dual-backend matrix exercises real backends
-- [Phase 23]: anyio/trio/aiotools added to [dependency-groups] dev only (D-07); runtime deps untouched so the shipped wheel gains no async dependency (zero-cost-sync-path goal)
-- [Phase 23]: anyio_backend fixture lives in a NESTED conftest (tests/_async_harness/), no anyio_mode=auto — conftest fixtures propagate downward only, so the sync suite never loads the anyio plugin (Pitfall 4) and Plan 04 self-tests must sit at tests/_async_harness/test_harness.py
-- [Phase 23]: anyio_backend is function-scoped — fresh trio MockClock(autojump_threshold=0) per test avoids virtual-clock state bleed
-- [Phase ?]: stubs.py strictly anyio-free (D-03); anyio bridge lives only in gating.py (T-23-03)
-- [Phase ?]: Dual-entered documented: threading.Event sync signal (stub) vs anyio.Event loop gate (run_blocking) — T-23-07/Pitfall 2
-- [Phase ?]: D-05 guard shipped as scan_async_package(root)->list[Finding]; aliased run_sync re-import is an accepted, test-locked limitation
-- [Phase 23]: A1 RESOLVED (positive): anyio asyncio move_on_after honours aiotools VirtualClock().patch_loop(); asyncio virtual-clock leg passes — no event-gating fallback needed for the asyncio timeout leg
-- [Phase 23]: Dual-backend harness self-tests live INSIDE tests/_async_harness/ (anyio_backend propagates downward); tg.start_soon binds entered=/limiter= via functools.partial; virtual-clock proofs use a real time.monotonic() watchdog (a nested virtual fail_after autojumps to its own deadline first under MockClock)
-- [Phase ?]: [Phase 24]: entered bridged via the stub's on_enter hook fired INSIDE _block (D-CF-01) — fixes the WR-01 re-arm deadlock at the root, making await entered a true 'inside the block' signal
-- [Phase ?]: [Phase 24]: on_enter is a single-worker attribute PLUS a per-thread register_on_enter registry — a single shared attribute deadlocked test_max_concurrent (two workers on one cursor, last-writer-wins clobber)
-- [Phase ?]: [Phase 24]: re-arm watchdog is a real time.monotonic() side thread that close()s the stub, NOT anyio.fail_after (a virtual fail_after autojumps under the trio MockClock the instant the worker blocks off-loop)
-- [Phase ?]: [Phase 24]: PEP 695 generic syntax rejected for a TypeVar — project pins pythonVersion=3.11; PEP 695 needs 3.12+
-- [Phase ?]: [Phase 24]: backend config names appear only in docstring Example: blocks; zero in executable _async/ code (D-24-04 verified by AST identifier scan)
-- [Phase ?]: [Phase 24]: AsyncConnection/AsyncCursor shipped as typed contracts (raise NotImplementedError) so connect() is typeable; Plan 03 fills bodies against the frozen interface
-- [Phase 24]: Plan 03 settled Open Q1/A3 — the SQLAlchemy _ConnectionFairy proxies commit/rollback/cursor/close straight to the dbapi connection (probed on DuckDB); no driver_connection unwrap needed
-- [Phase 24]: AsyncCursor lives in its own module src/adbc_poolhouse/_async/_cursor.py (split out of _connection.py); _SyncCursor structural Protocol types the driver-agnostic dbapi cursor surface, with a single cast at AsyncConnection.cursor() to bridge SQLAlchemy's narrower DBAPICursor type
-- [Phase 24]: _in_use is a plain bool check-and-set (no await between read and write), never a lock — 2nd concurrent caller is rejected with ConnectionBusyError, not queued (D-24-03 implemented); EDGE-15/18/21 behavioral proofs deferred to Plan 04
-- [Phase ?]: [Phase 24]: Plan 04 verification backbone — happy-path lifecycle (both backends + Snowflake cassette) + EDGE-09/10/11/12/15/17/18/21/25/26 all green and x20 loop-stable (0 hangs); EDGE-09 cancel-mid-block correctly absent (D-24-02)
-- [Phase ?]: [Phase 24]: tests/async cannot be imported by dotted path (async is a keyword) — sibling helpers loaded via importlib; real-clock watchdog (not anyio.fail_after) used for concurrency bodies per the MockClock autojump gotcha
-- [Phase ?]: [Phase 24]: Async docs gate closed — guide quotes Phase 22 SPIKE numbers honestly (execute ~2.77x@N=4, fetch_arrow_table ~1.67x@N=4, in-process DuckDB caveat); aliasing antipattern + ConnectionBusyError documented (D-24-03)
-- [Phase ?]: [Phase 24]: AsyncPool/AsyncConnection/AsyncCursor are NOT top-level exports — guide cross-refs only the exported factory fns + ConnectionBusyError; method-level mkdocstrings refs fail autorefs --strict, use inline code
-- [Phase 25]: BlockingStubConnection gained lock-guarded invalidate()/invalidate_call_count (D-04 LOCKED contract); the seam AsyncConnection.invalidate() -> self._fairy.invalidate() (D-25-03) that stub-backed EDGE-02/04/05/29 assert by name
-- [Phase 25]: AST guard gained banned-asyncio-cancelled-error rule (_GuardVisitor.visit_Attribute, EDGE-28/D-25-06); real _async/ scan stays clean; D-03 preserved (stubs.py still pure-threading)
-- [Phase 25]: strict basedpyright pre-commit gate forces RED+GREEN co-commit when a RED test references a not-yet-existing attribute (Task 1); RED verified via pytest before GREEN landed
-- [Phase 25]: cancellable_offload (watcher/worker task group) + AsyncConnection.invalidate (shielded, bypasses _in_use) shipped; six AsyncCursor query/fetch methods rewired; close untouched (D-25-04); to_thread.run_sync stays literal in _offload.py (scan []) 
-- [Phase 25]: invalidate moved INTO cancellable_offload via an on_abort shielded callback, gated on a worker_started flag (set on the worker thread = entered-driver boundary) — the verbatim RESEARCH cursor-except design deadlocked on a saturated-limiter queued-cancel and over-invalidated never-poisoned connections (EDGE-01/07); fix keeps TestEdge10 green and x20 loop-stable
-- [Phase 25]: adbc_cancel resolved lazily via getattr in AsyncCursor._adbc_cancel — the pytest-adbc-replay ReplayCursor (D-24-04 cassette backend) lacks adbc_cancel; eager attribute access crashed the Snowflake leg on the success path
-- [Phase 25]: method-level mkdocstrings autoref to _async._connection.AsyncConnection.invalidate fails --strict (the gen_ref_pages.py skips any _-prefixed module path) — confirms the Phase-24 lesson; guide names invalidate in inline code, not a cross-ref link
-- [Phase 25]: 25-02's cancellable_offload leaked the driver interrupt on the REAL cancel path — anyio does NOT collapse the bundle as research assumed; the aborted DuckDB worker RAISES ProgrammingError, surfaced as a single-member ExceptionGroup that escaped past fail_after. Fixed in 25-03 with a cancelled_by_us flag that swallows the interrupt and yields one cancellation checkpoint so the caller's TimeoutError/scope.cancel surfaces (D-25-02/05). Stub legs never hit this (stub adbc_cancel returns the worker cleanly)
-- [Phase 25]: DuckDB's adbc_cancel against an in-flight query is best-effort AND intermittently WEDGES the worker thread inside the C execute (~10-40% of cold runs, faulthandler-confirmed) — an unfixable driver-level hang. The real-driver EDGE-02 leg therefore proves the downstream invariant (AsyncConnection.invalidate drains checkedout() to 0) deterministically instead of racing the wedge-prone cancel; the cancel->abort->invalidate wiring is proven on the stub during leg, real cancel-during-checkin on the trio-stable checkin_duckdb leg
-- [Phase 25]: real-time-sensitive cancel/finish legs release the gated worker from a REAL thread (waiting on the stub's entered threading.Event), because a loop-side releaser is starved under the trio MockClock autojump (EDGE-07)
-- [Phase 25]: EDGE-19 pins the 25-02 single-member-EG unwrap on a real DuckDB pool — a genuine AdbcError escapes cancellable_offload BARE (pytest.raises(AdbcError) AND not isinstance(excinfo.value, BaseExceptionGroup)); after a NON-cancel error the connection returns via the reset path (_pool.checkedout()==0), NOT invalidated (invalidate-only-on-cancel, Pitfall 6 / EDGE-18)
-- [Phase 26]: [async] extra pins anyio>=4.13 (D-02, NOT >=4.0.0) matching the dev-group floor → resolves to 4.14.1; [all] gains adbc-poolhouse[async]; no new third-party package introduced (T-26-01 accept). uv.lock relocked so Plan 04's --locked no-anyio install stays coherent. Metadata test (tests/test_pkg_extra.py) is anyio-free (importlib.metadata only) so it collects under the no-anyio CI job
-- [Phase 26]: PKG-05 tightened offload()/cancellable_offload() with PEP 646 TypeVarTuple/Unpack (fn: Callable[[Unpack[_Ts]], _T] + *args: Unpack[_Ts]) — NOT ParamSpec (the typing spec forbids keyword-only limiter/on_dispatch/on_abort after *args: P.args; RESEARCH Pitfall 1, basedpyright reportGeneralTypeIssues). Mirrors anyio's own to_thread.run_sync. Positional args now type-checked at the dispatch boundary; basedpyright strict stays 0 errors. The anyio.to_thread.run_sync chokepoint body left byte-for-byte (scan_async_package clean). Kept the mandated Unpack[] spelling + per-line noqa UP044 (ruff wants inline *_Ts; both type-check at pythonVersion 3.11). tests/test_offload_typing.py pins the win: load-bearing # pyright: ignore[reportArgumentType] on str-where-int probes (stripping them surfaces 2 errors; a *args: object regression makes them unnecessary → red). Fixture imports offload under TYPE_CHECKING (anyio-free, collects in no-anyio CI)
-- [Phase 26]: PKG-02/03 pinned by tests/test_pkg_import_guard.py — two anyio-free tests share one meta-path-block child interpreter (importlib.abc.MetaPathFinder raising ImportError for anyio*). Subprocess (not in-process monkeypatch) is mandatory: sys.modules caching of anyio/_async from an earlier worker test would mask the guard's except-ImportError negative branch (RESEARCH Pitfall 2). Each branch prints its own sentinel (SYNC_IMPORT_OK / ASYNC_GUARD_OK) so the child proves the asserted path executed. D-01 honored — src/adbc_poolhouse/__init__.py left byte-for-byte. Module is anyio-free at collection so it collects under Plan 04's no-anyio CI job
-- [Phase 26]: PKG-04 sync-no-anyio CI job shipped — uv sync --locked --no-default-groups --extra duckdb --extra sqlite (drops the dev group, the only place anyio/trio live), asserts find_spec('anyio') is None (T-26-07), runs the sync suite via uv run --with pytest --with pytest-adbc-replay. RESEARCH/PLAN under-specified the deselection: tests/_async_harness (trio.testing at collection) must ALSO be ignored alongside tests/async, and the snowflake/databricks markers deselected (pytest-adbc-replay keys the cassette on the installed driver, which the minimal install omits → CassetteMissError). Added --extra sqlite so the SQLite integration test runs (anyio-free, in-proc). [Rule 1] TestNoGlobalState eagerly getattr'd lazy async names → ImportError under the supported [async]-absent install; now skips names whose access raises. Verified end-to-end in a clean throwaway UV_PROJECT_ENVIRONMENT venv: 299 passed, 4 deselected, anyio genuinely absent. Live GitHub Actions run is the one manual-only item, auto-approved under --auto pending next push
-- [Phase 25]: EDGE-09 cancel-mid-block leg (D-24-02 owed from Phase 24) lands — gate a stub worker inside execute, cancel the scope so the watcher fires adbc_cancel, assert adbc_cancel_call_count==1 + borrowed_tokens==0 after the cancelled offload (transient token released exactly once), x50, both backends, x20 loop-stable; a belt-and-braces finally release keeps the group fail-fast (never a hang) without changing the happy cancel path
-- [Phase 27]: P01 shared primitives — snowflake_async_pool cassette fixture (D-27-04, mirrors duckdb_async_pool: importorskip driver, skip on absent cassette, replay-mode dummy SNOWFLAKE_ACCOUNT, close in finally; cassette NOT mounted in the fixture — the consumer carries the adbc_cassette marker) + two pure-AST guard callables. scan_async_test_hygiene (EDGE-27/D-27-01) flags import asyncio, @pytest.mark.asyncio (plain+called), and async def test_* missing @pytest.mark.anyio — the axis signal is the PRESENCE of the marker, NOT a literal anyio_backend arg (RESEARCH Pitfall 2). scan_for_positive_sleep (EDGE-30) flags sleep(<positive numeric literal>) for both <mod>.sleep and bare sleep, ALLOWS sleep(0)/sleep(0.0)/non-literal args (bool excluded). Both exposed exactly like scan_async_package (rglob + tolerant ast.parse + absent-root []) via a shared _scan_with helper; scan_async_package/_GuardVisitor untouched. 16 synthetic self-tests added (27 guard tests green). No src/ change. EDGE-30 meta-scan scope is tests/async/ ONLY (_async_harness has deliberate virtual-clock sleeps)
-- [Phase 27]: P02 read-path matrix (TEST-01/02) — tests/async/test_matrix_readpath.py: connect->execute->fetch_arrow_table/fetchall->checkin x {DuckDB, Snowflake cassette} x {asyncio, trio} = 8 green legs; checkedout()==0 both backends; no src/ change. THREE test-authoring corrections vs the PATTERNS.md plan, all real-cassette/driver discoveries: (1) getfixturevalue in the @pytest.mark.anyio test BODY re-enters the anyio runner (RuntimeError: another coroutine already running) for async-generator pool fixtures — moved the backend-name indirection into a SYNC `pool` fixture (params=_BACKENDS) resolved at SETUP, tests take `pool` directly; (2) snowflake_arrow_round_trip cassette has exactly ONE recorded interaction — a 2nd execute raises CassetteMissError(Interaction 1 not found), so each test does ONE execute (dropped the planned 2nd-execute fetchone leg); (3) backend-neutral assertions required — Snowflake folds unquoted aliases to N/S (DuckDB keeps n/s) and returns N as Decimal('1') (DuckDB int 1), so added a case-insensitive _col() helper and compared by value (Decimal('1')==1). fetchall is typed `object` on the async surface -> cast to Sequence[Sequence[object]]. basedpyright strict 0 errors, hygiene guard clean, mkdocs --strict passes
-- [Phase 28]: P04 DOCS-04 docs quality gate closed — Phase 28 COMPLETE, v1.4.0 async docs closeout done. Humanizer judgment pass over all five phase-28 surfaces (async.md, index.md, configuration.md, changelog.md, and the reference prose in gen_ref_pages.py _ASYNC_REFERENCE_BLOCK — NOT the gitignored generator-shadowed on-disk reference/adbc_poolhouse.md). Prior waves authored with the docs-author humanizer patterns already applied, so only ONE prose change was needed: convert a paired em-dash parenthetical in configuration.md's Async pools subsection to parentheses (max-one-em-dash-per-paragraph). Banned-term subset (seamlessly|leverage|delve|effortlessly|"it's worth noting") absent across all five files. KEY VERIFICATION FINDING: the plan's strict-build grep `grep -qiE 'WARNING|ERROR'` false-positives — a recent Material-for-MkDocs release injects a boxed promotional banner ("Warning from the Material for MkDocs team" / "ProperDocs") on every build that contains the word "Warning" but is NOT a strict-mode warning. Authoritative gate = mkdocs EXIT CODE (0) + precise `^(WARNING|ERROR)[[:space:]]*-` log-line grep (matched nothing, after ANSI strip); set DISABLE_MKDOCS_2_WARNING=true to quiet the textual nag. Build exits 0, site/index.html + site/reference/adbc_poolhouse/index.html built, async symbols render (AsyncPool/Connection/Cursor + 3 entry points). T-28-04-I: no credential literals in phase-28 async prose (all credential-pattern matches are pre-phase-28 intentional demos: aws_secret_access_key field name, postgresql://me:s3cret with allowlist pragma, SnowflakeConfig password="s3cret" SecretStr-masking demo). Task 2 verification-only, no commit. Commit abbf002.
-- [Phase 28]: P03 configuration async gap closed + v1.4.0 experimental changelog (DOCS-03/D-28-01 changelog leg) — configuration.md gained an Async pools subsection after Pool tuning naming the [async] extra + the three entry points (create_async_pool/managed_async_pool/close_async_pool mirroring the sync signatures + same pool_size/max_overflow/timeout/recycle/pre_ping defaults), the CapacityLimiter(pool_size + max_overflow) sizing note (so existing tuning fields govern async concurrency), a !!! warning "Experimental" admonition, and an async.md cross-link in both the section and the See also list. changelog.md gained a [1.4.0] - Unreleased entry under [Unreleased] in the existing dated-section + bullet convention, async marked EXPERIMENTAL, sync path noted unchanged/zero async dependency, no deferred feature listed as shipped. index.md confirmed to already list the extra + entry points (28-01) — NOT duplicated. No deviations; both grep verifications passed first run; .venv/bin/mkdocs build --strict exit 0.
-- [Phase 28]: P02 async classes rendered in API reference (DOCS-02/D-28-02 option a) — AsyncPool/AsyncConnection/AsyncCursor documented at their real `_async._*` module paths via explicit mkdocstrings blocks. CRITICAL discovery: the blocks must be injected by the gen-files generator (`docs/scripts/gen_ref_pages.py`), NOT hand-edited into `docs/src/reference/adbc_poolhouse.md` — that on-disk file is gitignored and SHADOWED by the gen-files virtual-FS copy at build time, so hand edits are silently dropped (first build rendered ZERO of the three blocks). Moved the blocks into the generator as a `_ASYNC_REFERENCE_BLOCK` appended after `::: adbc_poolhouse`. Per-block `filters: ["!^__"]` (plan-mandated form) replaces the global `["!^_"]` so the single-underscore `_async._*` path resolves; side effect: a few single-underscore helpers (`_enter_offload`, `_exit_offload`, `_offloading`, `_adbc_cancel`) now render too (documented consequence of the mandated filter, not a bug). Task 2 needed NO extra blocks — the three entry-point functions already render via the package `::: adbc_poolhouse` block (in `__all__` + TYPE_CHECKING re-declaration → griffe collects them statically despite PEP-562 lazy runtime export). `__init__.py` byte-for-byte unchanged (T-28-02-T honored). `.venv/bin/mkdocs build --strict` exit 0. NOTE: basedpyright pre-commit hook PANICS under the command sandbox (macOS SystemConfiguration NULL-object / Tokio executor failure); passes cleanly outside the sandbox — env restriction, not a type error.
-- [Phase 28]: P01 async experimental caveat (DOCS-01/D-28-01) — `!!! warning "Experimental"` admonition added to async.md (before Install) naming the five deferred feature areas (Arrow streaming/fetch_record_batch, adbc_ingest, fetch_df/fetch_polars, async metadata, async prepared statements) sourced from REQUIREMENTS.md Future Requirements; one experimental flag line added to index.md Async section linking the guide. D-28-03 audit: async.md "What actually runs in parallel" prose verified against 22-GO-NO-GO.md (execute ~2.77x/~69%, fetch_arrow_table ~1.67x/~42%, parallelism-vs-I/O-concurrency distinction, in-process DuckDB inference gap, no linear-speedup promise) — already faithful, NO over-claim found, no edit to the parallelism section. Status carried by guide+index prose, not per-symbol docstring caveats (D-28-01). `.venv/bin/mkdocs build --strict` exit 0.
-- [Phase 27]: P04 limiter saturation stress (TEST-04) — tests/async/test_limiter_stress.py: stub-gated 4x(pool_size+max_overflow) flood (EDGE-12 pattern) of 32 stub-backed AsyncConnections sharing ONE CapacityLimiter(8) proves running-max == bound (borrowed_tokens==8 at saturation, never exceeded) + no starvation (close()-drain -> borrowed_tokens==0). Used the SHIPPED defaults 5+3=8 for the bound (Open Question 1) — 32 gated stubs are cheap, so prove the real shipped bound not a stand-in. close()-drain not release() (Phase 26 lost-wakeup); real_clock_watchdog not anyio.fail_after (Phase 24/25 trio MockClock autojump). [Rule 1] real-DuckDB smoke flood (4x bound real round trips) needed a CapacityLimiter(bound) gating concurrently-HELD connections: holding all 32 open at once genuinely exceeds the real QueuePool (5+3) and trips its 30s checkout TimeoutError (a real bounded-resource limit + hold-and-wait, not a wrapper bug) — gating the holds lets the bounded pool cycle every worker, checkedout()==0 afterwards. Both backends; x20 loop-stable (pass=20 fail=0, 0 hangs); no src/ change; in scope for the Plan 27-05 meta-scan (no import asyncio / @pytest.mark.asyncio / positive real sleep)
-
-### Roadmap Evolution
-
-- 22 phases completed across v1.0.0, v1.2.0, and v1.3.0 milestones (1–21, plus inserted 17.5 and 21.1).
-- v1.4.0 adds 7 phases (22–28) for the optional async API behind an `[async]` extra.
-- Phase ordering: Spike (22, gates) → Harness (23) → Core wrapper (24) → Cancellation (25) → Packaging (26) → Test matrix (27) → Docs (28).
-
-### Blockers/Concerns
-
-- **GIL / pyarrow materialization (MEDIUM confidence):** whether `fetch_arrow_table` / `fetchall` release the GIL during pyarrow object construction is unvalidated per-method. Phase 22 must resolve this before Phase 24 begins. If materialization serializes, document the limit honestly rather than re-architecting.
-- **Cancellation connection leak (highest industry-wide risk):** Phase 24 must never return a possibly-busy connection on any path even before the full `adbc_cancel` join lands in Phase 25.
-- **40-token global limiter:** the dedicated per-pool `CapacityLimiter` is a first-class Phase 24 requirement (CORE-02), not a Phase 27 load-test fix.
-
-### Quick Tasks Completed
-
-| # | Description | Date | Commit | Status | Directory |
-|---|-------------|------|--------|--------|-----------|
-| 10 | Rewrite integration tests to use pool API and wire up conftest fixtures | 2026-03-07 | 7721866 | Verified | [10-rewrite-integration-tests-to-use-pool-ap](./quick/10-rewrite-integration-tests-to-use-pool-ap/) |
-| 260624-u45 | Fix DatabricksConfig dropping catalog/schema in to_adbc_kwargs (DBX-02 follow-up) | 2026-06-24 | f72517b | Verified | [260624-u45-databricks-catalog-schema](./quick/260624-u45-databricks-catalog-schema/) |
-
 ## Session Continuity
 
-Last session: 2026-06-29T11:30:00.000Z
-Stopped at: Completed 28-04-PLAN.md (DOCS-04 docs quality gate — humanizer pass + mkdocs build --strict). Phase 28 is complete; all v1.4.0 milestone phases (22–28) are done.
-Next step: Phase 28 was the final phase of the v1.4.0 Async API milestone — run /gsd-transition then /gsd-complete-milestone for v1.4.0. NOTE (still open): the sync-no-anyio job's live GitHub Actions run is auto-approved pending the next push — confirm it is green on Actions when CI next runs. Also confirm the new Material-for-MkDocs "ProperDocs" advertising banner does not trip any strict-build CI gate that greps for the literal word "warning" (use the exit code, not a blunt grep).
-
-Phase 27 Plan 03 decisions: Arrow allocator-stability proved with an exact-zero pyarrow.total_allocated_bytes() delta over N=100 cursor cycles (NOT process RSS — D-27-07); reset-event count (the _release_arrow_allocators path) gathered once per checkin via a read-only sqlalchemy event.listen on pool._pool, no src/ change (ACONN-06 / D-27-08); runs x{asyncio, trio} via @pytest.mark.anyio (D-27-09); imported `from sqlalchemy import event` (repo _pool_factory.py form) to satisfy basedpyright. 20x loop-stable, 0 hangs.
-</content>
+Last session: 2026-07-01T11:30:00.000Z
+Stopped at: Created the v1.5.0 roadmap — ROADMAP.md (Phases 29–33, expanded milestone section + collapsed v1.4.0), REQUIREMENTS.md traceability (31/31 mapped, 100%), and this STATE.md refreshed for the new milestone.
+Next step: `/gsd-plan-phase 29` to decompose Arrow Streaming (the headline reader-lifetime phase). Note: v1.4.0 full per-plan decision log preserved in git history + PROJECT.md Key Decisions; this STATE.md is refocused on v1.5.0 as a digest.

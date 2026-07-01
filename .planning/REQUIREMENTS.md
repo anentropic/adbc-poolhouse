@@ -83,47 +83,54 @@ Explicit exclusions for this milestone (with reasoning):
 
 ## Traceability
 
-Populated during roadmap creation.
+Every v1.5.0 requirement maps to exactly one phase (Phases 29–33). PKG-* are cross-cutting gates enforced in every phase but assigned to a single phase each for coverage: PKG-01 (first Protocol extension) and PKG-03 (import-lint guard, owned early) → Phase 29; PKG-02 (pandas/polars first needed in tests) → Phase 31.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| STREAM-01 | TBD | Pending |
-| STREAM-02 | TBD | Pending |
-| STREAM-03 | TBD | Pending |
-| STREAM-04 | TBD | Pending |
-| STREAM-05 | TBD | Pending |
-| STREAM-06 | TBD | Pending |
-| INGEST-01 | TBD | Pending |
-| INGEST-02 | TBD | Pending |
-| INGEST-03 | TBD | Pending |
-| INGEST-04 | TBD | Pending |
-| DF-01 | TBD | Pending |
-| DF-02 | TBD | Pending |
-| DF-03 | TBD | Pending |
-| DF-04 | TBD | Pending |
-| PKG-01 | TBD | Pending |
-| PKG-02 | TBD | Pending |
-| PKG-03 | TBD | Pending |
-| EDGE-08 | TBD | Pending |
-| EDGE-13 | TBD | Pending |
-| EDGE-14 | TBD | Pending |
-| EDGE-20 | TBD | Pending |
-| EDGE-22 | TBD | Pending |
-| EDGE-23 | TBD | Pending |
-| EDGE-24 | TBD | Pending |
-| EDGE-31 | TBD | Pending |
-| EDGE-32 | TBD | Pending |
-| EDGE-33 | TBD | Pending |
-| DOCS-01 | TBD | Pending |
-| DOCS-02 | TBD | Pending |
-| DOCS-03 | TBD | Pending |
-| DOCS-04 | TBD | Pending |
+| STREAM-01 | Phase 29 | Pending |
+| STREAM-02 | Phase 29 | Pending |
+| STREAM-03 | Phase 29 | Pending |
+| STREAM-04 | Phase 29 | Pending |
+| STREAM-05 | Phase 29 | Pending |
+| STREAM-06 | Phase 29 | Pending |
+| INGEST-01 | Phase 30 | Pending |
+| INGEST-02 | Phase 30 | Pending |
+| INGEST-03 | Phase 30 | Pending |
+| INGEST-04 | Phase 30 | Pending |
+| DF-01 | Phase 31 | Pending |
+| DF-02 | Phase 31 | Pending |
+| DF-03 | Phase 31 | Pending |
+| DF-04 | Phase 31 | Pending |
+| PKG-01 | Phase 29 | Pending |
+| PKG-02 | Phase 31 | Pending |
+| PKG-03 | Phase 29 | Pending |
+| EDGE-08 | Phase 32 | Pending |
+| EDGE-13 | Phase 32 | Pending |
+| EDGE-14 | Phase 32 | Pending |
+| EDGE-20 | Phase 29 | Pending |
+| EDGE-22 | Phase 29 | Pending |
+| EDGE-23 | Phase 29 | Pending |
+| EDGE-24 | Phase 32 | Pending |
+| EDGE-31 | Phase 32 | Pending |
+| EDGE-32 | Phase 32 | Pending |
+| EDGE-33 | Phase 29 | Pending |
+| DOCS-01 | Phase 33 | Pending |
+| DOCS-02 | Phase 33 | Pending |
+| DOCS-03 | Phase 33 | Pending |
+| DOCS-04 | Phase 33 | Pending |
 
 **Coverage:**
 - v1.5.0 requirements: 31 total
-- Mapped to phases: 0 (roadmap pending)
-- Unmapped: 31 ⚠️
+- Mapped to phases: 31 (100%) ✓
+- Unmapped: 0 ✓
+
+**Per-phase counts:**
+- Phase 29 (Arrow Streaming): 12 — STREAM-01..06, EDGE-20, EDGE-22, EDGE-23, EDGE-33, PKG-01, PKG-03
+- Phase 30 (Async Bulk Write): 4 — INGEST-01..04
+- Phase 31 (DataFrame Convenience): 5 — DF-01..04, PKG-02
+- Phase 32 (P2 Edge Hardening): 6 — EDGE-08, EDGE-13, EDGE-14, EDGE-24, EDGE-31, EDGE-32
+- Phase 33 (Documentation): 4 — DOCS-01..04
 
 ---
 *Requirements defined: 2026-07-01*
-*Last updated: 2026-07-01 after initial definition*
+*Last updated: 2026-07-01 — traceability populated during roadmap creation (Phases 29–33, 100% coverage)*

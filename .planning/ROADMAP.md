@@ -2,14 +2,23 @@
 
 ## Milestones
 
+- 🚧 **v1.5.0 Async Cursor Completion** — Phases 29–33 (in progress)
 - ✅ **v1.4.0 Async API** — Phases 22–28 (shipped 2026-07-01)
 - ✅ **v1.3.0 Quack Backend** — Phases 21–21.1 (shipped 2026-05-21)
 - ✅ **v1.2.0 Plugin/Extensibility API** — Phases 16-20 (shipped 2026-03-15)
 - ✅ **v1.0.0 MVP + Backend Expansion** — Phases 1-15 (shipped 2026-03-07)
 
-_Next milestone: TBD — run `/gsd-new-milestone`._
-
 ## Phases
+
+### 🚧 v1.5.0 Async Cursor Completion (In Progress)
+
+**Milestone Goal:** Complete the async cursor surface by offloading the four v1.4.0-deferred ADBC cursor methods (`fetch_record_batch` Arrow streaming, `adbc_ingest` bulk write, `fetch_df`/`fetch_polars` DataFrame convenience) and land the deferred P2 async edge-case hardening suite. Every new method is a pure offload wrapper over a method that already exists on the wrapped sync `dbapi.Cursor`, routed through the existing v1.4.0 `offload`/`cancellable_offload` chokepoint and per-pool `CapacityLimiter` — no new runtime deps, no new extras, no sync-core change. Async methods mirror the underlying sync method's behavior: no invented async-specific error types, no `find_spec` pre-checks, no bespoke wrapping.
+
+- [ ] **Phase 29: Arrow Streaming** — `await cursor.fetch_record_batch()` → `AsyncRecordBatchReader` with per-batch offloaded `async for`, reader-lifetime bound to checkout, read-after-checkin surfaces the driver's native closed-stream error
+- [ ] **Phase 30: Async Bulk Write** — `await cursor.adbc_ingest(table, data, mode=...)`, single whole-op offload, typed `Literal` mode, `on_abort=invalidate` on cancel
+- [ ] **Phase 31: DataFrame Convenience** — `await cursor.fetch_df()` / `await cursor.fetch_polars()`, single-offload wrappers returning self-owning frames; pandas/polars user-supplied
+- [ ] **Phase 32: P2 Edge Hardening** — remaining deferred P2 edge cases (contextvars, trio-checkpoint, timeout precision, loop-shutdown, finalizers) extended across the new streaming/ingest/DataFrame paths
+- [ ] **Phase 33: Documentation** — streaming guide, ingest mode table + replace warning, DataFrame user-supplied note, API reference for the new symbols, `mkdocs build --strict` gate, humanizer pass
 
 <details>
 <summary>✅ v1.4.0 Async API (Phases 22-28) — SHIPPED 2026-07-01</summary>
@@ -67,17 +76,82 @@ Full detail: `milestones/v1.4.0-ROADMAP.md` · Audit: `milestones/v1.4.0-MILESTO
 
 </details>
 
+## Phase Details (v1.5.0)
+
+### Phase 29: Arrow Streaming
+**Goal**: Users can stream Arrow query results lazily via `await cursor.fetch_record_batch()` → `async for batch in reader:`, with the reader's lifetime safely bound to the checked-out connection so read-after-checkin surfaces a clean driver error rather than a use-after-free. This is the milestone's headline and only genuine design risk, front-loaded because the reader-lifetime patterns (`__aexit__`, `__del__`, `_detached` guard, per-batch `cancellable_offload`) are copied by later phases.
+**Depends on**: Phase 28 (v1.4.0 async layer shipped)
+**Requirements**: STREAM-01, STREAM-02, STREAM-03, STREAM-04, STREAM-05, STREAM-06, EDGE-33, EDGE-20, EDGE-22, EDGE-23, PKG-01, PKG-03
+**Success Criteria** (what must be TRUE):
+  1. `await cursor.fetch_record_batch()` returns an `AsyncRecordBatchReader`; `async for batch in reader:` yields `pyarrow.RecordBatch` chunks with each `read_next_batch()` pull offloaded individually through the pool limiter (STREAM-01, STREAM-02)
+  2. The reader is an async context manager (`await reader.close()` / `__aexit__` closes it offloaded-and-shielded), and reading after checkin or after close surfaces the driver's native closed-stream error — a clean Python exception, never a segfault — proven on DuckDB and the Snowflake cassette under asyncio and trio; drain-then-checkin yields correct rows (STREAM-03, STREAM-04, EDGE-33)
+  3. Cancelling or timing out a batch pull fires `adbc_cancel` once and invalidates the connection so `pool.checkedout() == 0`, identical under asyncio and trio; a second in-flight operation on the parent cursor while a reader is live raises `ConnectionBusyError` (STREAM-05, STREAM-06)
+  4. An unclosed reader's `__del__` emits a `ResourceWarning` (never a "coroutine was never awaited" `RuntimeWarning`); the happy path emits neither; an exception during shielded reader cleanup chains the body error via `__context__` and still releases/invalidates the connection (EDGE-22, EDGE-23, EDGE-20)
+  5. The `_SyncCursor` Protocol gains a `fetch_record_batch` signature and all new async public API is basedpyright-strict-clean (0 errors); the AST import-lint guard still passes over `_async/` with no `import asyncio` and no bare `to_thread` (PKG-01, PKG-03)
+**Plans**: TBD
+**UI hint**: no
+
+### Phase 30: Async Bulk Write
+**Goal**: Users can bulk-write Arrow data via `await cursor.adbc_ingest(table_name, data, mode=...)` as a single whole-operation offload that returns the affected row count, with a typed `Literal` mode forwarded verbatim to the driver and cancel-safety that invalidates the connection on a partially-applied write. This phase exercises the write path and the keyword-only-arg-arity concern in isolation, reusing the Phase 29 cancel/offload patterns.
+**Depends on**: Phase 29
+**Requirements**: INGEST-01, INGEST-02, INGEST-03, INGEST-04
+**Success Criteria** (what must be TRUE):
+  1. `await cursor.adbc_ingest(table_name, data, *, mode=..., catalog_name=None, db_schema_name=None, temporary=False)` returns the affected row count as an `int` from a single whole-operation offload; a round-trip ingest → query on DuckDB returns the ingested rows (INGEST-01)
+  2. `mode` is typed as `Literal["create", "append", "replace", "create_append"]`, defaults to `"create"`, and is forwarded verbatim to the driver (INGEST-02)
+  3. `data` accepts the Arrow inputs the driver accepts (`pyarrow.Table` / `RecordBatch` / `RecordBatchReader` / Arrow C-stream capsule) with no conversion by poolhouse (INGEST-03)
+  4. A cancelled or timed-out ingest fires `adbc_cancel` and invalidates the connection (`on_abort=invalidate`), leaving `pool.checkedout() == 0` with asyncio and trio parity (INGEST-04)
+**Plans**: TBD
+**UI hint**: no
+
+### Phase 31: DataFrame Convenience
+**Goal**: Users can materialize query results directly into a `pandas.DataFrame` (`await cursor.fetch_df()`) or `polars.DataFrame` (`await cursor.fetch_polars()`) via trivial single-offload wrappers, with pandas/polars remaining user-supplied runtime deps (a missing dep raises the native `ModuleNotFoundError` unchanged, exactly as the sync method does). The frames are self-owning and valid after checkin.
+**Depends on**: Phase 30
+**Requirements**: DF-01, DF-02, DF-03, DF-04, PKG-02
+**Success Criteria** (what must be TRUE):
+  1. `await cursor.fetch_df()` returns a `pandas.DataFrame` and `await cursor.fetch_polars()` returns a `polars.DataFrame`, each from a single whole-operation offload (DF-01, DF-02)
+  2. When pandas/polars is not installed, `fetch_df`/`fetch_polars` propagate the native `ModuleNotFoundError` raised in the worker unchanged through the offload chokepoint — no `find_spec` pre-check, no poolhouse wrapping (DF-03)
+  3. The returned frame is self-owning and valid after checkin (materialized in the worker, not bound to the connection) — same guarantee as `fetch_arrow_table` (EDGE-21) (DF-04)
+  4. pandas and polars are added to the dev dependency group only; `[project.dependencies]`, `[project.optional-dependencies]`, and the `__init__.py` lazy-import surface are unchanged, and `import adbc_poolhouse` with pandas/polars absent is unaffected (positive tests guarded by `importorskip`) (PKG-02)
+**Plans**: TBD
+**UI hint**: no
+
+### Phase 32: P2 Edge Hardening
+**Goal**: The remaining deferred P2 async edge cases are pinned by deterministic arrange/trigger/assert tests — each run under both asyncio and trio — extending existing chokepoint coverage across the new streaming, ingest, and DataFrame paths plus the `__del__` finalizer surface. No new production machinery beyond the finalizers; tests reuse the Phase 23 `BlockingStubCursor` harness, now that all four new methods exist.
+**Depends on**: Phase 31
+**Requirements**: EDGE-08, EDGE-13, EDGE-14, EDGE-24, EDGE-31, EDGE-32
+**Success Criteria** (what must be TRUE):
+  1. A trio checkpoint is delivered at the offload boundary even with no intervening checkpoint — no starvation, no missing cancellation point — asserted on a new-method offload (EDGE-08)
+  2. contextvars set before an offload are visible to the worker thread (copied in), and worker mutations do not leak back to the calling task after the offload returns — asserted on a new-method offload (EDGE-13, EDGE-14)
+  3. `move_on_after(0)` still cancels a blocked streaming pull / ingest cleanly (`adbc_cancel` fires, connection invalidates), while an operation completing at deadline−ε is not over-cancelled (no spurious `adbc_cancel`, no invalidate, connection returns clean) (EDGE-31, EDGE-32)
+  4. An open pool or a pending offload at event-loop shutdown — extended to mid-stream and mid-ingest scenarios — raises no library-attributable exception, with trio's nursery strictness as the canary (EDGE-24)
+**Plans**: TBD
+**UI hint**: no
+
+### Phase 33: Documentation
+**Goal**: The new async surface is fully documented — Arrow streaming guide, ingest mode table with the explicit `replace`-drops-the-table warning, DataFrame user-supplied note, and API-reference entries for `AsyncRecordBatchReader` and the four new `AsyncCursor` methods — with honest concurrency framing throughout. This is the consolidation point for the docs gate: per-method Google-style docstrings are already a completion requirement in every earlier phase, and this phase closes `mkdocs build --strict` plus a humanizer pass.
+**Depends on**: Phase 32
+**Requirements**: DOCS-01, DOCS-02, DOCS-03, DOCS-04
+**Success Criteria** (what must be TRUE):
+  1. The async guide documents Arrow streaming (`fetch_record_batch` → `async for` → close) including the reader-lifetime contract and honest concurrency framing (per-batch offload; GIL re-acquired during materialization) (DOCS-01)
+  2. The async guide and API reference document `adbc_ingest` with the `mode` Literal table and an explicit "`replace` drops the table" warning (DOCS-02)
+  3. `fetch_df` / `fetch_polars` are documented, noting pandas/polars are user-supplied (install-it-yourself) and that a missing dep surfaces a native `ModuleNotFoundError` (DOCS-03)
+  4. The API reference renders `AsyncRecordBatchReader` and the four new `AsyncCursor` methods with Google-style docstrings (Args/Returns/Raises + Example); `mkdocs build --strict` passes; a humanizer pass is applied to all new or substantially rewritten prose (DOCS-04)
+**Plans**: TBD
+**UI hint**: no
+
 ## Progress
+
+**Execution Order:**
+Phases execute in numeric order: 29 → 30 → 31 → 32 → 33
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
-| 22. Feasibility Spike | v1.4.0 | 2/2 | Complete | 2026-06-27 |
-| 23. Test Harness Foundation | v1.4.0 | 4/4 | Complete | 2026-06-27 |
-| 24. Core Async Wrapper | v1.4.0 | 5/5 | Complete | 2026-06-27 |
-| 25. Cancellation | v1.4.0 | 5/5 | Complete | 2026-06-28 |
-| 26. Packaging & Extra Scoping | v1.4.0 | 4/4 | Complete | 2026-06-28 |
-| 27. Dual-Backend Test Matrix | v1.4.0 | 5/5 | Complete | 2026-06-28 |
-| 28. Documentation | v1.4.0 | 4/4 | Complete | 2026-06-29 |
+| 29. Arrow Streaming | v1.5.0 | 0/TBD | Not started | - |
+| 30. Async Bulk Write | v1.5.0 | 0/TBD | Not started | - |
+| 31. DataFrame Convenience | v1.5.0 | 0/TBD | Not started | - |
+| 32. P2 Edge Hardening | v1.5.0 | 0/TBD | Not started | - |
+| 33. Documentation | v1.5.0 | 0/TBD | Not started | - |
+| 22-28. Async API | v1.4.0 | 29/29 | Complete | 2026-07-01 |
 | 21.1. ADBC dispatch URI-positional fix | v1.3.0 | 3/3 | Complete | 2026-05-20 |
 | 21. Quack Backend | v1.3.0 | 3/3 | Complete | 2026-05-19 |
 | 16-20. Plugin/Extensibility API | v1.2.0 | 17/17 | Complete | 2026-03-15 |
