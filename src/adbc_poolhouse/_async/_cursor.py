@@ -3,7 +3,8 @@ The async cursor wrapper: offloaded DBAPI surface, materialized Arrow, sync prop
 
 [`AsyncCursor`][adbc_poolhouse._async._cursor.AsyncCursor] wraps a single sync
 ADBC dbapi cursor and offloads every blocking call --- `execute`, `executemany`,
-`fetchone`, `fetchmany`, `fetchall`, `fetch_arrow_table`, `close` --- through the
+`fetchone`, `fetchmany`, `fetchall`, `fetch_arrow_table`, `adbc_ingest`, `close`
+--- through the
 owning pool's limiter. Each offloaded call brackets the work with the parent
 [`AsyncConnection`][adbc_poolhouse._async._connection.AsyncConnection]'s
 `_in_use` guard, so concurrent use of one cursor (or two cursors on one
@@ -434,8 +435,8 @@ class AsyncCursor:
             people = pa.table({"id": [1, 2, 3], "name": ["a", "b", "c"]})
             async with await pool.connect() as conn:
                 cursor = conn.cursor()
-                await cursor.adbc_ingest("people", people, mode="create")  # 3
-                await cursor.adbc_ingest("people", people, mode="append")  # 3, now 6 total
+                await cursor.adbc_ingest("people", people, mode="create")  # returns 3
+                await cursor.adbc_ingest("people", people, mode="append")  # returns 3 (6 total)
             ```
         """
         with self._owner._offloading():  # noqa: SLF001
