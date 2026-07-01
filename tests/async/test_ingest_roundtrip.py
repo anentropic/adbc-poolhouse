@@ -21,20 +21,6 @@ contract Plan 30-02 turns GREEN. Both backends (asyncio x trio) via the
 
 from __future__ import annotations
 
-# Wave-0 RED scaffolding: `AsyncCursor.adbc_ingest` does not exist until Plan 30-02
-# lands, so every reference to it is statically "unknown". These pragmas suppress
-# ONLY the errors that are a direct consequence of that not-yet-existing method;
-# delete the `adbc_ingest`-driven pragmas once the production method lands and the
-# file type-checks cleanly under the strict whole-project gate (PKG-01). The
-# `object`-fetch pragmas (`reportIndexIssue` etc.) reflect the deliberately-loose
-# `fetchone`/`fetchall` return typing (`_SyncCursor` returns `object`), matching the
-# Phase 29 reader-test precedent.
-# pyright: reportAttributeAccessIssue=false
-# pyright: reportUnknownMemberType=false
-# pyright: reportUnknownVariableType=false
-# pyright: reportUnknownArgumentType=false
-# pyright: reportIndexIssue=false
-# pyright: reportGeneralTypeIssues=false
 from typing import TYPE_CHECKING
 
 import pyarrow
@@ -68,7 +54,7 @@ class TestIngest01RoundTrip:
             await cursor.execute("SELECT count(*) FROM people")
             row = await cursor.fetchone()
             assert row is not None
-            assert row[0] == 3
+            assert row[0] == 3  # type: ignore[index]  # _SyncCursor.fetchone returns object
 
             appended = await cursor.adbc_ingest("people", table, mode="append")
             assert appended == 3
@@ -76,7 +62,7 @@ class TestIngest01RoundTrip:
             await cursor.execute("SELECT count(*) FROM people")
             row = await cursor.fetchone()
             assert row is not None
-            assert row[0] == 6
+            assert row[0] == 6  # type: ignore[index]  # _SyncCursor.fetchone returns object
 
 
 class TestIngest03DataPassThrough:
@@ -104,9 +90,9 @@ class TestIngest03DataPassThrough:
             assert batch_rows == 3
 
             await cursor.execute("SELECT id FROM from_table ORDER BY id")
-            table_ids = [r[0] for r in await cursor.fetchall()]
+            table_ids = [r[0] for r in await cursor.fetchall()]  # type: ignore[index]  # rows are object
             assert table_ids == [10, 20]
 
             await cursor.execute("SELECT id FROM from_batch ORDER BY id")
-            batch_ids = [r[0] for r in await cursor.fetchall()]
+            batch_ids = [r[0] for r in await cursor.fetchall()]  # type: ignore[index]  # rows are object
             assert batch_ids == [30, 40, 50]

@@ -26,13 +26,6 @@ once GREEN.
 
 from __future__ import annotations
 
-# Wave-0 RED scaffolding: `AsyncCursor.adbc_ingest` does not exist until Plan 30-02
-# lands, so every reference to it is statically "unknown". These pragmas suppress
-# ONLY the errors that are a direct consequence of that not-yet-existing method;
-# delete this block once the production method lands and the file type-checks
-# cleanly under the strict whole-project gate (PKG-01).
-# pyright: reportAttributeAccessIssue=false
-# pyright: reportUnknownMemberType=false
 import functools
 import importlib
 from collections.abc import Callable

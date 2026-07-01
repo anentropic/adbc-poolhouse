@@ -21,14 +21,6 @@ is the real driver leg.
 
 from __future__ import annotations
 
-# Wave-0 RED scaffolding: `AsyncCursor.adbc_ingest` does not exist until Plan 30-02
-# lands, so every reference to it is statically "unknown". These pragmas suppress
-# ONLY the errors that are a direct consequence of that not-yet-existing method;
-# delete the `adbc_ingest`-driven pragmas once the production method lands and the
-# file type-checks cleanly under the strict whole-project gate (PKG-01).
-# pyright: reportAttributeAccessIssue=false
-# pyright: reportUnknownMemberType=false
-# pyright: reportUnknownArgumentType=false
 from typing import TYPE_CHECKING
 
 import pyarrow
@@ -43,7 +35,7 @@ async def _count(cursor: object, table_name: str) -> int:
     await cursor.execute(f"SELECT count(*) FROM {table_name}")  # type: ignore[attr-defined]
     row = await cursor.fetchone()  # type: ignore[attr-defined]
     assert row is not None
-    return int(row[0])
+    return int(row[0])  # type: ignore[index]  # _SyncCursor.fetchone returns object
 
 
 class TestIngest02Modes:

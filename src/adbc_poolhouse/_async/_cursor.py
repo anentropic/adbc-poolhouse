@@ -30,6 +30,7 @@ Worker exceptions are never re-wrapped (ACUR-06/EDGE-17): the single
 
 from __future__ import annotations
 
+import functools
 from typing import TYPE_CHECKING, Protocol
 
 import anyio
@@ -362,6 +363,93 @@ class AsyncCursor:
             return await cancellable_offload(
                 self._adbc_cancel,
                 self._cursor.fetch_arrow_table,
+                limiter=self._limiter,
+                on_abort=self._owner.invalidate,  # poison recovery on a real abort (D-25-03)
+            )
+
+    async def adbc_ingest(
+        self,
+        table_name: str,
+        data: pyarrow.RecordBatch | pyarrow.Table | pyarrow.RecordBatchReader | CapsuleType,
+        *,
+        mode: Literal["create", "append", "replace", "create_append"] = "create",
+        catalog_name: str | None = None,
+        db_schema_name: str | None = None,
+        temporary: bool = False,
+    ) -> int:
+        """
+        Bulk-load an Arrow dataset into a table on a worker thread.
+
+        Offloads the dbapi `adbc_ingest` through the pool limiter while holding the
+        parent connection's `_in_use` guard, so a concurrent call on the same
+        connection is rejected with `ConnectionBusyError` (EDGE-15). This is a
+        single whole-operation offload --- the connection checks back in the moment
+        the ingest returns, unlike `fetch_record_batch`, which holds the connection
+        for a reader's whole lifetime.
+
+        `data` is handed to the driver untouched: poolhouse performs no conversion
+        and no validation. The driver owns the Arrow binding and the table
+        identifier, so a malformed dataset or a bad identifier surfaces the driver's
+        native error unchanged.
+
+        If the surrounding scope is cancelled or times out while the ingest is in
+        flight, the in-flight C call is aborted with `cursor.adbc_cancel`, the
+        now-poisoned connection is invalidated (shielded), and the cancellation is
+        re-raised --- the connection never returns to the pool busy (CANCEL-01/02).
+        Recovery restores the *connection*, not the *table*: an aborted bulk load
+        can leave rows already written, and poolhouse does not roll that back. Treat
+        a cancelled ingest as leaving the table in an undefined state.
+
+        Args:
+            table_name: The target table. Passed straight to the driver as a SQL
+                identifier; poolhouse does not quote or sanitize it.
+            data: The Arrow dataset to load --- a `pyarrow.Table`, `RecordBatch`,
+                `RecordBatchReader`, or an Arrow C-stream capsule. Forwarded to the
+                driver with zero conversion.
+            mode: How to write the data. `"create"` (the default) makes a new table
+                and fails if it exists; `"append"` adds rows to an existing table;
+                `"create_append"` creates the table if needed, then appends;
+                `"replace"` **drops** the existing table and recreates it --- the old
+                rows are lost, so it is not a row-level upsert. Forwarded to the
+                driver verbatim.
+            catalog_name: EXPERIMENTAL. Target catalog for the table. No stability
+                guarantee; surfaced as-is from the driver.
+            db_schema_name: EXPERIMENTAL. Target schema for the table. No stability
+                guarantee; surfaced as-is from the driver.
+            temporary: EXPERIMENTAL. Create the table as temporary. No stability
+                guarantee; surfaced as-is from the driver.
+
+        Returns:
+            The number of rows written, or `-1` when the driver cannot report a
+            count. Poolhouse returns the driver's value unchanged.
+
+        Raises:
+            ConnectionBusyError: If another offloaded call on the owning connection
+                is already in flight.
+
+        Example:
+            ```python
+            import pyarrow as pa
+
+            people = pa.table({"id": [1, 2, 3], "name": ["a", "b", "c"]})
+            async with await pool.connect() as conn:
+                cursor = conn.cursor()
+                await cursor.adbc_ingest("people", people, mode="create")  # 3
+                await cursor.adbc_ingest("people", people, mode="append")  # 3, now 6 total
+            ```
+        """
+        with self._owner._offloading():  # noqa: SLF001
+            return await cancellable_offload(
+                self._adbc_cancel,
+                functools.partial(
+                    self._cursor.adbc_ingest,
+                    table_name,
+                    data,
+                    mode=mode,
+                    catalog_name=catalog_name,
+                    db_schema_name=db_schema_name,
+                    temporary=temporary,
+                ),
                 limiter=self._limiter,
                 on_abort=self._owner.invalidate,  # poison recovery on a real abort (D-25-03)
             )
