@@ -17,6 +17,12 @@ worker thread:
 - [`BlockingStubConnection`][tests._async_harness.stubs.BlockingStubConnection]
   -- the connection-level mirror, recording the close / cancel / cursor-handle
   contract that EDGE-09..12/15/18 assert against.
+- [`BlockingStubReader`][tests._async_harness.stubs.BlockingStubReader] -- the
+  Phase-29 streaming sibling, satisfying the `_SyncReader` structural surface
+  (`schema` property, blocking `read_next_batch`, `close`) so the async record-batch
+  reader can offload onto it. Handed out by `BlockingStubCursor.fetch_record_batch`.
+  It reuses the same sticky-release `_block` idiom but has NO `adbc_cancel` of its
+  own -- cancellation is fired through the owning cursor (Phase-29 Pitfall 4).
 
 The public attribute names below are a HARD CONTRACT (D-04): later phases read
 them by name, so they are locked and must not be renamed.
@@ -333,6 +339,295 @@ class BlockingStubCursor:
 
         Leaves `observed_cancel` `False` -- use this to model a query that
         completes normally, as opposed to `adbc_cancel`.
+        """
+        self._event.set()
+
+    def fetch_record_batch(self) -> BlockingStubReader:
+        """
+        Return a fresh `BlockingStubReader` (the Phase 29 streaming stub).
+
+        Sync accessor mirroring the real ADBC cursor's `fetch_record_batch`, which
+        hands back a `pyarrow.RecordBatchReader`. This fake returns a
+        [`BlockingStubReader`][tests._async_harness.stubs.BlockingStubReader]
+        structurally satisfying the forthcoming `_SyncReader` surface (a `schema`
+        property, a blocking `read_next_batch`, a terminal `close`) so the async
+        `AsyncRecordBatchReader` can offload onto it without a live driver. Each call
+        makes a new reader with no configured batches (exhausts on the first pull);
+        tests that need drainable rows pass a batch sequence + schema directly to
+        `BlockingStubReader`.
+
+        The reader has NO `adbc_cancel` of its own (Pitfall 4): a cancelled pull
+        fires the OWNING cursor's `adbc_cancel`, so a test drives cancellation
+        through this cursor and reads `self.adbc_cancel_call_count`, not the
+        reader's. The reader is created unblocked-by-default; a test configures
+        blocking by leaving its batch sequence pending and gating on `entered`.
+
+        Returns:
+            A fresh `BlockingStubReader` bound to no batches and a `None` schema.
+        """
+        with self._lock:
+            self.fetch_call_count += 1
+        return BlockingStubReader()
+
+
+class BlockingStubReader:
+    """
+    Sync `RecordBatchReader`-shaped fake whose `read_next_batch` blocks until released.
+
+    The streaming sibling of
+    [`BlockingStubCursor`][tests._async_harness.stubs.BlockingStubCursor], added in
+    Phase 29 (D-29-17) to satisfy the forthcoming `_SyncReader` structural Protocol
+    (`schema` property, `read_next_batch`, `close`) WITHOUT importing a concrete
+    `pyarrow` class. Kept pure-`threading` (no anyio, D-03) for the same
+    framework-neutrality reason as the cursor stub, so it drives both the asyncio
+    and trio legs of every Phase-29 reader test.
+
+    It reuses the cursor's **sticky-release** design verbatim (see the module
+    docstring): `close` latches `_closed` UNDER THE LOCK and is checked at `_block`
+    entry BEFORE the re-arm `clear()`, so a `close` racing ahead of the worker is
+    never lost to a Linux-only lost-wakeup. The happy-path `release` stays transient
+    (the worker is provably inside `_block` via `entered`, so it cannot race the
+    clear). Cancellation is fired via the OWNING cursor's `adbc_cancel` (Pitfall 4),
+    so this reader deliberately exposes NO `adbc_cancel` of its own; `_cancelled`
+    exists only so `close` (the terminal release) has a single short-circuit path,
+    mirroring the cursor's `_closed` check.
+
+    `read_next_batch` pops the next configured batch after unblocking and raises a
+    bare `StopIteration` (`args == ()`) once the configured sequence is drained ---
+    exactly the end-of-stream signal the real driver raises, so the async layer's
+    worker-side `StopIteration`→`_EXHAUSTED` catch (D-29-05) is exercised.
+
+    Attributes:
+        entered: A `threading.Event` set the instant a worker is inside the blocked
+            `read_next_batch` section --- the SYNC signal for pure-threading
+            self-tests (poll or `wait()` it from a thread, NEVER from the event
+            loop). Identical dual-`entered` discipline to the cursor stub: the
+            loop-facing gate is a DISTINCT `anyio.Event` bridged via `on_enter` in
+            `gating.py`. Re-armable: cleared at each `_block` entry so a second pull
+            re-fires it.
+        on_enter: An optional zero-argument callback invoked INSIDE `_block`, after
+            concurrency is recorded and immediately before the worker waits --- the
+            worker-entry hook `run_blocking` uses to bridge the loop-facing
+            `anyio.Event` (D-CF-01). Stays a plain `Callable` so this module remains
+            anyio-free (D-03). Defaults to `None`. The single-worker fallback; a
+            per-thread hook registered via `register_on_enter` takes precedence.
+        closed: `True` once `close` has run; `False` otherwise. Public terminal
+            close-state flag (read it to assert a reader was closed). Written under
+            the lock so a loop-thread reader never sees a torn state.
+        read_call_count: Number of `read_next_batch` calls (including the one that
+            raises `StopIteration` at exhaustion).
+        close_call_count: Number of `close` calls.
+        read_thread_ids: The `threading.get_ident()` of each `read_next_batch`
+            caller, in call order --- lets a test assert pulls ran off the loop
+            thread (STREAM-02).
+
+    Example:
+        ```python
+        import threading
+
+        from tests._async_harness.stubs import BlockingStubReader
+
+        reader = BlockingStubReader(batches=["batch-0"], schema="the-schema")
+        worker = threading.Thread(target=reader.read_next_batch)
+        worker.start()
+
+        reader.entered.wait()  # block until the worker is inside read_next_batch
+        reader.release()  # let the blocked pull return "batch-0"
+        worker.join()
+        ```
+    """
+
+    def __init__(
+        self,
+        *,
+        batches: list[object] | None = None,
+        schema: object = None,
+        entered: threading.Event | None = None,
+        on_enter: Callable[[], None] | None = None,
+    ) -> None:
+        """
+        Create a fresh reader over an optional batch sequence, with counters zeroed.
+
+        Args:
+            batches: The batches `read_next_batch` returns in order (one per pull);
+                once drained, the next pull raises a bare `StopIteration`. Defaults
+                to an empty list (the first pull exhausts). The list is copied so a
+                caller's list is not mutated as batches are consumed.
+            schema: The object returned by the `schema` property (a stand-in for a
+                `pyarrow.Schema`; the fake does no I/O and never inspects it).
+                Defaults to `None`.
+            entered: Optional pre-existing `threading.Event` to use as the
+                worker-entry signal. Defaults to a fresh, unset event.
+            on_enter: Optional zero-argument callback invoked inside `_block` before
+                the worker waits (see the `on_enter` attribute). Defaults to `None`.
+        """
+        self._event = threading.Event()
+        self._lock = threading.Lock()
+        self._schema = schema
+        self._batches: list[object] = list(batches) if batches is not None else []
+        self.entered: threading.Event = entered or threading.Event()
+        self.on_enter: Callable[[], None] | None = on_enter
+        self._on_enter_by_thread: dict[int, Callable[[], None]] = {}
+        self.read_call_count: int = 0
+        self.close_call_count: int = 0
+        self.read_thread_ids: list[int] = []
+        self._in_read: int = 0
+        self.max_concurrent_in_read: int = 0
+        self._closed: bool = False
+        # Sticky terminal state, symmetric with `BlockingStubCursor._closed`, so a
+        # `close` that arrives BEFORE the worker reaches `_block` is honoured at
+        # entry instead of being lost to the re-arm `clear()` (the Linux-only
+        # lost-wakeup the module docstring warns about). The reader has no
+        # `adbc_cancel` (Pitfall 4), so unlike the cursor it needs no `_cancelled`
+        # sibling --- `close` is the sole terminal release path.
+        self._closed_latched: bool = False
+
+    @property
+    def schema(self) -> object:
+        """
+        The reader's Arrow schema (synchronous passthrough; touches no I/O).
+
+        Mirrors the real `pyarrow.RecordBatchReader.schema` property the async
+        reader forwards without offloading. Returns the object handed in at
+        construction (a stand-in for a `pyarrow.Schema`); the fake never inspects
+        it.
+
+        Returns:
+            The caller-supplied schema stand-in (`None` by default).
+        """
+        return self._schema
+
+    @property
+    def closed(self) -> bool:
+        """Whether `close` has run (terminal). Backed by `_closed`, lock-written."""
+        with self._lock:
+            return self._closed
+
+    def register_on_enter(self, callback: Callable[[], None]) -> Callable[[], None]:
+        """
+        Register a worker-entry hook keyed by the CALLING thread's id.
+
+        Concurrency-safe alternative to the single `on_enter` attribute, identical
+        in contract to
+        [`BlockingStubCursor.register_on_enter`][tests._async_harness.stubs.BlockingStubCursor.register_on_enter]:
+        each worker thread bridges its OWN loop-facing event, so `_block` dispatches
+        the hook for the current thread (falling back to `on_enter`). The hook is
+        removed by the returned cleanup callable.
+
+        Args:
+            callback: Zero-argument hook to invoke inside `_block` for the calling
+                thread, before it waits.
+
+        Returns:
+            A zero-argument cleanup callable that unregisters this thread's hook;
+            call it in a `finally` so a reused reader is never left with a dangling
+            per-thread bridge.
+        """
+        thread_id = threading.get_ident()
+        with self._lock:
+            self._on_enter_by_thread[thread_id] = callback
+
+        def _cleanup() -> None:
+            with self._lock:
+                self._on_enter_by_thread.pop(thread_id, None)
+
+        return _cleanup
+
+    def _block(self) -> None:
+        """
+        Re-arm the gate, record entry, fire `on_enter`/`entered`, then wait.
+
+        A verbatim mirror of
+        [`BlockingStubCursor._block`][tests._async_harness.stubs.BlockingStubCursor]
+        minus the `_cancelled` tier (the reader has no `adbc_cancel`, Pitfall 4):
+        clears the internal event at the START so a prior `release` cannot
+        pre-satisfy this pull, but short-circuits BEFORE that clear when `_closed`
+        has latched sticky under the lock --- so a `close` racing ahead of the
+        worker is honoured (the pull returns at once) instead of being lost to the
+        re-arm clear. Lock-guards the concurrency high-water mark on entry and the
+        decrement on exit; `entered` and the optional `on_enter` bridge fire from
+        INSIDE the blocked section (after concurrency is recorded, before the wait).
+        """
+        with self._lock:
+            if self._closed_latched:
+                # Terminal: a closed reader never blocks. The sticky `_closed_latched`
+                # check honours a `close` that landed BEFORE the worker reached
+                # `_block` instead of clearing it on re-arm and stranding the worker
+                # (the Linux-only lost-wakeup). A `close` arriving while the worker
+                # already waits is handled by `close`'s `_event.set()` below.
+                self.entered.set()
+                return
+            self._event.clear()
+            self.entered.clear()
+            self._in_read += 1
+            self.max_concurrent_in_read = max(self.max_concurrent_in_read, self._in_read)
+            hook = self._on_enter_by_thread.get(threading.get_ident(), self.on_enter)
+        try:
+            self.entered.set()  # signal "worker is inside the block" (see gating.py)
+            if hook is not None:
+                hook()  # bridge the loop-facing anyio.Event from inside
+            self._event.wait()  # blocks until released / closed
+        finally:
+            with self._lock:
+                self._in_read -= 1
+
+    def read_next_batch(self) -> object:
+        """
+        Record the call, block until released, then return the next batch.
+
+        Blocks on the internal event (via `_block`) exactly like the cursor stub's
+        `execute`/`fetch_arrow_table`, then pops and returns the next configured
+        batch. Once the configured sequence is drained, raises a BARE `StopIteration`
+        (`args == ()`) --- the end-of-stream signal the real
+        `pyarrow.RecordBatchReader.read_next_batch()` raises, which the async layer's
+        worker-side catch converts to its `_EXHAUSTED` sentinel (D-29-05). The
+        `StopIteration` is raised AFTER `_block` returns, so a test can still gate on
+        `entered` for the exhausting pull.
+
+        Returns:
+            The next configured batch object.
+
+        Raises:
+            StopIteration: Bare (`args == ()`) once the configured batch sequence is
+                exhausted --- the driver's end-of-stream contract.
+        """
+        with self._lock:
+            self.read_call_count += 1
+            self.read_thread_ids.append(threading.get_ident())
+        self._block()
+        with self._lock:
+            if self._batches:
+                return self._batches.pop(0)
+        raise StopIteration  # bare (args == ()): end-of-stream, per the real driver
+
+    def close(self) -> None:
+        """
+        Mark the reader closed and release any blocked pull (terminal).
+
+        Increments `close_call_count` and sets the terminal `closed` flag, both
+        under the lock (WR-03) so a reader never sees a half-updated state, latches
+        the sticky `_closed_latched` so a pull reaching `_block` AFTER this close
+        still returns, then releases the internal event to free a worker already
+        waiting. Mirrors
+        [`BlockingStubCursor.close`][tests._async_harness.stubs.BlockingStubCursor]:
+        a closed reader is terminal and never re-arms, guaranteeing no worker is ever
+        stranded in the blocked section.
+        """
+        with self._lock:
+            self.close_call_count += 1
+            self._closed = True
+            self._closed_latched = True
+        self._event.set()
+
+    def release(self) -> None:
+        """
+        Test-only: unblock a waiting pull WITHOUT closing (happy path).
+
+        Lets a blocked `read_next_batch` return its next configured batch, modelling
+        a pull that completes normally. Transient on purpose (see the module
+        docstring's sticky-release discipline): the worker is provably inside
+        `_block` (the test waits for `entered`), so it cannot race the re-arm clear,
+        and keeping it non-sticky preserves per-pull re-arm.
         """
         self._event.set()
 
