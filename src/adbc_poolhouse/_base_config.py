@@ -31,7 +31,7 @@ class WarehouseConfig(Protocol):
     """Connections allowed above pool_size when the pool is exhausted."""
 
     timeout: int
-    """Seconds to wait for a connection before raising TimeoutError."""
+    """Seconds to wait for a connection before raising `sqlalchemy.exc.TimeoutError`."""
 
     recycle: int
     """Seconds before a connection is closed and replaced."""
@@ -107,7 +107,8 @@ class BaseWarehouseConfig(BaseSettings, ABC):
     """Connections allowed above pool_size when pool is exhausted. Default: 3."""
 
     timeout: int = 30
-    """Seconds to wait for a connection before raising TimeoutError. Default: 30."""
+    """Seconds to wait for a connection before raising
+    `sqlalchemy.exc.TimeoutError`. Default: 30."""
 
     recycle: int = 3600
     """Seconds before a connection is closed and replaced. Default: 3600."""

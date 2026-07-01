@@ -1,8 +1,8 @@
 # Custom backends
 
-adbc-poolhouse ships config classes for 12 ADBC backends. If your driver is not
+adbc-poolhouse ships config classes for 13 ADBC backends. If your driver is not
 on that list you have two options: pass
-[raw driver arguments](configuration.md#raw-driver-arguments) to `create_pool()`
+[raw driver arguments](configuration.md#raw-driver-arguments) to [`create_pool()`][adbc_poolhouse.create_pool]
 directly, or write a config class as described below.
 
 ## The short version
@@ -65,7 +65,7 @@ for details about driver path resolution.
 
 The PyPI package for many drivers has a method like `_driver_path()` that
 returns this value. A `_resolve_driver_path("adbc_driver_mydriver")` helper is
-provided on `BaseWarehouseConfig` — it tries `importlib.util.find_spec` ->
+provided on `BaseWarehouseConfig`. It tries `importlib.util.find_spec` ->
 import -> call the package's own `_driver_path()`, and falls back to returning
 the package name if the package is not installed.
 
@@ -87,7 +87,7 @@ The exact keys depend on your driver. Common patterns:
 Return the driver's init symbol name, or `None` for the default.
 
 Most ADBC drivers use a default init function. Override this only when your
-driver requires a non-standard symbol. Among the 12 built-in backends, only
+driver requires a non-standard symbol. Among the 13 built-in backends, only
 DuckDB and SQLite override this method.
 
 ```python
@@ -148,7 +148,7 @@ submodule.
 |---|---|---|
 | `pool_size` | `5` | Connections kept in the pool |
 | `max_overflow` | `3` | Extra connections above `pool_size` |
-| `timeout` | `30` | Seconds to wait before `TimeoutError` |
+| `timeout` | `30` | Seconds to wait before `sqlalchemy.exc.TimeoutError` |
 | `recycle` | `3600` | Seconds before a connection is replaced |
 
 Your config's `env_prefix` applies to these fields automatically. With

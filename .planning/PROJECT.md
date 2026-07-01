@@ -4,15 +4,11 @@
 
 A focused Python library that takes a typed warehouse configuration and returns a pooled ADBC connection. Supports 13 warehouse backends (DuckDB, Snowflake, BigQuery, PostgreSQL, FlightSQL, Databricks, Redshift, Trino, MSSQL, SQLite, MySQL, ClickHouse, Quack) with both PyPI and Foundry driver detection. Published to PyPI as `adbc-poolhouse`.
 
-## Current Milestone: v1.3.0 Quack Backend
+## Current State
 
-**Goal:** Add `QuackConfig` warehouse backend for `adbc-driver-quack` (DuckDB remote/Quack protocol).
+**Shipped:** v1.4.0 Async API (2026-07-01) — an optional async surface behind an `[async]` extra. `create_async_pool` / `managed_async_pool` / `close_async_pool` mirror the sync trio; awaitable `AsyncPool` / `AsyncConnection` / `AsyncCursor` cover all 13 backends by offloading the unchanged sync core to worker threads via anyio (asyncio + trio). ADBC releases the GIL, so the offload delivers real concurrency, and the sync path is untouched with zero added async dependency.
 
-**Target features:**
-- `QuackConfig` class implementing the `WarehouseConfig` Protocol (URI + optional token + TLS)
-- Driver detection via PyPI path (`adbc_driver_quack`)
-- Semi-integration test with conditional mock target
-- Documentation: per-warehouse guide, configuration.md row, index.md listing
+**Next milestone:** TBD — run `/gsd-new-milestone`. Candidate v1.4.x hardening (deferred at v1.4.0): Arrow streaming (`fetch_record_batch`), async bulk write (`adbc_ingest`), DataFrame convenience (`fetch_df`/`fetch_polars`), and the P2 async edge-case suite. See `milestones/v1.4.0-REQUIREMENTS.md` Future Requirements.
 
 ## Core Value
 
@@ -43,15 +39,21 @@ One config in, one pool out — `create_pool(SnowflakeConfig(...))` returns a re
 - ✓ Custom backends guide with Protocol reference — v1.2.0
 - ✓ Semi-integration tests for all 12 backends — v1.2.0
 - ✓ `QuackConfig` backend for `adbc-driver-quack` (URI + decomposed host/port + token + tls), plus guide, configuration table, index listing, mkdocs nav — v1.3.0 (Phase 21, 2026-05-19)
+- ✓ Optional async API (`[async]` extra): `create_async_pool` / `managed_async_pool` / `close_async_pool` + `AsyncPool` / `AsyncConnection` / `AsyncCursor` for all 13 backends via anyio thread-offload (asyncio + trio), dedicated per-pool `CapacityLimiter`, cooperative cancellation that never poisons the pool, PEP 562 zero-cost sync path, dual-backend test matrix, honest concurrency docs — v1.4.0 (Phases 22–28, 2026-07-01)
 
 ### Active
 
-**Milestone v1.3.0 — Quack Backend:** Complete (Phase 21 verified 2026-05-19; QUACK-01 through QUACK-18 satisfied)
+_No active milestone — planning the next one. Run `/gsd-new-milestone`._
 
 **Carried (externally blocked):**
 - [ ] Verify Teradata field names against real Columnar ADBC Teradata driver
 - [ ] Live integration tests for non-DuckDB, non-Snowflake backends (blocked on test account availability)
-- [ ] Async pool support (blocked on ADBC adding async dbapi interface)
+
+**Deferred to v1.4.x (P1 async core now validated):**
+- [ ] Arrow streaming — `await cursor.fetch_record_batch()` + `async for batch in ...`
+- [ ] Async bulk write — `await cursor.adbc_ingest(...)`
+- [ ] DataFrame convenience — `await cursor.fetch_df()` / `fetch_polars()`
+- [ ] P2 async edge-case test suite (designs in `.planning/research/ASYNC-EDGE-CASES.md`)
 
 ### Out of Scope
 
@@ -60,7 +62,8 @@ One config in, one pool out — `create_pool(SnowflakeConfig(...))` returns a re
 - Knowledge of dbt, profiles.yml, semantic layers, or MetricFlow
 - REST/HTTP/Flight SQL serving
 - OAuth / SSO auth logic — delegated entirely to ADBC drivers
-- Async connection pools — ADBC dbapi is synchronous
+- ~~Async connection pools — ADBC dbapi is synchronous~~ — **reversed in v1.4.0**: ADBC releases the GIL, so anyio thread-offload delivers real async concurrency without a native async ADBC driver
+- Native async ADBC driver — not required; async is achieved by offloading the sync driver to threads
 - Teradata — private Foundry registry (requires paid Columnar access)
 - Oracle — private Foundry registry
 - ClickHouse via Apache ADBC — github.com/ClickHouse/adbc_clickhouse is WIP with many NotImplemented stubs
@@ -81,7 +84,7 @@ Two concrete consumers:
 
 Integration tests use pytest-adbc-replay cassettes (VCR-style record/replay) for Snowflake and Databricks — CI runs without credentials.
 
-265 tests passing (241 from v1.2.0 baseline + 24 new in Phase 21 for QuackConfig).
+433 tests passing, 2 skipped (v1.4.0 added the async layer plus a dual-backend asyncio/trio matrix over DuckDB + Snowflake cassette). The `[async]` extra adds only anyio; the shipped sync wheel gains no async dependency.
 
 ## Constraints
 
@@ -110,6 +113,12 @@ Integration tests use pytest-adbc-replay cassettes (VCR-style record/replay) for
 | EAFP in create_pool() | AttributeError is natural error for configs missing methods; no TypeError raise | ✓ Good — simpler, Pythonic |
 | `_create_pool_impl()` shared helper | Avoids overload forwarding issues between `managed_pool()` and `create_pool()` | ✓ Good — single implementation, three call patterns |
 | Direct `to_adbc_kwargs()` over aliases | Field-to-key mappings too divergent for Pydantic alias approach | ✓ Good — explicit, readable, correct |
+| Async layer wraps the sync core unchanged | Reuse `_create_pool_impl`, config dispatch, Protocol, reset event — no fork | ✓ Good — one code path, generic over 13 backends (v1.4.0) |
+| anyio over asyncio-native | asyncio + trio neutrality; ADBC GIL-release makes thread-offload real concurrency | ✓ Good — dual-backend matrix green on Linux CI (v1.4.0) |
+| Dedicated per-pool `CapacityLimiter` | The global 40-token anyio default over-admits; bound = `pool_size + max_overflow` | ✓ Good — in-flight concurrency strictly bounded (v1.4.0) |
+| Cancellation invalidates, never returns busy | A cancelled in-flight C call can poison the connection | ✓ Good — `checkedout()==0` after cancel, asyncio/trio parity (v1.4.0) |
+| `[async]` extra + PEP 562 lazy import | Sync users pay nothing; anyio stays optional | ✓ Good — sync suite green with anyio absent (v1.4.0) |
+| TypeVarTuple/Unpack at offload boundary (not ParamSpec) | ParamSpec can't type keyword-only params after `*args` | ✓ Good — basedpyright strict, 0 errors (v1.4.0) |
 
 ## Evolution
 
@@ -129,4 +138,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-19 after starting v1.3.0 milestone*
+*Last updated: 2026-07-01 — v1.4.0 Async API milestone shipped and archived (phases 22–28, 29 plans, 63/63 requirements, audit passed). Full milestone review applied: async requirements moved to Validated, v1.4.0 design decisions logged, context refreshed to 433 tests. Next: `/gsd-new-milestone`.*

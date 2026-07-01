@@ -39,8 +39,59 @@ jobs:
       - name: Run quality gates
         run: prek run --all-files
 
+      # ADBC_ASYNC_REPEAT runs the concurrency-sensitive async suite N times (the
+      # `concurrency_marks` repeat gate in tests/async/_edge_helpers.py), so an
+      # intermittent worker-thread deadlock fails CI instead of slipping through on a
+      # single lucky pass. pytest-timeout backstops any genuine hang.
       - name: Tests
+        env:
+          ADBC_ASYNC_REPEAT: "20"
         run: uv run pytest
+
+      - name: Cache pruning
+        if: always()
+        run: uv cache prune --ci
+
+  sync-no-anyio:
+    name: Sync suite without anyio
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+          python-version: "3.11"
+
+      # --no-default-groups drops the `dev` group, the ONLY place anyio/trio
+      # live, proving the shipped package has no hard async dependency.
+      # --extra duckdb/sqlite supply the in-proc, anyio-free sync backends.
+      # --locked enforces the relocked uv.lock from Plan 01.
+      - name: Sync runtime + sync backends (no anyio)
+        run: uv sync --locked --no-default-groups --extra duckdb --extra sqlite
+
+      # PKG-04 / T-26-07: fail loudly if anyio leaked into the no-dev install.
+      # Without this assertion the zero-cost-sync claim would be unproven.
+      - name: Assert anyio is genuinely absent
+        run: >-
+          uv run --no-default-groups --extra duckdb --extra sqlite python -c
+          "import importlib.util, sys; sys.exit(0 if importlib.util.find_spec('anyio') is None else 'anyio present')"
+
+      # pytest + pytest-adbc-replay are dev-only, supplied at run time via --with.
+      # tests/async and tests/_async_harness import anyio/trio at collection time,
+      # so they are deselected; the snowflake/databricks integration tests need
+      # their (non-installed) cloud drivers, so their markers are deselected too.
+      - name: Run sync suite (async dirs + cloud-driver tests deselected)
+        run: >-
+          uv run --no-default-groups --extra duckdb --extra sqlite
+          --with pytest --with pytest-adbc-replay
+          pytest tests/ --ignore=tests/async --ignore=tests/_async_harness
+          -m "not snowflake and not databricks"
 
       - name: Cache pruning
         if: always()

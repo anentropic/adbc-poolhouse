@@ -14,7 +14,7 @@ uv add "adbc-poolhouse[flightsql]"
 
 ## Connection
 
-[`FlightSQLConfig`][adbc_poolhouse.FlightSQLConfig] connects to any Arrow Flight SQL server. Set `uri` to the gRPC endpoint — `grpc://` for plaintext, `grpc+tls://` for TLS — and provide credentials via username/password or a raw authorization header.
+[`FlightSQLConfig`][adbc_poolhouse.FlightSQLConfig] connects to any Arrow Flight SQL server. Set `uri` to the gRPC endpoint (`grpc://` for plaintext, `grpc+tls://` for TLS) and provide credentials via username/password or a raw authorization header.
 
 ### Username and password
 

@@ -1,6 +1,6 @@
 # adbc-poolhouse
 
-adbc-poolhouse creates a SQLAlchemy `QueuePool` from a typed warehouse config. One config in, one pool out — no boilerplate around driver detection or connection string assembly.
+adbc-poolhouse creates a SQLAlchemy `QueuePool` from a typed warehouse config. One config in, one pool out, with no boilerplate around driver detection or connection string assembly.
 
 ## Installation
 
@@ -40,11 +40,11 @@ adbc-poolhouse manages the pool, not the driver. You also need an ADBC driver fo
 
 All supported warehouses have a typed config class.
 
-PyPI-installed: `BigQueryConfig`, `DuckDBConfig`, `FlightSQLConfig`, `PostgreSQLConfig`, `QuackConfig`, `SnowflakeConfig`, `SQLiteConfig`.
+PyPI-installed: [`BigQueryConfig`][adbc_poolhouse.BigQueryConfig], [`DuckDBConfig`][adbc_poolhouse.DuckDBConfig], [`FlightSQLConfig`][adbc_poolhouse.FlightSQLConfig], [`PostgreSQLConfig`][adbc_poolhouse.PostgreSQLConfig], [`QuackConfig`][adbc_poolhouse.QuackConfig], [`SnowflakeConfig`][adbc_poolhouse.SnowflakeConfig], [`SQLiteConfig`][adbc_poolhouse.SQLiteConfig].
 
-Foundry-distributed: `ClickHouseConfig`, `DatabricksConfig`, `MSSQLConfig`, `MySQLConfig`, `RedshiftConfig`, `TrinoConfig`.
+Foundry-distributed: [`ClickHouseConfig`][adbc_poolhouse.ClickHouseConfig], [`DatabricksConfig`][adbc_poolhouse.DatabricksConfig], [`MSSQLConfig`][adbc_poolhouse.MSSQLConfig], [`MySQLConfig`][adbc_poolhouse.MySQLConfig], [`RedshiftConfig`][adbc_poolhouse.RedshiftConfig], [`TrinoConfig`][adbc_poolhouse.TrinoConfig].
 
-The example below uses DuckDB — no credentials or running server required.
+The example below uses DuckDB, which needs no credentials or running server.
 
 ```python
 from adbc_poolhouse import DuckDBConfig, create_pool, close_pool
@@ -62,15 +62,43 @@ with pool.connect() as conn:
 close_pool(pool)
 ```
 
-`pool.connect()` checks out a connection from the pool and returns it when the `with` block exits. `close_pool(pool)` drains the pool and closes the underlying ADBC source connection.
+`pool.connect()` checks out a connection from the pool and returns it when the `with` block exits. [`close_pool(pool)`][adbc_poolhouse.close_pool] drains the pool and closes the underlying ADBC source connection.
+
+## Async
+
+For asyncio or trio code, [`create_async_pool`][adbc_poolhouse.create_async_pool], [`managed_async_pool`][adbc_poolhouse.managed_async_pool], and [`close_async_pool`][adbc_poolhouse.close_async_pool] mirror the sync entry points and run each blocking ADBC call on a worker thread. Install the `[async]` extra (`pip install adbc-poolhouse[async]`) and see the [async pool guide](guides/async.md).
+
+The async API is experimental and incomplete. Its surface may change between minor releases, and several features (Arrow streaming, `adbc_ingest`, DataFrame fetches, async metadata, and prepared statements) are not available yet. See the [async pool guide](guides/async.md) for the full caveat.
+
+```python
+import anyio
+from adbc_poolhouse import DuckDBConfig, create_async_pool, close_async_pool
+
+
+async def main():
+    pool = create_async_pool(DuckDBConfig(database="/tmp/warehouse.db"))
+    try:
+        async with await pool.connect() as conn:
+            cur = conn.cursor()  # synchronous, no await
+            await cur.execute("SELECT 42 AS answer")
+            table = await cur.fetch_arrow_table()
+            print(table.column("answer")[0].as_py())  # 42
+    finally:
+        await close_async_pool(pool)
+
+
+anyio.run(main)
+```
 
 ## What's next
 
 - [Pool lifecycle](guides/pool-lifecycle.md) — how to dispose correctly, pytest fixture patterns, and common mistakes
+- [Async pool](guides/async.md) — the asyncio/trio wrapper, honest concurrency limits, and the one connection per task rule
 - [Consumer patterns](guides/consumer-patterns.md) — wiring a pool into FastAPI and reading credentials from a dbt profiles file
 - [Configuration reference](guides/configuration.md) — environment variable prefixes, pool tuning, and secret handling
 - [Snowflake guide](guides/snowflake.md) — supported auth methods and private key variants
 - [Warehouse guides](guides/duckdb.md) — per-warehouse install commands, auth examples, and env var prefixes
+- [Custom backends](guides/custom-backends.md) — raw driver arguments and writing a reusable config class for an unsupported warehouse
 
 ## See also
 

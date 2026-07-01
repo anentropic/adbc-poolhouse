@@ -48,7 +48,7 @@ config = BigQueryConfig(
 )
 ```
 
-Set `BIGQUERY_AUTH_CREDENTIALS_PATH` or supply the JSON string via your secrets manager before calling `create_pool`.
+Set `BIGQUERY_AUTH_CREDENTIALS_PATH` or supply the JSON string via your secrets manager before calling [`create_pool`][adbc_poolhouse.create_pool].
 
 ### User authentication (OAuth)
 

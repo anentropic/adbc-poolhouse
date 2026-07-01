@@ -1,6 +1,6 @@
 [project]
 name = "adbc-poolhouse"
-version = "1.3.1"
+version = "1.4.0"
 description = "Connection pooling for ADBC drivers from typed warehouse configs"
 readme = "README.md"
 authors = [
@@ -21,6 +21,7 @@ quack = ["adbc-driver-quack>=0.1.0a1"]
 flightsql = ["adbc-driver-flightsql>=1.0.0"]
 bigquery = ["adbc-driver-bigquery>=1.3.0"]
 sqlite = ["adbc-driver-sqlite>=1.0.0"]
+async = ["anyio>=4.13"]
 all = [
     "adbc-poolhouse[duckdb]",
     "adbc-poolhouse[snowflake]",
@@ -29,6 +30,7 @@ all = [
     "adbc-poolhouse[flightsql]",
     "adbc-poolhouse[bigquery]",
     "adbc-poolhouse[sqlite]",
+    "adbc-poolhouse[async]",
 ]
 
 [project.urls]
@@ -53,6 +55,11 @@ dev = [
     "pytest-cov>=6.0.0",
     "ruff>=0.15.1",
     "pytest-adbc-replay>=1.0.0a3",
+    "anyio>=4.13",
+    "trio>=0.31",
+    "aiotools>=2.2",
+    "pytest-repeat",
+    "pytest-timeout",
 ]
 docs = [
     "mkdocs>=1.6.0",

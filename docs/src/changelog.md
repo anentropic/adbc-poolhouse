@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-07-01
+
+### Features
+
+- Add an optional `[async]` extra providing an anyio-based async surface (asyncio + trio). The async API is **experimental**: its surface may change between minor releases, and several features are not yet available.
+- Add the async entry points `create_async_pool`, `managed_async_pool`, and `close_async_pool`, mirroring the sync `create_pool` / `managed_pool` / `close_pool` signatures.
+- Add `AsyncPool`, `AsyncConnection`, and `AsyncCursor` wrappers exposing the awaited DBAPI surface, including `fetch_arrow_table`. Each blocking ADBC call runs on a worker thread.
+- Size each async pool with a per-pool `CapacityLimiter` of `pool_size + max_overflow`, capping concurrent offloaded calls.
+- Shield connection checkin so a cancelled task returns its connection cleanly, and route query cancellation through `adbc_cancel`.
+
+The sync path is unchanged and gains no async dependency: installing without the `[async]` extra pulls in no anyio or trio.
+
 ## [1.3.1] - 2026-06-24
 
 ### Bug Fixes
@@ -57,7 +69,6 @@ All notable changes to this project will be documented in this file.
 - Bump adbc-driver-manager floor to >=1.8.0
 - Add duckdb extra to dev dependency group
 - Pass --group docs to uv run in Justfile build/serve recipes
-- Close Phase 10 — update roadmap, state, and planning artifacts
 - Remove synthetic cassette files
 - Bump version to 1.1.0
 
