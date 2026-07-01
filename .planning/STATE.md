@@ -20,14 +20,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-01)
 
 **Core value:** One config in, one pool out — `create_pool(SnowflakeConfig(...))` returns a ready-to-use SQLAlchemy QueuePool in a single call.
-**Current focus:** v1.5.0 Async Cursor Completion — roadmap created (Phases 29–33). Next: `/gsd-plan-phase 29` (Arrow Streaming).
+**Current focus:** v1.5.0 Async Cursor Completion — Phase 29 (Arrow Streaming) planned (4 plans, 3 waves). Next: `/gsd-execute-phase 29`.
 
 ## Current Position
 
 Phase: 29 of 33 (Arrow Streaming) — first phase of v1.5.0
-Plan: — (not yet planned)
-Status: Ready to plan
-Last activity: 2026-07-01 — Roadmap created for v1.5.0 (5 phases, 31/31 requirements mapped)
+Plan: 29-01..04 planned (3 waves)
+Status: Ready to execute
+Last activity: 2026-07-01 — Phase 29 decomposed into 4 plans (Wave 1: tests + connection guard; Wave 2: reader + cursor; Wave 3: docs)
 
 Progress: [░░░░░░░░░░] 0%
 

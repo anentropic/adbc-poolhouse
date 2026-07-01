@@ -88,7 +88,11 @@ Full detail: `milestones/v1.4.0-ROADMAP.md` · Audit: `milestones/v1.4.0-MILESTO
   3. Cancelling or timing out a batch pull fires `adbc_cancel` once and invalidates the connection so `pool.checkedout() == 0`, identical under asyncio and trio; a second in-flight operation on the parent cursor while a reader is live raises `ConnectionBusyError` (STREAM-05, STREAM-06)
   4. An unclosed reader's `__del__` emits a `ResourceWarning` (never a "coroutine was never awaited" `RuntimeWarning`); the happy path emits neither; an exception during shielded reader cleanup chains the body error via `__context__` and still releases/invalidates the connection (EDGE-22, EDGE-23, EDGE-20)
   5. The `_SyncCursor` Protocol gains a `fetch_record_batch` signature and all new async public API is basedpyright-strict-clean (0 errors); the AST import-lint guard still passes over `_async/` with no `import asyncio` and no bare `to_thread` (PKG-01, PKG-03)
-**Plans**: TBD
+**Plans**: 4 plans
+- [ ] 29-01-PLAN.md — Wave-0 test scaffolding: stub reader + six RED reader test files + Snowflake cassette A1 smoke
+- [ ] 29-02-PLAN.md — AsyncConnection two-tier `_reader_open` lifetime guard (`from_reader` reentrancy)
+- [ ] 29-03-PLAN.md — `AsyncRecordBatchReader` + `AsyncCursor.fetch_record_batch` + `_SyncReader`/`_SyncCursor` Protocols
+- [ ] 29-04-PLAN.md — Arrow-streaming docs (async guide + API reference + strict build + humanizer)
 **UI hint**: no
 
 ### Phase 30: Async Bulk Write
@@ -146,7 +150,7 @@ Phases execute in numeric order: 29 → 30 → 31 → 32 → 33
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
-| 29. Arrow Streaming | v1.5.0 | 0/TBD | Not started | - |
+| 29. Arrow Streaming | v1.5.0 | 0/4 | Planned | - |
 | 30. Async Bulk Write | v1.5.0 | 0/TBD | Not started | - |
 | 31. DataFrame Convenience | v1.5.0 | 0/TBD | Not started | - |
 | 32. P2 Edge Hardening | v1.5.0 | 0/TBD | Not started | - |
