@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.5.0
 milestone_name: Async Cursor Completion
 status: executing
-stopped_at: Created the v1.5.0 roadmap — ROADMAP.md (Phases 29–33, expanded milestone section + collapsed v1.4.0), REQUIREMENTS.md traceability (31/31 mapped, 100%), and this STATE.md refreshed for the new milestone.
-last_updated: "2026-07-01T15:03:56.506Z"
-last_activity: "2026-07-01 — Phase 29 decomposed into 4 plans (Wave 1: tests + connection guard; Wave 2: reader + cursor; Wave 3: docs)"
+stopped_at: Completed 29-01-PLAN.md — Wave-0 RED scaffolding (BlockingStubReader harness stub + six RED reader test files, 46 asyncio×trio cases pinning STREAM-01..06 + EDGE-20/22/23/33). Resolved A1 = the Snowflake cassette cannot replay a streaming fetch_record_batch; Snowflake reader legs scoped to a manual-only re-record follow-up.
+last_updated: "2026-07-01T15:42:14Z"
+last_activity: 2026-07-01 -- Completed Phase 29 Plan 01 (Wave-0 RED scaffolding + A1 resolved)
 progress:
   total_phases: 5
   completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
-  percent: 0
+  total_plans: 4
+  completed_plans: 1
+  percent: 25
 ---
 
 # Project State
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-01)
 
 **Core value:** One config in, one pool out — `create_pool(SnowflakeConfig(...))` returns a ready-to-use SQLAlchemy QueuePool in a single call.
-**Current focus:** v1.5.0 Async Cursor Completion — Phase 29 (Arrow Streaming) planned (4 plans, 3 waves). Next: `/gsd-execute-phase 29`.
+**Current focus:** Phase 29 — arrow-streaming
 
 ## Current Position
 
-Phase: 29 of 33 (Arrow Streaming) — first phase of v1.5.0
-Plan: 29-01..04 planned (3 waves)
-Status: Ready to execute
-Last activity: 2026-07-01 — Phase 29 decomposed into 4 plans (Wave 1: tests + connection guard; Wave 2: reader + cursor; Wave 3: docs)
+Phase: 29 (arrow-streaming) — EXECUTING
+Plan: 2 of 4
+Status: Executing Phase 29 (Plan 01 complete — Wave-0 RED scaffolding)
+Last activity: 2026-07-01 -- Completed Phase 29 Plan 01 (Wave-0 RED scaffolding + A1 resolved)
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [██░░░░░░░░] 25%
 
 ## Accumulated Context
 
@@ -63,7 +63,8 @@ Five phases, numbered 29–33 (monotonic continuation from v1.4.0's Phase 28). D
 
 ### Blockers/Concerns
 
-- **`fetch_record_batch` returns a LIVE reader** (confirmed use-after-free/`ArrowInvalid` on read-after-checkin, DuckDB-probed): the entire Phase 29 design rests on binding the reader lifetime to the checked-out connection and forbidding checkin-while-live. This is the milestone's one real risk — verify the closed-before-checkin ordering on both DuckDB and the Snowflake cassette.
+- **`fetch_record_batch` returns a LIVE reader** (confirmed use-after-free/`ArrowInvalid` on read-after-checkin, DuckDB-probed): the entire Phase 29 design rests on binding the reader lifetime to the checked-out connection and forbidding checkin-while-live. This is the milestone's one real risk — the closed-before-checkin ordering is pinned by `test_reader_lifetime.py` on DuckDB (mandatory). **Snowflake cassette leg is NOT available** (see A1 below).
+- **A1 RESOLVED (Plan 29-01): the Snowflake cassette cannot replay a streaming `fetch_record_batch`.** `pytest-adbc-replay`'s `ReplayCursor` implements only `fetch_arrow_table` + row fetches (no `fetch_record_batch`); the cassette stores one materialized Arrow result. Both Snowflake reader legs in `test_reader_lifetime.py` are skipped (`@pytest.mark.snowflake` + class-level skip) and documented as a MANUAL-ONLY re-record follow-up (29-VALIDATION §Manual-Only). DuckDB carries mandatory EDGE-33 coverage and is not gated on Snowflake. `test_reader_cassette_smoke.py` fails loudly if a future replay plugin gains streaming support (the signal to re-enable). Green-wave TODO: delete the file-level pyright pragma block from the six RED test files once production symbols land.
 - **Keyword-only args across the TypeVarTuple offload boundary** (Phase 30): not a blocker, but resolve the explicit-arm-vs-partial pattern in phase planning.
 
 ## Deferred Items
@@ -87,6 +88,6 @@ Pre-v1.4.0 tracking cruft plus one non-functional docstring; run `/gsd-cleanup` 
 
 ## Session Continuity
 
-Last session: 2026-07-01T11:30:00.000Z
-Stopped at: Created the v1.5.0 roadmap — ROADMAP.md (Phases 29–33, expanded milestone section + collapsed v1.4.0), REQUIREMENTS.md traceability (31/31 mapped, 100%), and this STATE.md refreshed for the new milestone.
-Next step: `/gsd-plan-phase 29` to decompose Arrow Streaming (the headline reader-lifetime phase). Note: v1.4.0 full per-plan decision log preserved in git history + PROJECT.md Key Decisions; this STATE.md is refocused on v1.5.0 as a digest.
+Last session: 2026-07-01T15:42:14Z
+Stopped at: Completed 29-01-PLAN.md — Wave-0 RED scaffolding (BlockingStubReader harness stub + six RED reader test files, 46 asyncio×trio cases pinning STREAM-01..06 + EDGE-20/22/23/33; A1 resolved = no Snowflake streaming cassette replay).
+Next step: Execute 29-02-PLAN.md (next wave — production `_reader.py`, `AsyncCursor.fetch_record_batch`, `_SyncReader` Protocol, `_reader_open` two-tier guard) to turn the RED tests GREEN. Remember the green-wave cleanup: delete the file-level pyright pragma block from the six RED test files once production symbols exist.

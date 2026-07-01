@@ -87,12 +87,12 @@ Every v1.5.0 requirement maps to exactly one phase (Phases 29–33). PKG-* are c
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| STREAM-01 | Phase 29 | Pending |
-| STREAM-02 | Phase 29 | Pending |
-| STREAM-03 | Phase 29 | Pending |
-| STREAM-04 | Phase 29 | Pending |
-| STREAM-05 | Phase 29 | Pending |
-| STREAM-06 | Phase 29 | Pending |
+| STREAM-01 | Phase 29 | RED-pinned (29-01) |
+| STREAM-02 | Phase 29 | RED-pinned (29-01) |
+| STREAM-03 | Phase 29 | RED-pinned (29-01) |
+| STREAM-04 | Phase 29 | RED-pinned (29-01) |
+| STREAM-05 | Phase 29 | RED-pinned (29-01) |
+| STREAM-06 | Phase 29 | RED-pinned (29-01) |
 | INGEST-01 | Phase 30 | Pending |
 | INGEST-02 | Phase 30 | Pending |
 | INGEST-03 | Phase 30 | Pending |
@@ -107,13 +107,13 @@ Every v1.5.0 requirement maps to exactly one phase (Phases 29–33). PKG-* are c
 | EDGE-08 | Phase 32 | Pending |
 | EDGE-13 | Phase 32 | Pending |
 | EDGE-14 | Phase 32 | Pending |
-| EDGE-20 | Phase 29 | Pending |
-| EDGE-22 | Phase 29 | Pending |
-| EDGE-23 | Phase 29 | Pending |
+| EDGE-20 | Phase 29 | RED-pinned (29-01) |
+| EDGE-22 | Phase 29 | RED-pinned (29-01) |
+| EDGE-23 | Phase 29 | RED-pinned (29-01) |
 | EDGE-24 | Phase 32 | Pending |
 | EDGE-31 | Phase 32 | Pending |
 | EDGE-32 | Phase 32 | Pending |
-| EDGE-33 | Phase 29 | Pending |
+| EDGE-33 | Phase 29 | RED-pinned (29-01, DuckDB; Snowflake leg manual-only per A1) |
 | DOCS-01 | Phase 33 | Pending |
 | DOCS-02 | Phase 33 | Pending |
 | DOCS-03 | Phase 33 | Pending |
