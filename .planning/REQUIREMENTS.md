@@ -92,7 +92,7 @@ Every v1.5.0 requirement maps to exactly one phase (Phases 29–33). PKG-* are c
 | STREAM-03 | Phase 29 | RED-pinned (29-01) |
 | STREAM-04 | Phase 29 | RED-pinned (29-01) |
 | STREAM-05 | Phase 29 | RED-pinned (29-01) |
-| STREAM-06 | Phase 29 | RED-pinned (29-01) |
+| STREAM-06 | Phase 29 | Guard GREEN (29-02: two-tier `_reader_open`/`from_reader`); e2e pending 29-03 |
 | INGEST-01 | Phase 30 | Pending |
 | INGEST-02 | Phase 30 | Pending |
 | INGEST-03 | Phase 30 | Pending |
@@ -103,7 +103,7 @@ Every v1.5.0 requirement maps to exactly one phase (Phases 29–33). PKG-* are c
 | DF-04 | Phase 31 | Pending |
 | PKG-01 | Phase 29 | Pending |
 | PKG-02 | Phase 31 | Pending |
-| PKG-03 | Phase 29 | Pending |
+| PKG-03 | Phase 29 | Guard passes over `_async/` (29-02); re-verified each phase |
 | EDGE-08 | Phase 32 | Pending |
 | EDGE-13 | Phase 32 | Pending |
 | EDGE-14 | Phase 32 | Pending |

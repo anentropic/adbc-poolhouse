@@ -94,7 +94,7 @@ Full detail: `milestones/v1.4.0-ROADMAP.md` · Audit: `milestones/v1.4.0-MILESTO
 **Wave 1**
 
 - [x] 29-01-PLAN.md — Wave-0 test scaffolding: stub reader + six RED reader test files + Snowflake cassette A1 smoke (A1 resolved: no streaming cassette replay; Snowflake legs manual-only) — completed 2026-07-01
-- [ ] 29-02-PLAN.md — AsyncConnection two-tier `_reader_open` lifetime guard (`from_reader` reentrancy)
+- [x] 29-02-PLAN.md — AsyncConnection two-tier `_reader_open` lifetime guard (`from_reader` reentrancy) — completed 2026-07-01
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -173,7 +173,7 @@ Phases execute in numeric order: 29 → 30 → 31 → 32 → 33
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
-| 29. Arrow Streaming | v1.5.0 | 1/4 | In progress | - |
+| 29. Arrow Streaming | v1.5.0 | 2/4 | In progress | - |
 | 30. Async Bulk Write | v1.5.0 | 0/TBD | Not started | - |
 | 31. DataFrame Convenience | v1.5.0 | 0/TBD | Not started | - |
 | 32. P2 Edge Hardening | v1.5.0 | 0/TBD | Not started | - |

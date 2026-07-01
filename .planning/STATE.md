@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.5.0
 milestone_name: Async Cursor Completion
 status: executing
-stopped_at: Completed 29-01-PLAN.md — Wave-0 RED scaffolding (BlockingStubReader harness stub + six RED reader test files, 46 asyncio×trio cases pinning STREAM-01..06 + EDGE-20/22/23/33). Resolved A1 = the Snowflake cassette cannot replay a streaming fetch_record_batch; Snowflake reader legs scoped to a manual-only re-record follow-up.
-last_updated: "2026-07-01T15:42:14Z"
-last_activity: 2026-07-01 -- Completed Phase 29 Plan 01 (Wave-0 RED scaffolding + A1 resolved)
+stopped_at: Completed 29-02-PLAN.md — AsyncConnection two-tier reader guard (persistent _reader_open lifetime flag + keyword-only from_reader exemption on _enter_offload/_offloading, D-29-09/10/11). Foreign callers rejected on _in_use OR _reader_open; reader pulls exempt from the _reader_open tier only. Every existing call site unchanged (from_reader defaults False). Guard proven by tests/async/test_reader_guard.py (9 GREEN); end-to-end test_reader_busy.py stays RED until plan 03's fetch_record_batch.
+last_updated: "2026-07-01T16:52:00Z"
+last_activity: 2026-07-01 -- Completed Phase 29 Plan 02 (AsyncConnection two-tier reader guard)
 progress:
   total_phases: 5
   completed_phases: 0
   total_plans: 4
-  completed_plans: 1
-  percent: 25
+  completed_plans: 2
+  percent: 50
 ---
 
 # Project State
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-07-01)
 ## Current Position
 
 Phase: 29 (arrow-streaming) — EXECUTING
-Plan: 2 of 4
-Status: Executing Phase 29 (Plan 01 complete — Wave-0 RED scaffolding)
-Last activity: 2026-07-01 -- Completed Phase 29 Plan 01 (Wave-0 RED scaffolding + A1 resolved)
+Plan: 3 of 4
+Status: Executing Phase 29 (Plan 02 complete — AsyncConnection two-tier reader guard)
+Last activity: 2026-07-01 -- Completed Phase 29 Plan 02 (AsyncConnection two-tier reader guard)
 
-Progress: [██░░░░░░░░] 25%
+Progress: [█████░░░░░] 50%
 
 ## Accumulated Context
 
