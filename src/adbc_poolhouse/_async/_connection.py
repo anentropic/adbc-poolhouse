@@ -71,11 +71,30 @@ class AsyncConnection:
     shielded from cancellation so a connection is never returned to the pool in an
     unknown state.
 
+    Two-tier entry guard (D-29-10). The entry method layers a persistent
+    reader-lifetime tier on top of the per-call `_in_use` tier:
+
+    - **Foreign callers** (`execute`, `commit`, another cursor, a new
+      `fetch_record_batch`) are rejected while a reader is live --- they hit
+      `_in_use` **or** `_reader_open` and get `ConnectionBusyError`.
+    - **A live reader's own per-batch pulls** pass `from_reader=True`, which exempts
+      them from the `_reader_open` tier only (the reentrancy exemption --- a reader
+      must not deadlock on its own lifetime lock) while STILL taking the per-call
+      `_in_use` C-access tier.
+
     Attributes:
         _in_use: True while an offloaded call on this connection (or one of its
             cursors) is in flight. The single-task aliasing guard; deliberately a
             plain bool, never a serializing lock, so a second concurrent caller is
             rejected rather than queued (D-24-03).
+        _reader_open: True for the WHOLE lifetime of a live Arrow reader on this
+            connection (Model B, D-29-08/09), distinct from the per-call `_in_use`.
+            A live reader locks the connection so no foreign op can touch the still
+            -open C stream between pulls, closing the gap `_in_use` alone leaves
+            (STREAM-06). Set by `fetch_record_batch` and cleared by `reader.close()`
+            / checkin (plan 03); `_exit_offload` NEVER touches it. A stale
+            `_reader_open == True` is harmless because a fresh `AsyncConnection`
+            wraps each `connect()`, so checkin is the backstop eraser (D-29-13).
         _teardown_limiter: A dedicated 1-token `anyio.CapacityLimiter` the
             poison-recovery `invalidate` offloads through, kept separate from the
             shared pool `limiter` so recovery never contends for the pool token the
@@ -113,6 +132,12 @@ class AsyncConnection:
         self._fairy = fairy
         self._limiter = limiter
         self._in_use = False
+        # D-29-09: a live Arrow reader locks the connection for its WHOLE lifetime,
+        # not just during an in-flight pull. Distinct from the per-call `_in_use`
+        # (which reads False between pulls, leaving the STREAM-06 gap this closes).
+        # Owned by fetch_record_batch (set) / reader.close() + checkin (clear) in
+        # plan 03; `_exit_offload` must never touch it (D-29-11/13).
+        self._reader_open = False
         # Poison-recovery (`invalidate`) runs off a DEDICATED 1-token limiter, not
         # the pool's shared `limiter` (WR-03). Teardown is not throughput-bounded,
         # and on a `pool_size + max_overflow == 1` pool the just-aborted worker
@@ -121,22 +146,40 @@ class AsyncConnection:
         # aborted. A private limiter sidesteps that ordering dependency entirely.
         self._teardown_limiter: CapacityLimiter = anyio.CapacityLimiter(1)
 
-    def _enter_offload(self) -> None:
+    def _enter_offload(self, *, from_reader: bool = False) -> None:
         """
         Claim this connection for one offloaded call, or reject an aliased caller.
 
-        Raises `ConnectionBusyError` if the connection is already executing a call
-        (from this task or another), otherwise marks it busy. The read of
-        `_in_use` and the write that sets it run in one synchronous span with NO
-        `await` between them, so on the single-threaded event loop two tasks can
-        never both observe `_in_use == False` and both proceed (Pitfall 3 / the
+        Applies the two-tier entry guard (D-29-10). First the per-call C-access tier:
+        raise `ConnectionBusyError` if the connection is already executing a call
+        (from this task or another) --- this tier is unconditional, so `from_reader`
+        never bypasses it. Then the reader-lifetime tier: raise `ConnectionBusyError`
+        if a reader is live (`_reader_open`) UNLESS the caller is that reader's own
+        pull (`from_reader=True`), which is exempt from this tier only (the
+        reentrancy exemption --- a reader must not deadlock on its own lifetime
+        lock). If both tiers pass, mark the connection busy.
+
+        The read of `_in_use` and the write that sets it run in one synchronous span
+        with NO `await` between them, so on the single-threaded event loop two tasks
+        can never both observe `_in_use == False` and both proceed (Pitfall 3 / the
         check-and-set race). Always paired with `_exit_offload` in a `finally`.
+
+        Args:
+            from_reader: True only for a live reader's own per-batch pull, exempting
+                it from the `_reader_open` tier (not the `_in_use` tier). Defaults
+                False, so every existing (foreign) call site is unchanged.
 
         Raises:
             ConnectionBusyError: If an offloaded call on this connection is already
-                in flight.
+                in flight (`_in_use`), or a reader is live and the caller is foreign
+                (`_reader_open and not from_reader`).
         """
         if self._in_use:
+            raise ConnectionBusyError
+        # Reader-lifetime tier: foreign callers are rejected while a reader is live.
+        # The reader's own pulls pass from_reader=True to skip ONLY this tier
+        # (D-29-10); they still took the _in_use tier above.
+        if self._reader_open and not from_reader:
             raise ConnectionBusyError
         self._in_use = True
 
@@ -145,25 +188,36 @@ class AsyncConnection:
         self._in_use = False
 
     @contextlib.contextmanager
-    def _offloading(self) -> Generator[None]:
+    def _offloading(self, *, from_reader: bool = False) -> Generator[None]:
         """
-        Hold the single-task `_in_use` guard for the span of one offloaded call.
+        Hold the two-tier entry guard for the span of one offloaded call.
 
         Claims the connection on entry (raising `ConnectionBusyError` if it is
-        already executing a call) and releases it on exit, so every offloading
-        method on this connection --- and on its cursors --- brackets its work
-        identically without repeating the `try`/`finally` (D-24-03). If the guard
-        rejects the caller the body never runs and `_in_use` is left untouched for
-        the call that legitimately holds it.
+        already executing a call, or if a reader is live and the caller is foreign)
+        and releases the per-call `_in_use` tier on exit, so every offloading method
+        on this connection --- and on its cursors --- brackets its work identically
+        without repeating the `try`/`finally` (D-24-03). If the guard rejects the
+        caller the body never runs and the flags are left untouched for the call
+        that legitimately holds them.
+
+        `_reader_open` is deliberately NOT cleared here: its lifetime spans many
+        offload calls and is owned by `reader.close()` / checkin (D-29-11), so
+        `_exit_offload` only clears `_in_use`.
+
+        Args:
+            from_reader: Forwarded to `_enter_offload`. True only for a live
+                reader's own per-batch pull (the reentrancy exemption); defaults
+                False so every existing call site keeps its foreign-tier semantics
+                with no edit.
 
         Yields:
             `None`. The guarded offload runs inside the `with` body.
 
         Raises:
             ConnectionBusyError: If an offloaded call on this connection is already
-                in flight.
+                in flight, or a reader is live and the caller is foreign.
         """
-        self._enter_offload()
+        self._enter_offload(from_reader=from_reader)
         try:
             yield
         finally:
