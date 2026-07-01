@@ -45,6 +45,12 @@ experimental and is not part of the constructible public API.
       show_root_heading: true
       members_order: source
       filters: ["!^__"]
+
+::: adbc_poolhouse._async._reader.AsyncRecordBatchReader
+    options:
+      show_root_heading: true
+      members_order: source
+      filters: ["!^__"]
 """
 
 

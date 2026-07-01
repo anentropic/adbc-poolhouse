@@ -22,14 +22,14 @@ awaited.
 
     It is also incomplete. The following are not available yet on the async side:
 
-    - **Arrow streaming** — `fetch_record_batch` and `async for batch in ...`
     - **Async bulk write** — `adbc_ingest`
     - **DataFrame convenience** — `fetch_df` and `fetch_polars`
     - **Async ADBC metadata** — `adbc_get_table_schema`, `adbc_get_objects`, `adbc_get_info`
     - **Async prepared statements** — `adbc_prepare`, `adbc_execute_schema`
 
     What you get today is checkout, `execute` / `executemany`, the `fetch*` methods,
-    `fetch_arrow_table`, and cooperative cancellation. The rest is on the roadmap.
+    `fetch_arrow_table`, Arrow streaming through `fetch_record_batch`, and cooperative
+    cancellation. The rest is on the roadmap.
 
 ## Install
 
@@ -134,6 +134,94 @@ The pool caps concurrency for you. Each [`AsyncPool`][adbc_poolhouse._async._poo
 in-flight offloaded calls can never exceed the pool's checkout ceiling. There is
 no separate knob to tune and no global limiter to collide with.
 
+## Streaming a result set batch by batch
+
+`fetch_arrow_table` materializes the whole result before it returns. For a large
+query that is a lot of memory to hold at once. When you want to process the rows in
+chunks instead, `fetch_record_batch` hands you an
+[`AsyncRecordBatchReader`][adbc_poolhouse._async._reader.AsyncRecordBatchReader]:
+an async iterator that pulls one `pyarrow.RecordBatch` at a time, each pull offloaded
+off the event loop.
+
+The canonical form stacks `async with` over the awaited `fetch_record_batch`, then
+iterates:
+
+```python
+import anyio
+from adbc_poolhouse import DuckDBConfig, managed_async_pool
+
+async with managed_async_pool(DuckDBConfig(database="/tmp/warehouse.db")) as pool:
+    async with await pool.connect() as conn:
+        cursor = conn.cursor()
+        await cursor.execute("SELECT * FROM events WHERE day = ?", ["2026-06-27"])
+        async with await cursor.fetch_record_batch() as reader:
+            async for batch in reader:
+                process(batch)  # a pyarrow.RecordBatch, one chunk at a time
+```
+
+The `async with await cursor.fetch_record_batch()` line reads the same way as
+`async with await pool.connect()`: awaiting the coroutine builds the reader, and
+`async with` wraps the result so it closes when the block exits. Inside, `async for`
+drives the reader — each iteration awaits the next batch on a worker thread.
+
+### Always close the reader
+
+Use `async with`. It is the only path that guarantees the reader closes on every
+exit: a normal drain, a `break` partway through, an exception in the loop body, or a
+cancellation from an outer deadline. Draining the stream is not the same as closing
+it. After the last batch, the underlying Arrow C stream still sits on the cursor
+until `close` runs, so the reader will not release the connection on exhaustion
+alone.
+
+That matters because a live reader locks its connection for its whole lifetime, not
+just during a pull. While the reader is open, any other operation on the same
+connection raises
+[`ConnectionBusyError`][adbc_poolhouse.ConnectionBusyError]: a second cursor, an
+`execute`, a `commit`, all of it. The lock clears when you close the reader. A reader
+you drain but forget to close keeps the connection busy until check-in reclaims it,
+and its finalizer emits a `ResourceWarning` to tell you so. `async with` closes it for
+you, so reach for it and the question does not come up.
+
+### Reading after the reader is gone
+
+The reader is bound to its checked-out connection. Once you close the reader, or once
+the connection checks back into the pool, the underlying stream is closed. A read
+after that point raises `pyarrow.lib.ArrowInvalid` — the driver's own
+closed-stream error. Poolhouse does not wrap it in a bespoke type or convert it into
+a silent no-op; you get the native exception, never a segfault or a read of freed
+memory.
+
+```python
+async with await pool.connect() as conn:
+    cursor = conn.cursor()
+    await cursor.execute("SELECT * FROM events")
+    reader = await cursor.fetch_record_batch()
+    first = await reader.__anext__()
+# connection checked back in here; the stream is closed
+await reader.__anext__()  # raises pyarrow.lib.ArrowInvalid
+```
+
+Keep the reader's work inside the `async with await pool.connect()` block. If you
+need rows after the connection is gone, materialize them with `fetch_arrow_table`
+instead — that returns a `pyarrow.Table` that owns its buffers and outlives the
+cursor.
+
+### What streaming does and does not parallelize
+
+Each `read_next_batch` pull is offloaded individually through the pool limiter, the
+same limiter that bounds every other async call. A slow pull does not block the event
+loop, and a cancelled pull aborts the in-flight C call through the cursor's
+`adbc_cancel`, then invalidates the connection so the pool's count stays correct.
+
+The pull runs off the loop, but it is not free of the GIL. Reading a batch
+materializes Arrow objects, and that construction reacquires the GIL for parts of the
+work — the same behavior described under
+[What actually runs in parallel](#what-actually-runs-in-parallel) for
+`fetch_arrow_table`. Streaming trades peak memory for a steady per-batch cost; it does
+not turn one reader into a parallel pipeline. Batches from a single reader arrive one
+at a time, in order. Real overlap comes from running separate readers on separate
+connections, each checked out from the pool.
+
 ## Do not share one async connection across concurrent tasks
 
 An ADBC connection permits serialized access (one call at a time) but not
@@ -225,6 +313,8 @@ anyio's scope, not from anything the pool does.
   fixtures
 - [Configuration reference](configuration.md) for env var loading and pool tuning
 - [API Reference](../reference/) for the generated `AsyncPool`,
-  `AsyncConnection`, and [`AsyncCursor`][adbc_poolhouse._async._cursor.AsyncCursor] docs, including
+  `AsyncConnection`, [`AsyncCursor`][adbc_poolhouse._async._cursor.AsyncCursor], and
+  [`AsyncRecordBatchReader`][adbc_poolhouse._async._reader.AsyncRecordBatchReader]
+  docs, including
   [`AsyncConnection.invalidate`][adbc_poolhouse._async._connection.AsyncConnection.invalidate]
   (the poison-recovery drop the cancellation path uses)
