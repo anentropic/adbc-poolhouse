@@ -22,14 +22,13 @@ awaited.
 
     It is also incomplete. The following are not available yet on the async side:
 
-    - **Async bulk write** — `adbc_ingest`
     - **DataFrame convenience** — `fetch_df` and `fetch_polars`
     - **Async ADBC metadata** — `adbc_get_table_schema`, `adbc_get_objects`, `adbc_get_info`
     - **Async prepared statements** — `adbc_prepare`, `adbc_execute_schema`
 
     What you get today is checkout, `execute` / `executemany`, the `fetch*` methods,
-    `fetch_arrow_table`, Arrow streaming through `fetch_record_batch`, and cooperative
-    cancellation. The rest is on the roadmap.
+    `fetch_arrow_table`, Arrow streaming through `fetch_record_batch`, bulk write
+    through `adbc_ingest`, and cooperative cancellation. The rest is on the roadmap.
 
 ## Install
 
@@ -221,6 +220,62 @@ work — the same behavior described under
 not turn one reader into a parallel pipeline. Batches from a single reader arrive one
 at a time, in order. Real overlap comes from running separate readers on separate
 connections, each checked out from the pool.
+
+## Bulk-loading Arrow data
+
+`adbc_ingest` writes an Arrow dataset straight into a table. Hand it a
+`pyarrow.Table`, `RecordBatch`, `RecordBatchReader`, or an Arrow C-stream capsule
+and the driver loads it in one offloaded call, returning the number of rows written:
+
+```python
+import pyarrow as pa
+from adbc_poolhouse import DuckDBConfig, managed_async_pool
+
+people = pa.table({"id": [1, 2, 3], "name": ["a", "b", "c"]})
+
+async with managed_async_pool(DuckDBConfig(database="/tmp/warehouse.db")) as pool:
+    async with await pool.connect() as conn:
+        cursor = conn.cursor()
+        written = await cursor.adbc_ingest("people", people, mode="create")  # 3
+        await cursor.adbc_ingest("people", people, mode="append")  # 3 more, 6 total
+```
+
+The dataset reaches the driver unconverted. Poolhouse does no validation, so a
+malformed payload or a bad table name surfaces the driver's own error. The row
+count is whatever the driver reports, which is `-1` when it cannot count.
+
+### The four write modes
+
+`mode` is passed through verbatim. It defaults to `create`:
+
+| `mode` | Effect |
+|--------|--------|
+| `create` | Create a new table. Fails if it already exists. |
+| `append` | Add rows to an existing table. |
+| `create_append` | Create the table if it is missing, then append. |
+| `replace` | **Drop** the existing table and recreate it. |
+
+`replace` is the one to watch. It is not a row-level upsert: it **drops** the
+existing table and its data, then recreates it from the new dataset. If you meant
+to add or update rows, use `append` or `create_append`.
+
+`catalog_name`, `db_schema_name`, and `temporary` route the table to a specific
+catalog or schema, or create it as temporary. The driver marks all three
+EXPERIMENTAL, so treat their behaviour as subject to change.
+
+### A cancelled ingest recovers the connection, not the table
+
+Cancelling an in-flight `adbc_ingest` (a `fail_after` deadline, a `move_on_after`,
+or a cancelled task group) aborts it the same way `execute` and `fetch_arrow_table`
+are aborted: the driver's `adbc_cancel` unblocks the worker, and the now-poisoned
+connection is invalidated rather than returned to the pool, so the checked-out
+count stays correct.
+
+What that recovers is the connection, not the table. A bulk load aborted partway
+through can leave rows already written, and poolhouse does not roll them back — it
+cannot, since the write is not wrapped in a transaction it controls. After a
+cancelled ingest, treat the target table as being in an undefined state and clean
+it up yourself before retrying.
 
 ## Do not share one async connection across concurrent tasks
 
