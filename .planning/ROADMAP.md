@@ -173,7 +173,7 @@ Phases execute in numeric order: 29 → 30 → 31 → 32 → 33
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
-| 29. Arrow Streaming | v1.5.0 | 4/4 | Complete | 2026-07-01 |
+| 29. Arrow Streaming | v1.5.0 | 4/4 | Complete    | 2026-07-01 |
 | 30. Async Bulk Write | v1.5.0 | 0/TBD | Not started | - |
 | 31. DataFrame Convenience | v1.5.0 | 0/TBD | Not started | - |
 | 32. P2 Edge Hardening | v1.5.0 | 0/TBD | Not started | - |

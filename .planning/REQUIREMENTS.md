@@ -22,7 +22,7 @@ Scope constraints (maintainer-confirmed):
 - [x] **STREAM-03**: `AsyncRecordBatchReader` is an async context manager; `await reader.close()` / `__aexit__` closes the reader offloaded and shielded, freeing Arrow resources before the connection can check in
 - [x] **STREAM-04**: The reader's lifetime is bound to its checked-out connection; the reset-event checkin closes the reader first, so a read after checkin (or after `close`) surfaces the driver's native closed-stream error (as the sync method would) — a clean Python exception, never a use-after-free / segfault. poolhouse adds no bespoke error type
 - [x] **STREAM-05**: Cancelling or timing out a batch pull fires `cursor.adbc_cancel()` once from the loop thread and invalidates the connection, so `pool.checkedout() == 0` and the pool is never poisoned — identical under asyncio and trio
-- [ ] **STREAM-06**: A second in-flight operation on the parent cursor/connection while a reader is live raises `ConnectionBusyError` (reuses the `_in_use` guard) — never silent serialization or concurrent C access
+- [x] **STREAM-06**: A second in-flight operation on the parent cursor/connection while a reader is live raises `ConnectionBusyError` (reuses the `_in_use` guard) — never silent serialization or concurrent C access
 
 ### Async Bulk Write
 
@@ -92,7 +92,7 @@ Every v1.5.0 requirement maps to exactly one phase (Phases 29–33). PKG-* are c
 | STREAM-03 | Phase 29 | Complete (29-03) |
 | STREAM-04 | Phase 29 | Complete (29-03) |
 | STREAM-05 | Phase 29 | Complete (29-03) |
-| STREAM-06 | Phase 29 | Guard GREEN (29-02: two-tier `_reader_open`/`from_reader`); e2e pending 29-03 |
+| STREAM-06 | Phase 29 | Complete (29-03) |
 | INGEST-01 | Phase 30 | Pending |
 | INGEST-02 | Phase 30 | Pending |
 | INGEST-03 | Phase 30 | Pending |

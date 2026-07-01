@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.5.0
 milestone_name: Async Cursor Completion
-status: executing
-stopped_at: Completed 29-04-PLAN.md — Arrow-streaming documentation. Added the "Streaming a result set batch by batch" how-to section to docs/src/guides/async.md (canonical async with await cursor.fetch_record_batch() usage D-29-18; the always-close reader-lifetime contract — whole-lifetime connection lock, drain ≠ close, read-after-checkin surfaces native pyarrow.lib.ArrowInvalid with no bespoke type, T-29-07 mitigation; honest per-batch-offload / GIL-reacquired concurrency framing). Registered AsyncRecordBatchReader as a fourth explicit async reference block in gen_ref_pages.py so it + fetch_record_batch render in the API reference. Dropped Arrow streaming from the experimental "not available yet" list. mkdocs build --strict exits 0; humanizer pass applied. The human-verify checkpoint was AUTO-APPROVED under the --auto chain (all automated verification performed by the executor). Phase 29 (Arrow Streaming) is now COMPLETE — 4/4 plans.
-last_updated: "2026-07-01T18:00:00Z"
-last_activity: 2026-07-01 -- Completed Phase 29 Plan 04 (Arrow-streaming docs) — Phase 29 complete
+status: completed
+stopped_at: Completed 29-01-PLAN.md — Wave-0 RED scaffolding (BlockingStubReader harness stub + six RED reader test files, 46 asyncio×trio cases pinning STREAM-01..06 + EDGE-20/22/23/33; A1 resolved = no Snowflake streaming cassette replay).
+last_updated: "2026-07-01T17:30:38.497Z"
+last_activity: 2026-07-01
 progress:
   total_phases: 5
   completed_phases: 1
   total_plans: 4
   completed_plans: 4
-  percent: 100
+  percent: 20
 ---
 
 # Project State
@@ -25,10 +25,10 @@ See: .planning/PROJECT.md (updated 2026-07-01)
 
 ## Current Position
 
-Phase: 29 (arrow-streaming) — COMPLETE (4/4 plans)
-Plan: 4 of 4 (complete)
+Phase: 30
+Plan: Not started
 Status: Phase 29 complete — Arrow streaming shipped and documented; ready to advance to Phase 30 (Async Bulk Write)
-Last activity: 2026-07-01 -- Completed Phase 29 Plan 04 (Arrow-streaming docs) — Phase 29 complete
+Last activity: 2026-07-01
 
 Progress: [██████████] 100% (Phase 29 plans)
 
