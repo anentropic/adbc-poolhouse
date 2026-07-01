@@ -3,7 +3,7 @@
 ## Milestones
 
 - ✅ **v1.4.0 Async API** — Phases 22–28 (shipped 2026-07-01)
-- ✅ **v1.3.0 Quack Backend** — Phases 21–21.1 (shipped 2026-05-20)
+- ✅ **v1.3.0 Quack Backend** — Phases 21–21.1 (shipped 2026-05-21)
 - ✅ **v1.2.0 Plugin/Extensibility API** — Phases 16-20 (shipped 2026-03-15)
 - ✅ **v1.0.0 MVP + Backend Expansion** — Phases 1-15 (shipped 2026-03-07)
 
@@ -27,7 +27,7 @@ Full detail: `milestones/v1.4.0-ROADMAP.md` · Audit: `milestones/v1.4.0-MILESTO
 </details>
 
 <details>
-<summary>✅ v1.3.0 Quack Backend (Phases 21-21.1) — SHIPPED 2026-05-20</summary>
+<summary>✅ v1.3.0 Quack Backend (Phases 21-21.1) — SHIPPED 2026-05-21</summary>
 
 - [x] **Phase 21: Quack Backend** — Add `QuackConfig` (config + tests + docs) for `adbc-driver-quack` — completed 2026-05-19
 - [x] **Phase 21.1: ADBC dispatch URI-positional fix** — Fix `create_pool()` dispatch for Quack/Postgres/FlightSQL — completed 2026-05-20

@@ -25,6 +25,31 @@
 
 ---
 
+## v1.3.0 Quack Backend (Shipped: 2026-05-21)
+
+**Phases completed:** 2 phases (21, 21.1), 6 plans
+
+**Delivered:** `QuackConfig` backend for the `adbc-driver-quack` remote DuckDB protocol, following the v1.2.0 self-describing Protocol pattern, plus a dispatch fix (Phase 21.1) correcting `create_pool()` for every PyPI driver that takes a required-positional `uri` (Quack, PostgreSQL, FlightSQL).
+
+**Key accomplishments:**
+- `QuackConfig` accepting either `uri="quack://host:port"` or decomposed `host`/`port`, with optional `token` (SecretStr) and `tls`, mutual-exclusion validated at construction
+- `create_pool(QuackConfig(...))` works via the existing self-describing dispatch — no `_pool_factory` changes; `pip install adbc-poolhouse[quack]` installs the driver
+- Per-warehouse Quack guide (mkdocs nav + configuration table + index listing) with alpha-status warning and external project link
+- Phase 21.1: fixed `TypeError: connect() missing 1 required positional argument: 'uri'` for uri-positional drivers — repaired the documented quickstart for Quack and latent v1.0.0 dispatch bugs in PostgreSQL and FlightSQL
+- Signature-preserving import stubs so this regression class is caught by CI in future
+
+**Stats:**
+- Phases: 2 (21, 21.1), 6 plans; 29 requirements (QUACK-01..18, DISP-01..11)
+- Files changed: 43; Commits: 77
+- Shipped: 2026-05-21 (git range v1.2.0 → v1.3.0)
+- Tests: ~265 passing
+- Backends: 12 → 13 (added Quack)
+- Follow-up patch: v1.3.1 (2026-06-24) — DatabricksConfig catalog/schema fix
+
+_Retroactively archived 2026-07-01 — v1.3.0 shipped and was tagged but never formally closed via `/gsd-complete-milestone`._
+
+---
+
 ## v1.2.0 Plugin/Extensibility API (Shipped: 2026-03-15)
 
 **Phases completed:** 6 phases (16-20), 17 plans

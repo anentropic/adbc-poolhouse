@@ -92,6 +92,38 @@
 
 ---
 
+## Milestone: v1.3.0 — Quack Backend
+
+**Shipped:** 2026-05-21
+**Phases:** 2 (21, 21.1) | **Plans:** 6
+
+### What Was Built
+- `QuackConfig` for `adbc-driver-quack` (uri OR decomposed host/port + token + tls), with guide, configuration table, index listing, and mkdocs nav
+- Phase 21.1 dispatch fix: `create_pool()` correctly passes a required-positional `uri` to PyPI drivers (Quack, PostgreSQL, FlightSQL)
+
+### What Worked
+- The v1.2.0 self-describing Protocol pattern made adding Quack nearly mechanical — no `_pool_factory` changes; the config carries its own driver path and kwargs
+- Shipping a real backend exposed a latent dispatch bug (uri-positional `connect()`) that also affected PostgreSQL and FlightSQL — better found by Quack than by a user
+- Inserting Phase 21.1 as a gap-closure phase kept the fix separate and traceable rather than folding it silently into Phase 21
+
+### What Was Inefficient
+- The uri-positional dispatch bug was latent since v1.0.0 (PostgreSQL/FlightSQL) but only surfaced when Quack exercised the path — earlier real-driver dispatch tests would have caught it sooner
+- The milestone shipped and was tagged (v1.3.0) but never formally closed — no MILESTONES/retrospective entry, REQUIREMENTS left unchecked, ROADMAP stuck on "awaiting release" — until this retroactive cleanup (2026-07-01)
+
+### Patterns Established
+- Signature-preserving import stubs so dispatch regressions are caught by CI
+- Gap-closure phase (21.1) for a bug a new backend exposes in shared machinery
+
+### Key Lessons
+1. A new backend doubles as a dispatch integration test — Quack exposed a uri-positional bug latent in PostgreSQL/FlightSQL since v1.0.0
+2. Close milestones as you ship them — v1.3.0 was tagged but left un-archived, creating the bookkeeping gap this cleanup resolved
+
+### Cost Observations
+- 77 commits; shipped 2026-05-21 (git range v1.2.0 → v1.3.0)
+- Follow-up patch v1.3.1 (2026-06-24): DatabricksConfig catalog/schema fix
+
+---
+
 ## Milestone: v1.4.0 — Async API
 
 **Shipped:** 2026-07-01
@@ -143,6 +175,7 @@
 |-----------|--------|-------|------------|
 | v1.0.0 | 15 | 51 | Full GSD workflow: research → plan → execute → verify → audit |
 | v1.2.0 | 6 | 17 | Architectural pivot mid-milestone; gap closure from audit |
+| v1.3.0 | 2 | 6 | Single-backend addition on the v1.2.0 Protocol pattern + gap-closure phase (21.1) |
 | v1.4.0 | 7 | 29 | Feasibility-spike gate + deterministic async harness before code; Linux CI as async gate |
 
 ### Cumulative Quality
@@ -151,6 +184,7 @@
 |-----------|-------|----------|-------------|
 | v1.0.0 | 192 | 12 | 66/66 |
 | v1.2.0 | 241 | 12 | 1/13 satisfied, 12/13 superseded |
+| v1.3.0 | ~265 | 13 | 29/29 |
 | v1.4.0 | 433 | 13 (async for all) | 63/63 |
 
 ### Top Lessons (Verified Across Milestones)
