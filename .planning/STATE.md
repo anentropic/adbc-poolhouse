@@ -18,10 +18,29 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-06-25)
+See: .planning/PROJECT.md (updated 2026-07-01)
 
 **Core value:** One config in, one pool out — `create_pool(SnowflakeConfig(...))` returns a ready-to-use SQLAlchemy QueuePool in a single call.
-**Current focus:** Phase 28 — documentation
+**Current focus:** v1.4.0 Async API shipped and archived 2026-07-01 — planning next milestone (`/gsd-new-milestone`)
+
+## Deferred Items
+
+Items acknowledged and deferred at v1.4.0 milestone close on 2026-07-01:
+
+| Category | Item | Status |
+|----------|------|--------|
+| quick_task | 1-check-with-gh-run-list-and-related-comma | unknown |
+| quick_task | 2-add-a-justfile-with-recipes-for-build-an | unknown |
+| quick_task | 3-docs-guides-foundry-drivers-need-a-link | unknown |
+| quick_task | 5-mkdocs-hot-reload-not-working | unknown |
+| quick_task | 6-improve-readme-and-add-project-homepage | missing |
+| quick_task | 7-improve-readme-and-add-project-homepage | unknown |
+| quick_task | 9-fix-docs-gaps-develop-md-stale-syrupy-re | unknown |
+| quick_task | 10-rewrite-integration-tests-to-use-pool-ap | unknown |
+| quick_task | 260624-u45-databricks-catalog-schema | unknown |
+| tech_debt | _async/_cancel.py docstring drift (describes from_thread bridge not used) | non-functional |
+
+Pre-v1.4.0 tracking cruft plus one non-functional docstring; run `/gsd-cleanup` to triage.
 
 ## Current Position
 

@@ -1,5 +1,30 @@
 # Milestones
 
+## v1.4.0 Async API (Shipped: 2026-07-01)
+
+**Phases completed:** 7 phases (22-28), 29 plans
+
+**Delivered:** An optional async API surface behind an `[async]` extra — `create_async_pool` / `managed_async_pool` / `close_async_pool` mirroring the sync trio, with awaitable `AsyncPool` / `AsyncConnection` / `AsyncCursor` for all 13 backends. Every blocking ADBC call is offloaded to a worker thread via `anyio.to_thread.run_sync` (real concurrency — ADBC releases the GIL), wrapping the sync core unchanged. anyio gives asyncio + trio neutrality; the sync path is untouched and gains zero async dependency.
+
+**Key accomplishments:**
+- Async pool/connection/cursor surface over the unchanged sync core, generic across all 13 backends via the `WarehouseConfig` Protocol (no per-backend async code)
+- Single offload chokepoint with a dedicated per-pool `anyio.CapacityLimiter(pool_size + max_overflow)` — never the global 40-token default; AST-lint-enforced
+- Cooperative cancellation that never poisons the pool — `adbc_cancel` fired once from the loop thread, shielded checkin, invalidate-on-cancel, identical under asyncio and trio
+- `[async]` extra with PEP 562 lazy import — `import adbc_poolhouse` and the full sync suite pass with anyio absent (proven by a `sync-no-anyio` CI job); async public API fully typed under basedpyright strict (PEP 646 `TypeVarTuple`/`Unpack` at the offload boundary)
+- Dual-backend test matrix — every async test parametrized over asyncio + trio across DuckDB (in-proc) and a Snowflake cassette, plus Arrow allocator-stability and limiter-saturation stress proofs and no-asyncio meta-guards
+- Honest async documentation — usage guide distinguishing I/O-bound wins (~2.77x execute) from materialization-bound limits (~1.67x fetch) per the Phase 22 benchmarks, full API reference, mkdocs `--strict` gate
+
+**Stats:**
+- Phases: 7 (22-28), 29 plans; 63/63 requirements satisfied
+- Files changed: 214; Commits: 190
+- Timeline: 6 days (2026-06-25 → 2026-07-01)
+- Tests: 433 passing, 2 skipped
+- Git range: v1.3.1 → v1.4.0
+- Milestone audit: passed (0 blockers, 4/4 E2E flows wired) — `milestones/v1.4.0-MILESTONE-AUDIT.md`
+- Known deferred items at close: 9 stale quick-task tracking artifacts (pre-v1.4.0 cruft, see STATE.md Deferred Items) + one non-functional `_cancel.py` docstring drift
+
+---
+
 ## v1.2.0 Plugin/Extensibility API (Shipped: 2026-03-15)
 
 **Phases completed:** 6 phases (16-20), 17 plans

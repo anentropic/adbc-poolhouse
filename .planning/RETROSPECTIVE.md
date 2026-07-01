@@ -92,6 +92,49 @@
 
 ---
 
+## Milestone: v1.4.0 — Async API
+
+**Shipped:** 2026-07-01
+**Phases:** 7 (22-28) | **Plans:** 29
+
+### What Was Built
+- Optional async API behind an `[async]` extra — `create_async_pool`/`managed_async_pool`/`close_async_pool` + `AsyncPool`/`AsyncConnection`/`AsyncCursor` for all 13 backends
+- Thread-offload over the unchanged sync core via a single `anyio.to_thread.run_sync` chokepoint with a dedicated per-pool `CapacityLimiter`
+- Cooperative cancellation (`adbc_cancel` + shielded invalidate) that never poisons the pool, identical under asyncio and trio
+- Zero-cost sync path (PEP 562 lazy import; sync suite green with anyio absent) and basedpyright-strict async typing
+- Dual-backend (asyncio/trio × DuckDB/Snowflake cassette) test matrix + Arrow-stability and limiter-stress proofs
+
+### What Worked
+- Front-loading a feasibility spike (Phase 22) to measure GIL release BEFORE building — set honest concurrency claims and gated the milestone
+- Building the deterministic test harness (Phase 23) before the code it exercises — event-gating/virtual-clock over real sleeps kept the EDGE suite fast and non-flaky
+- Isolating cancellation as its own phase (25) — the #1 industry-wide async-DB leak risk got focused design and explicit no-leak assertions
+- Enforcing async hygiene (no asyncio, no bare `to_thread`) with AST guards co-located with the behaviour they test
+- Linux CI as the real cross-platform gate — the documented "passes on macOS, hangs on Linux" race class
+
+### What Was Inefficient
+- ROADMAP checkboxes for 26-03/26-04 drifted out of sync (work done, boxes unchecked) because this build's gsd-tools lacks the mutation handlers — hand reconciliation at close
+- Two verifications + one UAT sat in `human_needed`/`testing` waiting on a CI observation that had already gone green — the close had to discharge them manually
+- Nyquist VALIDATION.md files mostly left `draft`/non-compliant despite the work being done — validation formalization lagged execution
+
+### Patterns Established
+- Feasibility spike as a gating Phase-0 for any milestone resting on an unproven premise
+- Deterministic async test harness (blocking stub + virtual clock + AST hygiene guards) before the async code
+- Single offload chokepoint + dedicated per-pool limiter as the concurrency-bounding pattern
+- Cancellation-invalidates-never-returns-busy as the pool-safety invariant
+- Optional feature behind an extra + PEP 562 lazy import for zero-cost-to-non-users surfaces
+
+### Key Lessons
+1. Measure the premise before building on it — the spike turned a MEDIUM-confidence GIL assumption into honest, documented concurrency claims
+2. For async correctness, Linux CI is the gate, not local loops — macOS can hide lost-wakeup/cancel races
+3. Keep tracking artifacts (ROADMAP checkboxes, VALIDATION status) in sync as you go; reconciling at close is avoidable friction
+
+### Cost Observations
+- Model mix: primarily opus for planning/execution and cancellation design; sonnet for research/harness
+- 190 commits over 6 days
+- Notable: the hardest correctness work (cancellation, limiter, trio/asyncio parity) concentrated in Phases 24-25; docs + packaging were comparatively mechanical
+
+---
+
 ## Cross-Milestone Trends
 
 ### Process Evolution
@@ -100,6 +143,7 @@
 |-----------|--------|-------|------------|
 | v1.0.0 | 15 | 51 | Full GSD workflow: research → plan → execute → verify → audit |
 | v1.2.0 | 6 | 17 | Architectural pivot mid-milestone; gap closure from audit |
+| v1.4.0 | 7 | 29 | Feasibility-spike gate + deterministic async harness before code; Linux CI as async gate |
 
 ### Cumulative Quality
 
@@ -107,6 +151,7 @@
 |-----------|-------|----------|-------------|
 | v1.0.0 | 192 | 12 | 66/66 |
 | v1.2.0 | 241 | 12 | 1/13 satisfied, 12/13 superseded |
+| v1.4.0 | 433 | 13 (async for all) | 63/63 |
 
 ### Top Lessons (Verified Across Milestones)
 

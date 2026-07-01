@@ -4,22 +4,11 @@
 
 A focused Python library that takes a typed warehouse configuration and returns a pooled ADBC connection. Supports 13 warehouse backends (DuckDB, Snowflake, BigQuery, PostgreSQL, FlightSQL, Databricks, Redshift, Trino, MSSQL, SQLite, MySQL, ClickHouse, Quack) with both PyPI and Foundry driver detection. Published to PyPI as `adbc-poolhouse`.
 
-## Current Milestone: v1.4.0 Async API
+## Current State
 
-**Goal:** Add an optional async API surface (behind an `[async]` extra) that wraps the sync ADBC pool/connection/cursor methods with anyio thread-offload, exposing awaitable versions of the full poolhouse API for all 13 backends.
+**Shipped:** v1.4.0 Async API (2026-07-01) — an optional async surface behind an `[async]` extra. `create_async_pool` / `managed_async_pool` / `close_async_pool` mirror the sync trio; awaitable `AsyncPool` / `AsyncConnection` / `AsyncCursor` cover all 13 backends by offloading the unchanged sync core to worker threads via anyio (asyncio + trio). ADBC releases the GIL, so the offload delivers real concurrency, and the sync path is untouched with zero added async dependency.
 
-**Target features:**
-- Parallel async functions — `create_async_pool()`, `managed_async_pool()`, `close_async_pool()` mirroring the sync trio
-- Async connection wrapper — `await pool.connect()` returns an async connection
-- Async cursor wrapper — `execute` / `executemany` / `fetch*` / `fetch_arrow_table` offloaded via `anyio.to_thread.run_sync`
-- Cooperative cancellation — `adbc_cancel` wired to anyio cancellation scopes
-- `[async]` optional extra (adds anyio); sync API completely unchanged
-- Generic machinery — one async layer covers every `WarehouseConfig` via the Protocol
-- Documentation — async usage guide + configuration/index/API-reference updates
-
-**Feasibility basis:** ADBC releases the GIL in its C calls, so offloading the sync methods to a thread pool yields real concurrency — no native async ADBC driver required. This reverses the prior "ADBC dbapi is synchronous" out-of-scope decision.
-
-**Open design decision (settled in research):** checkout-wait strategy — plain sync `QueuePool` with anyio-offloaded checkout-and-execute vs. an anyio-native checkout limiter (trio-safe). SQLAlchemy's `AsyncAdaptedQueuePool` is asyncio-bound and does not replace the thread-offload, so it is a reference, not a foundation.
+**Next milestone:** TBD — run `/gsd-new-milestone`. Candidate v1.4.x hardening (deferred at v1.4.0): Arrow streaming (`fetch_record_batch`), async bulk write (`adbc_ingest`), DataFrame convenience (`fetch_df`/`fetch_polars`), and the P2 async edge-case suite. See `milestones/v1.4.0-REQUIREMENTS.md` Future Requirements.
 
 ## Core Value
 
@@ -50,14 +39,21 @@ One config in, one pool out — `create_pool(SnowflakeConfig(...))` returns a re
 - ✓ Custom backends guide with Protocol reference — v1.2.0
 - ✓ Semi-integration tests for all 12 backends — v1.2.0
 - ✓ `QuackConfig` backend for `adbc-driver-quack` (URI + decomposed host/port + token + tls), plus guide, configuration table, index listing, mkdocs nav — v1.3.0 (Phase 21, 2026-05-19)
+- ✓ Optional async API (`[async]` extra): `create_async_pool` / `managed_async_pool` / `close_async_pool` + `AsyncPool` / `AsyncConnection` / `AsyncCursor` for all 13 backends via anyio thread-offload (asyncio + trio), dedicated per-pool `CapacityLimiter`, cooperative cancellation that never poisons the pool, PEP 562 zero-cost sync path, dual-backend test matrix, honest concurrency docs — v1.4.0 (Phases 22–28, 2026-07-01)
 
 ### Active
 
-**Milestone v1.4.0 — Async API:** Complete (all phases 22–28 done; async surface for all 13 backends behind an `[async]` extra). Phases 22–25: async pool/connection/cursor surface, dedicated per-pool limiter, and cooperative cancellation (cancel/timeout never poisons the pool — `adbc_cancel` fired once from the loop thread, shielded invalidate, identical under asyncio + trio; CANCEL-01..04, EDGE-01..07/19/28/29). Phase 26 (packaging/`[async]` extra) and Phase 27 (dual-backend test matrix) complete. Phase 28 (Documentation) complete: honest async usage guide, async API reference, configuration/index/changelog updates, docs quality gate passing (DOCS-01..04). Milestone ready for `/gsd-complete-milestone`.
+_No active milestone — planning the next one. Run `/gsd-new-milestone`._
 
 **Carried (externally blocked):**
 - [ ] Verify Teradata field names against real Columnar ADBC Teradata driver
 - [ ] Live integration tests for non-DuckDB, non-Snowflake backends (blocked on test account availability)
+
+**Deferred to v1.4.x (P1 async core now validated):**
+- [ ] Arrow streaming — `await cursor.fetch_record_batch()` + `async for batch in ...`
+- [ ] Async bulk write — `await cursor.adbc_ingest(...)`
+- [ ] DataFrame convenience — `await cursor.fetch_df()` / `fetch_polars()`
+- [ ] P2 async edge-case test suite (designs in `.planning/research/ASYNC-EDGE-CASES.md`)
 
 ### Out of Scope
 
@@ -88,7 +84,7 @@ Two concrete consumers:
 
 Integration tests use pytest-adbc-replay cassettes (VCR-style record/replay) for Snowflake and Databricks — CI runs without credentials.
 
-265 tests passing (241 from v1.2.0 baseline + 24 new in Phase 21 for QuackConfig).
+433 tests passing, 2 skipped (v1.4.0 added the async layer plus a dual-backend asyncio/trio matrix over DuckDB + Snowflake cassette). The `[async]` extra adds only anyio; the shipped sync wheel gains no async dependency.
 
 ## Constraints
 
@@ -117,6 +113,12 @@ Integration tests use pytest-adbc-replay cassettes (VCR-style record/replay) for
 | EAFP in create_pool() | AttributeError is natural error for configs missing methods; no TypeError raise | ✓ Good — simpler, Pythonic |
 | `_create_pool_impl()` shared helper | Avoids overload forwarding issues between `managed_pool()` and `create_pool()` | ✓ Good — single implementation, three call patterns |
 | Direct `to_adbc_kwargs()` over aliases | Field-to-key mappings too divergent for Pydantic alias approach | ✓ Good — explicit, readable, correct |
+| Async layer wraps the sync core unchanged | Reuse `_create_pool_impl`, config dispatch, Protocol, reset event — no fork | ✓ Good — one code path, generic over 13 backends (v1.4.0) |
+| anyio over asyncio-native | asyncio + trio neutrality; ADBC GIL-release makes thread-offload real concurrency | ✓ Good — dual-backend matrix green on Linux CI (v1.4.0) |
+| Dedicated per-pool `CapacityLimiter` | The global 40-token anyio default over-admits; bound = `pool_size + max_overflow` | ✓ Good — in-flight concurrency strictly bounded (v1.4.0) |
+| Cancellation invalidates, never returns busy | A cancelled in-flight C call can poison the connection | ✓ Good — `checkedout()==0` after cancel, asyncio/trio parity (v1.4.0) |
+| `[async]` extra + PEP 562 lazy import | Sync users pay nothing; anyio stays optional | ✓ Good — sync suite green with anyio absent (v1.4.0) |
+| TypeVarTuple/Unpack at offload boundary (not ParamSpec) | ParamSpec can't type keyword-only params after `*args` | ✓ Good — basedpyright strict, 0 errors (v1.4.0) |
 
 ## Evolution
 
@@ -136,4 +138,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-06-29 — Phase 28 (Documentation) complete, closing out the v1.4.0 Async API milestone (phases 22–28). Ships an honest async usage guide distinguishing I/O-bound wins (~2.77x execute) from materialization-bound limits per the Phase 22 benchmarks, an API reference rendering `AsyncPool`/`AsyncConnection`/`AsyncCursor` plus the three entry points, configuration/index/changelog updates flagging the async API experimental, and a passing `mkdocs build --strict` + humanizer gate (DOCS-01..04). Next: `/gsd-complete-milestone` to archive v1.4.0.*
+*Last updated: 2026-07-01 — v1.4.0 Async API milestone shipped and archived (phases 22–28, 29 plans, 63/63 requirements, audit passed). Full milestone review applied: async requirements moved to Validated, v1.4.0 design decisions logged, context refreshed to 433 tests. Next: `/gsd-new-milestone`.*
