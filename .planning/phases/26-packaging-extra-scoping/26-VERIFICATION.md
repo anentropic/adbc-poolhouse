@@ -1,9 +1,10 @@
 ---
 phase: 26-packaging-extra-scoping
 verified: 2026-06-28T11:05:00Z
-status: human_needed
+status: passed
 score: 5/5 must-haves verified
 overrides_applied: 0
+human_verification_result: "DISCHARGED 2026-07-01 via GitHub Actions run 28481988002 (branch gsd/v1.4.0-async-api, push): 'Sync suite without anyio' job = success on Linux (PKG-04 live checkpoint); 'Quality gates' 3.11 + 3.14 = success under the relocked uv.lock."
 human_verification:
   - test: "Push the branch / open the PR and open the GitHub Actions run for the commit"
     expected: "The `Sync suite without anyio` job is green — the `Assert anyio is genuinely absent` step exits 0 (find_spec('anyio') is None) and the pytest step passes with tests/async + tests/_async_harness deselected; the existing `quality` matrix job also stays green under the relocked uv.lock"
@@ -14,7 +15,7 @@ human_verification:
 
 **Phase Goal:** The async surface ships behind an `[async]` extra with zero cost to sync users — `import adbc_poolhouse` succeeds and the sync suite passes with anyio uninstalled — and all async public API is fully typed under basedpyright strict.
 **Verified:** 2026-06-28T11:05:00Z
-**Status:** human_needed
+**Status:** passed (human checkpoint discharged 2026-07-01 — CI run 28481988002 green on Linux)
 **Re-verification:** No — initial verification
 
 ## Goal Achievement
