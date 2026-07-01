@@ -2,9 +2,10 @@
 gsd_state_version: 1.0
 milestone: v1.5.0
 milestone_name: Async Cursor Completion
-status: planning
-last_updated: "2026-07-01T11:30:00.000Z"
-last_activity: 2026-07-01
+status: executing
+stopped_at: Created the v1.5.0 roadmap — ROADMAP.md (Phases 29–33, expanded milestone section + collapsed v1.4.0), REQUIREMENTS.md traceability (31/31 mapped, 100%), and this STATE.md refreshed for the new milestone.
+last_updated: "2026-07-01T15:03:56.506Z"
+last_activity: "2026-07-01 — Phase 29 decomposed into 4 plans (Wave 1: tests + connection guard; Wave 2: reader + cursor; Wave 3: docs)"
 progress:
   total_phases: 5
   completed_phases: 0
