@@ -1,17 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.4.0
-milestone_name: Async API
-status: completed
-stopped_at: Completed 28-04-PLAN.md (DOCS-04 docs quality gate — humanizer pass + mkdocs build --strict). Phase 28 is complete; all v1.4.0 milestone phases (22–28) are done.
-last_updated: "2026-06-29T10:46:03.466Z"
-last_activity: 2026-06-29
+milestone: v1.5.0
+milestone_name: Async Cursor Completion
+status: planning
+last_updated: "2026-07-01T10:23:05.083Z"
+last_activity: 2026-07-01
 progress:
-  total_phases: 9
-  completed_phases: 7
-  total_plans: 29
-  completed_plans: 30
-  percent: 78
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -44,12 +43,10 @@ Pre-v1.4.0 tracking cruft plus one non-functional docstring; run `/gsd-cleanup` 
 
 ## Current Position
 
-Phase: 28
-Plan: Not started
-Status: Phase 28 complete (28-01..04 done); v1.4.0 async documentation closeout finished
-Last activity: 2026-06-29
-
-Progress: [░░░░░░░░░░] 0% (0/7 phases)
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-07-01 — Milestone v1.5.0 started
 
 ## Performance Metrics
 

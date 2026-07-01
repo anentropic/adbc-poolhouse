@@ -8,7 +8,7 @@ A focused Python library that takes a typed warehouse configuration and returns 
 
 **Shipped:** v1.4.0 Async API (2026-07-01) — an optional async surface behind an `[async]` extra. `create_async_pool` / `managed_async_pool` / `close_async_pool` mirror the sync trio; awaitable `AsyncPool` / `AsyncConnection` / `AsyncCursor` cover all 13 backends by offloading the unchanged sync core to worker threads via anyio (asyncio + trio). ADBC releases the GIL, so the offload delivers real concurrency, and the sync path is untouched with zero added async dependency.
 
-**Next milestone:** TBD — run `/gsd-new-milestone`. Candidate v1.4.x hardening (deferred at v1.4.0): Arrow streaming (`fetch_record_batch`), async bulk write (`adbc_ingest`), DataFrame convenience (`fetch_df`/`fetch_polars`), and the P2 async edge-case suite. See `milestones/v1.4.0-REQUIREMENTS.md` Future Requirements.
+**Current milestone:** v1.5.0 Async Cursor Completion — offload the four v1.4.0-deferred ADBC cursor methods (`fetch_record_batch` Arrow streaming, `adbc_ingest` bulk write, `fetch_df`/`fetch_polars` DataFrame convenience) and land the deferred P2 async edge-case hardening suite. Pure offload wrappers over methods that already exist on the wrapped sync ADBC cursor — no dependency changes, no sync-core changes. pandas/polars stay user-supplied runtime deps (ADBC raises if absent), consistent with how the library treats drivers.
 
 ## Core Value
 
@@ -43,17 +43,16 @@ One config in, one pool out — `create_pool(SnowflakeConfig(...))` returns a re
 
 ### Active
 
-_No active milestone — planning the next one. Run `/gsd-new-milestone`._
+**v1.5.0 Async Cursor Completion** — complete the async cursor surface with the four v1.4.0-deferred methods (pure offload wrappers over the already-wrapped sync ADBC cursor) plus the deferred P2 edge-case hardening:
+
+- [ ] Arrow streaming — `await cursor.fetch_record_batch()` + `async for batch in ...` (RecordBatchReader lifetime vs. reset-event checkin is the headline design)
+- [ ] Async bulk write — `await cursor.adbc_ingest(table_name, data, mode=...)`
+- [ ] DataFrame convenience — `await cursor.fetch_df()` / `await cursor.fetch_polars()` (pandas/polars user-supplied at runtime; no new poolhouse extras)
+- [ ] P2 async edge-case suite — EDGE-08, 13/14, 20, 22/23, 24, 31/32 (designs in `.planning/research/ASYNC-EDGE-CASES.md`)
 
 **Carried (externally blocked):**
 - [ ] Verify Teradata field names against real Columnar ADBC Teradata driver
 - [ ] Live integration tests for non-DuckDB, non-Snowflake backends (blocked on test account availability)
-
-**Deferred to v1.4.x (P1 async core now validated):**
-- [ ] Arrow streaming — `await cursor.fetch_record_batch()` + `async for batch in ...`
-- [ ] Async bulk write — `await cursor.adbc_ingest(...)`
-- [ ] DataFrame convenience — `await cursor.fetch_df()` / `fetch_polars()`
-- [ ] P2 async edge-case test suite (designs in `.planning/research/ASYNC-EDGE-CASES.md`)
 
 ### Out of Scope
 
@@ -138,4 +137,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-07-01 — v1.4.0 Async API milestone shipped and archived (phases 22–28, 29 plans, 63/63 requirements, audit passed). Full milestone review applied: async requirements moved to Validated, v1.4.0 design decisions logged, context refreshed to 433 tests. Next: `/gsd-new-milestone`.*
+*Last updated: 2026-07-01 — v1.5.0 Async Cursor Completion milestone started. Active scope set to the four v1.4.0-deferred cursor methods (fetch_record_batch, adbc_ingest, fetch_df, fetch_polars) + the P2 edge-case suite; confirmed as pure offload wrappers with no dependency or sync-core changes. Phase numbering continues from 28. Next: requirements → roadmap.*
