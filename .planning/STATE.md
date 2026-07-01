@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v1.5.0
 milestone_name: Async Cursor Completion
-status: completed
+status: executing
 stopped_at: Completed 29-01-PLAN.md — Wave-0 RED scaffolding (BlockingStubReader harness stub + six RED reader test files, 46 asyncio×trio cases pinning STREAM-01..06 + EDGE-20/22/23/33; A1 resolved = no Snowflake streaming cassette replay).
-last_updated: "2026-07-01T17:30:38.497Z"
-last_activity: 2026-07-01
+last_updated: "2026-07-01T20:56:15.234Z"
+last_activity: 2026-07-01 -- Phase 30 planning complete
 progress:
   total_phases: 5
   completed_phases: 1
@@ -27,8 +27,8 @@ See: .planning/PROJECT.md (updated 2026-07-01)
 
 Phase: 30
 Plan: Not started
-Status: Phase 29 complete — Arrow streaming shipped and documented; ready to advance to Phase 30 (Async Bulk Write)
-Last activity: 2026-07-01
+Status: Ready to execute
+Last activity: 2026-07-01 -- Phase 30 planning complete
 
 Progress: [██████████] 100% (Phase 29 plans)
 

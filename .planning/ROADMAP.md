@@ -119,10 +119,15 @@ Full detail: `milestones/v1.4.0-ROADMAP.md` · Audit: `milestones/v1.4.0-MILESTO
   4. A cancelled or timed-out ingest fires `adbc_cancel` and invalidates the connection (`on_abort=invalidate`), leaving `pool.checkedout() == 0` with asyncio and trio parity (INGEST-04)
 
 **Plans**: 2 plans
-
 Plans:
+**Wave 1**
+
 - [ ] 30-01-PLAN.md — Wave 0 RED scaffolding: BlockingStubCursor.adbc_ingest stub + four failing tests (round-trip, modes, cancel/parity, signature) pinning INGEST-01..04
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 30-02-PLAN.md — GREEN: AsyncCursor.adbc_ingest (fetch_arrow_table clone + functools.partial arg binding) + _SyncCursor Protocol member + docs quality gate
+
 **UI hint**: no
 
 ### Phase 31: DataFrame Convenience
