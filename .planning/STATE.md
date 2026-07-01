@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v1.5.0
 milestone_name: Async Cursor Completion
-status: executing
-stopped_at: Completed 30-02-PLAN.md — GREEN implementation of async bulk write (AsyncCursor.adbc_ingest as a fetch_arrow_table clone with functools.partial arg binding + -> int; _SyncCursor Protocol extension; all 20 asyncio×trio RED cases from 30-01 now GREEN, cancel parity 20/20 looped). Phase 30 complete.
-last_updated: "2026-07-01T21:15:30Z"
-last_activity: 2026-07-01 -- Completed 30-02-PLAN.md (GREEN async bulk-write; Phase 30 complete)
+status: completed
+stopped_at: "Completed 30-02-PLAN.md — GREEN implementation of async bulk write. `AsyncCursor.adbc_ingest` landed as a `fetch_arrow_table` clone (only deltas: the `functools.partial(self._cursor.adbc_ingest, ...)` callable, the `-> int` return, and the docstring); `_SyncCursor` Protocol extended; `import functools` runtime + `Literal`/`CapsuleType` under `TYPE_CHECKING`. All 20 asyncio×trio RED cases from 30-01 are GREEN (round-trip/modes/signature 14 passed; cancel/invalidate 20/20 looped, 0 hangs — INGEST-04/T-30-01). The four RED pyright pragma blocks are deleted (replaced by targeted inline `# type: ignore[index]` for the permanent object-fetch typing). Import-lint guard re-passes with `functools` present (T-30-02). Docs gate satisfied: async guide documents `adbc_ingest` with the `replace`-drops-table warning; `mkdocs build --strict` exit 0. Full async suite 162 passed / 4 skipped. Phase 30 complete (INGEST-01..04 done)."
+last_updated: "2026-07-01T21:36:06.222Z"
+last_activity: 2026-07-01
 progress:
   total_phases: 5
   completed_phases: 2
@@ -25,10 +25,10 @@ See: .planning/PROJECT.md (updated 2026-07-01)
 
 ## Current Position
 
-Phase: 30 (async-bulk-write) — COMPLETE (both plans landed)
-Plan: 2 of 2 (30-01 RED + 30-02 GREEN both complete)
+Phase: 31
+Plan: Not started
 Status: Phase 30 complete; ready for Phase 31
-Last activity: 2026-07-01 -- Completed 30-02-PLAN.md (GREEN async bulk-write; Phase 30 complete)
+Last activity: 2026-07-01
 
 Progress: [████████░░] 40% (2 of 5 phases complete: 29, 30)
 
