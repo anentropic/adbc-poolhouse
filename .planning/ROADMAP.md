@@ -16,7 +16,7 @@
 
 - [x] **Phase 29: Arrow Streaming** — `await cursor.fetch_record_batch()` → `AsyncRecordBatchReader` with per-batch offloaded `async for`, reader-lifetime bound to checkout, read-after-checkin surfaces the driver's native closed-stream error — completed 2026-07-01
 - [x] **Phase 30: Async Bulk Write** — `await cursor.adbc_ingest(table, data, mode=...)`, single whole-op offload, typed `Literal` mode, `on_abort=invalidate` on cancel (2/2 plans) — completed 2026-07-01
-- [ ] **Phase 31: DataFrame Convenience** — `await cursor.fetch_df()` / `await cursor.fetch_polars()`, single-offload wrappers returning self-owning frames; pandas/polars user-supplied
+- [x] **Phase 31: DataFrame Convenience** — `await cursor.fetch_df()` / `await cursor.fetch_polars()`, single-offload wrappers returning self-owning frames; pandas/polars user-supplied
 - [ ] **Phase 32: P2 Edge Hardening** — remaining deferred P2 edge cases (contextvars, trio-checkpoint, timeout precision, loop-shutdown, finalizers) extended across the new streaming/ingest/DataFrame paths
 - [ ] **Phase 33: Documentation** — streaming guide, ingest mode table + replace warning, DataFrame user-supplied note, API reference for the new symbols, `mkdocs build --strict` gate, humanizer pass
 
@@ -150,7 +150,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 31-02-PLAN.md — Wave 2 GREEN: AsyncCursor.fetch_df/fetch_polars (fetch_arrow_table clones) + _SyncCursor Protocol members + TYPE_CHECKING pandas/polars imports + docs section
+- [x] 31-02-PLAN.md — Wave 2 GREEN: AsyncCursor.fetch_df/fetch_polars (fetch_arrow_table clones) + _SyncCursor Protocol members + TYPE_CHECKING pandas/polars imports + docs section ✅ 18 DF tests GREEN, cancel/busy 20/20 looped, full async suite 193 passed/4 skipped, basedpyright 0 errors, mkdocs --strict green
 
 **UI hint**: no
 

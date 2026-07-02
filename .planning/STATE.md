@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.5.0
 milestone_name: Async Cursor Completion
 status: executing
-stopped_at: "Completed 31-01-PLAN.md — Wave-0 RED scaffolding for DataFrame convenience. Added pandas>=2.0/polars>=1.0 to `[dependency-groups].dev` (no extra; PKG-02/D-31-08) and `uv sync`ed (pandas 3.0.3, polars 1.42.1). Extended `BlockingStubCursor` with blockable `fetch_df`/`fetch_polars` (`df_call_count`/`polars_call_count` counters + `fetch_df_raises`/`fetch_polars_raises` worker-raise injection — raise AFTER `_block` so the native error crosses the real to_thread boundary; no cancel machinery added). Landed six RED test files (round-trip DF-01/02, lifetime DF-04, signature+import-surface PKG-02, missing-dep DF-03, busy T-31-03, cancel T-31-01): 30 failed / 1 passed (import_surface, acceptable), all failing solely on the missing `AsyncCursor.fetch_df`/`fetch_polars`. basedpyright 0 errors (Wave-0 RED pragmas, delete-on-GREEN); existing async suite unaffected (162 passed / 4 skipped); mkdocs --strict passes."
-last_updated: "2026-07-02T08:31:32Z"
-last_activity: 2026-07-02 -- Completed 31-01-PLAN.md (Wave-0 RED)
+stopped_at: "Completed 31-02-PLAN.md — Wave-2 GREEN for DataFrame convenience. Landed `AsyncCursor.fetch_df -> pandas.DataFrame` and `fetch_polars -> polars.DataFrame` as byte-for-byte `fetch_arrow_table` clones (bare `self._cursor.fetch_df`/`fetch_polars` through `cancellable_offload`, `on_abort=invalidate`, no `functools.partial`/`find_spec`/wrapping — D-31-01/03/05/09). Extended `_SyncCursor` Protocol with both `-> object` members (D-31-06); added `import pandas`/`import polars` under `TYPE_CHECKING` and bridged the `-> object` offload result to the public annotation via `typing.cast` (D-31-07). Added `pandas-stubs` to the dev group (pandas ships no inline stubs; strict basedpyright needs it — dev-group-only, consistent with D-31-08). Deleted the Wave-0 RED pyright pragmas from five test files; fixed a hanging `test_df_missing_dep` (it awaited `fetch_df()` with no releaser, parking the worker in `_block()` forever — now releases the gate so the native `ModuleNotFoundError` crosses the real to_thread boundary). Added a 'Fetching a DataFrame' section to the async guide (self-owning frame + user-supplied pandas/polars + native `ModuleNotFoundError` note; plain fenced block, humanizer pass). Verification: 18 DF tests GREEN; cancel+busy 20/20 looped (0 hangs); full async suite 193 passed / 4 skipped; basedpyright 0 errors whole-tree; scan_async_package []; import-leak check OK; mkdocs --strict exit 0. Phase 31 COMPLETE."
+last_updated: "2026-07-02T21:30:00Z"
+last_activity: 2026-07-02 -- Completed 31-02-PLAN.md (Wave-2 GREEN); Phase 31 complete
 progress:
   total_phases: 5
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 8
-  completed_plans: 7
-  percent: 40
+  completed_plans: 8
+  percent: 60
 ---
 
 # Project State
@@ -25,12 +25,12 @@ See: .planning/PROJECT.md (updated 2026-07-01)
 
 ## Current Position
 
-Phase: 31 (dataframe-convenience) — EXECUTING
-Plan: 2 of 2 (31-01 complete; 31-02 GREEN next)
-Status: Executing Phase 31
-Last activity: 2026-07-02 -- Completed 31-01-PLAN.md (Wave-0 RED)
+Phase: 31 (dataframe-convenience) — COMPLETE
+Plan: 2 of 2 (31-01 RED complete; 31-02 GREEN complete)
+Status: Phase 31 complete — next up Phase 32 (P2 edge hardening)
+Last activity: 2026-07-02 -- Completed 31-02-PLAN.md (Wave-2 GREEN); Phase 31 complete
 
-Progress: [████████░░] 40% (2 of 5 phases complete: 29, 30)
+Progress: [██████████░░░░░░░░░░] 60% (3 of 5 phases complete: 29, 30, 31)
 
 ## Accumulated Context
 

@@ -33,15 +33,15 @@ Scope constraints (maintainer-confirmed):
 
 ### DataFrame Convenience
 
-- [ ] **DF-01**: User can `await cursor.fetch_df()` returning a `pandas.DataFrame` (single whole-operation offload)
-- [ ] **DF-02**: User can `await cursor.fetch_polars()` returning a `polars.DataFrame` (single whole-operation offload)
-- [ ] **DF-03**: When pandas/polars is not installed, `fetch_df`/`fetch_polars` behave exactly as the underlying sync ADBC cursor method does — the native `ModuleNotFoundError` raised in the worker propagates unchanged through the offload chokepoint. poolhouse adds no `find_spec` pre-check or wrapping; pandas/polars are user-supplied, not poolhouse dependencies
-- [ ] **DF-04**: The returned frame is self-owning and valid after checkin (materialized, not bound to the connection) — same guarantee as `fetch_arrow_table` (EDGE-21)
+- [x] **DF-01**: User can `await cursor.fetch_df()` returning a `pandas.DataFrame` (single whole-operation offload)
+- [x] **DF-02**: User can `await cursor.fetch_polars()` returning a `polars.DataFrame` (single whole-operation offload)
+- [x] **DF-03**: When pandas/polars is not installed, `fetch_df`/`fetch_polars` behave exactly as the underlying sync ADBC cursor method does — the native `ModuleNotFoundError` raised in the worker propagates unchanged through the offload chokepoint. poolhouse adds no `find_spec` pre-check or wrapping; pandas/polars are user-supplied, not poolhouse dependencies
+- [x] **DF-04**: The returned frame is self-owning and valid after checkin (materialized, not bound to the connection) — same guarantee as `fetch_arrow_table` (EDGE-21)
 
 ### Packaging & Type Safety
 
 - [x] **PKG-01**: The internal `_SyncCursor` structural Protocol gains signatures for `fetch_record_batch`, `adbc_ingest`, `fetch_df`, and `fetch_polars`; all new async public API is fully typed under basedpyright strict (0 errors)
-- [ ] **PKG-02**: pandas and polars are added to the **dev dependency group only** (positive tests guarded by `importorskip`); `[project.dependencies]`, `[project.optional-dependencies]`, and the `__init__.py` lazy-import surface are unchanged — `import adbc_poolhouse` with pandas/polars absent is unaffected
+- [x] **PKG-02**: pandas and polars are added to the **dev dependency group only** (positive tests guarded by `importorskip`); `[project.dependencies]`, `[project.optional-dependencies]`, and the `__init__.py` lazy-import surface are unchanged — `import adbc_poolhouse` with pandas/polars absent is unaffected
 - [x] **PKG-03**: The AST import-lint guard still passes over `_async/` — the four new methods route through the offload chokepoint with the pool limiter, no `import asyncio`, no bare `to_thread`
 
 ### Async Edge-Case Hardening (deferred P2 suite)
@@ -97,12 +97,12 @@ Every v1.5.0 requirement maps to exactly one phase (Phases 29–33). PKG-* are c
 | INGEST-02 | Phase 30 | ✅ Complete (30-01 RED → 30-02 GREEN) |
 | INGEST-03 | Phase 30 | ✅ Complete (30-01 RED → 30-02 GREEN) |
 | INGEST-04 | Phase 30 | ✅ Complete (30-01 RED → 30-02 GREEN) |
-| DF-01 | Phase 31 | RED pinned (31-01); GREEN in 31-02 |
-| DF-02 | Phase 31 | RED pinned (31-01); GREEN in 31-02 |
-| DF-03 | Phase 31 | RED pinned (31-01); GREEN in 31-02 |
-| DF-04 | Phase 31 | RED pinned (31-01); GREEN in 31-02 |
+| DF-01 | Phase 31 | ✅ Complete (31-01 RED → 31-02 GREEN) |
+| DF-02 | Phase 31 | ✅ Complete (31-01 RED → 31-02 GREEN) |
+| DF-03 | Phase 31 | ✅ Complete (31-01 RED → 31-02 GREEN) |
+| DF-04 | Phase 31 | ✅ Complete (31-01 RED → 31-02 GREEN) |
 | PKG-01 | Phase 29 | Complete (29-03) |
-| PKG-02 | Phase 31 | RED pinned (31-01: dev deps + importorskip guards landed); GREEN in 31-02 |
+| PKG-02 | Phase 31 | ✅ Complete (31-01 RED → 31-02 GREEN) |
 | PKG-03 | Phase 29 | Complete (29-03); guard passes over `_async/`, re-verified each phase |
 | EDGE-08 | Phase 32 | Pending |
 | EDGE-13 | Phase 32 | Pending |
