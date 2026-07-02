@@ -166,7 +166,16 @@ Plans:
   3. `move_on_after(0)` still cancels a blocked streaming pull / ingest cleanly (`adbc_cancel` fires, connection invalidates), while an operation completing at deadline−ε is not over-cancelled (no spurious `adbc_cancel`, no invalidate, connection returns clean) (EDGE-31, EDGE-32)
   4. An open pool or a pending offload at event-loop shutdown — extended to mid-stream and mid-ingest scenarios — raises no library-attributable exception, with trio's nursery strictness as the canary (EDGE-24)
 
-**Plans**: TBD
+**Plans**: 3 plans
+Plans:
+**Wave 1** *(parallel RED — no file overlap)*
+
+- [ ] 32-01-PLAN.md — EDGE-08 (cancel-at-offload on adbc_ingest) + EDGE-13/14 (contextvar copy-in / no-leak-back on fetch_df); deterministic, dual-backend
+- [ ] 32-02-PLAN.md — EDGE-31/32 (move_on_after(0) cancels / deadline−ε not over-cancelled on streaming pull + ingest) + EDGE-24 (loop-shutdown cleanliness mid-stream/mid-ingest + real drained-close); looped x20
+
+**Wave 2** *(blocked on Wave 1)*
+
+- [ ] 32-03-PLAN.md — Full-suite x20 loop gate + import-lint + basedpyright-strict; DISCOVERED-NECESSITY contingency resolution + Linux-CI x20 confirmation (blocking checkpoint); docs strict-build gate
 **UI hint**: no
 
 ### Phase 33: Documentation
@@ -194,7 +203,7 @@ Phases execute in numeric order: 29 → 30 → 31 → 32 → 33
 | 29. Arrow Streaming | v1.5.0 | 4/4 | Complete    | 2026-07-01 |
 | 30. Async Bulk Write | v1.5.0 | 2/2 | Complete    | 2026-07-01 |
 | 31. DataFrame Convenience | v1.5.0 | 2/2 | Complete    | 2026-07-02 |
-| 32. P2 Edge Hardening | v1.5.0 | 0/TBD | Not started | - |
+| 32. P2 Edge Hardening | v1.5.0 | 0/3 | Not started | - |
 | 33. Documentation | v1.5.0 | 0/TBD | Not started | - |
 | 22-28. Async API | v1.4.0 | 29/29 | Complete | 2026-07-01 |
 | 21.1. ADBC dispatch URI-positional fix | v1.3.0 | 3/3 | Complete | 2026-05-20 |
