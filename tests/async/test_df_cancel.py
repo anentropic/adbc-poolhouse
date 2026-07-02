@@ -26,13 +26,6 @@ returned to pool / pool starvation) once GREEN.
 
 from __future__ import annotations
 
-# Wave-0 RED scaffolding: `AsyncCursor.fetch_df` / `fetch_polars` do not exist until
-# Plan 31-02 lands, so every reference to them is statically "unknown". These pragmas
-# suppress ONLY the errors that are a direct consequence of those not-yet-existing
-# methods; delete them once the production methods land and the file type-checks
-# cleanly under the strict whole-project gate (matches the Phase 29/30 RED precedent).
-# pyright: reportAttributeAccessIssue=false
-# pyright: reportUnknownMemberType=false
 import functools
 import importlib
 from collections.abc import Callable

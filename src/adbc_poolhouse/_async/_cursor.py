@@ -3,7 +3,8 @@ The async cursor wrapper: offloaded DBAPI surface, materialized Arrow, sync prop
 
 [`AsyncCursor`][adbc_poolhouse._async._cursor.AsyncCursor] wraps a single sync
 ADBC dbapi cursor and offloads every blocking call --- `execute`, `executemany`,
-`fetchone`, `fetchmany`, `fetchall`, `fetch_arrow_table`, `adbc_ingest`, `close`
+`fetchone`, `fetchmany`, `fetchall`, `fetch_arrow_table`, `fetch_df`,
+`fetch_polars`, `adbc_ingest`, `close`
 --- through the
 owning pool's limiter. Each offloaded call brackets the work with the parent
 [`AsyncConnection`][adbc_poolhouse._async._connection.AsyncConnection]'s
@@ -32,7 +33,7 @@ Worker exceptions are never re-wrapped (ACUR-06/EDGE-17): the single
 from __future__ import annotations
 
 import functools
-from typing import TYPE_CHECKING, Protocol
+from typing import TYPE_CHECKING, Protocol, cast
 
 import anyio
 
@@ -45,6 +46,8 @@ if TYPE_CHECKING:
     from types import TracebackType
     from typing import Literal
 
+    import pandas
+    import polars
     import pyarrow
     from anyio import CapacityLimiter
     from typing_extensions import CapsuleType
@@ -76,6 +79,8 @@ class _SyncCursor(Protocol):
     def fetchall(self) -> Sequence[object]: ...
     def fetch_arrow_table(self) -> pyarrow.Table: ...
     def fetch_record_batch(self) -> pyarrow.RecordBatchReader: ...
+    def fetch_df(self) -> object: ...
+    def fetch_polars(self) -> object: ...
     def adbc_ingest(
         self,
         table_name: str,
@@ -366,6 +371,109 @@ class AsyncCursor:
                 self._cursor.fetch_arrow_table,
                 limiter=self._limiter,
                 on_abort=self._owner.invalidate,  # poison recovery on a real abort (D-25-03)
+            )
+
+    async def fetch_df(self) -> pandas.DataFrame:
+        """
+        Materialize the full result set as a `pandas.DataFrame` on a worker thread.
+
+        Offloads the driver's native `fetch_df` through the pool limiter and returns
+        its result unchanged: a fully-materialized `pandas.DataFrame` that owns its
+        own buffers. The frame is safe to read after the connection is checked in ---
+        it is never bound to the (soon-closed) cursor's C stream (EDGE-21 / Pitfall 7).
+
+        `pandas` is not a poolhouse dependency --- you install it yourself. poolhouse
+        never imports it: the driver imports `pandas` inside the worker, so a missing
+        install surfaces the native `ModuleNotFoundError` unchanged, with no
+        pre-check and no wrapping.
+
+        If the surrounding scope is cancelled or times out while the result is
+        being materialized, the in-flight C call is aborted with
+        `cursor.adbc_cancel`, the now-poisoned connection is invalidated
+        (shielded), and the cancellation is re-raised (CANCEL-01/02).
+
+        Returns:
+            The materialized `pandas.DataFrame` for the current result set.
+
+        Raises:
+            ConnectionBusyError: If another offloaded call on the owning connection
+                is already in flight.
+            ModuleNotFoundError: If `pandas` is not installed. Raised by the driver
+                in the worker and propagated unchanged.
+
+        Example:
+            ```python
+            async with await pool.connect() as conn:
+                cursor = conn.cursor()
+                await cursor.execute("SELECT * FROM events")
+                df = await cursor.fetch_df()  # a pandas.DataFrame
+            ```
+        """
+        with self._owner._offloading():  # noqa: SLF001
+            # `_SyncCursor.fetch_df` is typed `-> object` to keep the Protocol
+            # driver-agnostic and free of a pandas stub dependency (D-31-06); cast
+            # back to the public return type. No runtime effect --- the driver
+            # materializes and returns the pandas.DataFrame itself.
+            return cast(
+                "pandas.DataFrame",
+                await cancellable_offload(
+                    self._adbc_cancel,
+                    self._cursor.fetch_df,
+                    limiter=self._limiter,
+                    on_abort=self._owner.invalidate,  # poison recovery on a real abort (D-25-03)
+                ),
+            )
+
+    async def fetch_polars(self) -> polars.DataFrame:
+        """
+        Materialize the full result set as a `polars.DataFrame` on a worker thread.
+
+        Offloads the driver's native `fetch_polars` through the pool limiter and
+        returns its result unchanged: a fully-materialized `polars.DataFrame` that
+        owns its own buffers. The frame is safe to read after the connection is
+        checked in --- it is never bound to the (soon-closed) cursor's C stream
+        (EDGE-21 / Pitfall 7).
+
+        `polars` is not a poolhouse dependency --- you install it yourself. poolhouse
+        never imports it: the driver imports `polars` inside the worker, so a missing
+        install surfaces the native `ModuleNotFoundError` unchanged, with no
+        pre-check and no wrapping.
+
+        If the surrounding scope is cancelled or times out while the result is
+        being materialized, the in-flight C call is aborted with
+        `cursor.adbc_cancel`, the now-poisoned connection is invalidated
+        (shielded), and the cancellation is re-raised (CANCEL-01/02).
+
+        Returns:
+            The materialized `polars.DataFrame` for the current result set.
+
+        Raises:
+            ConnectionBusyError: If another offloaded call on the owning connection
+                is already in flight.
+            ModuleNotFoundError: If `polars` is not installed. Raised by the driver
+                in the worker and propagated unchanged.
+
+        Example:
+            ```python
+            async with await pool.connect() as conn:
+                cursor = conn.cursor()
+                await cursor.execute("SELECT * FROM events")
+                df = await cursor.fetch_polars()  # a polars.DataFrame
+            ```
+        """
+        with self._owner._offloading():  # noqa: SLF001
+            # `_SyncCursor.fetch_polars` is typed `-> object` to keep the Protocol
+            # driver-agnostic (D-31-06); cast back to the public return type. No
+            # runtime effect --- the driver materializes and returns the
+            # polars.DataFrame itself.
+            return cast(
+                "polars.DataFrame",
+                await cancellable_offload(
+                    self._adbc_cancel,
+                    self._cursor.fetch_polars,
+                    limiter=self._limiter,
+                    on_abort=self._owner.invalidate,  # poison recovery on a real abort (D-25-03)
+                ),
             )
 
     async def adbc_ingest(

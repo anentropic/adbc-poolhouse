@@ -23,26 +23,19 @@ worker-thread -> caller exception-path boundary once GREEN.
 
 from __future__ import annotations
 
-# Wave-0 RED scaffolding: `AsyncCursor.fetch_df` / `fetch_polars` do not exist until
-# Plan 31-02 lands, so every reference to them is statically "unknown". These pragmas
-# suppress ONLY the errors that are a direct consequence of those not-yet-existing
-# methods; delete them once the production methods land and the file type-checks
-# cleanly under the strict whole-project gate (matches the Phase 29/30 RED precedent).
-# pyright: reportAttributeAccessIssue=false
-# pyright: reportUnknownMemberType=false
-from collections.abc import Callable
-from typing import TYPE_CHECKING
+import importlib
 
+import anyio
 import pytest
 
 from adbc_poolhouse import PoolhouseError
+from adbc_poolhouse._async._connection import AsyncConnection
+from tests._async_harness.stubs import BlockingStubConnection
 
-if TYPE_CHECKING:
-    from adbc_poolhouse._async._connection import AsyncConnection
-    from tests._async_harness.stubs import BlockingStubConnection
-
-# The factory the `make_stub_async_connection` conftest fixture hands back.
-_StubFactory = Callable[[], "tuple[AsyncConnection, BlockingStubConnection]"]
+# `tests/async/` cannot be imported with a dotted path (`async` is a reserved
+# keyword), so the sibling helper module is loaded via importlib.
+_helpers = importlib.import_module("tests.async._edge_helpers")
+await_inside = _helpers.await_inside
 
 
 class TestDf03MissingDependencyPropagates:
@@ -50,45 +43,84 @@ class TestDf03MissingDependencyPropagates:
 
     @pytest.mark.anyio
     async def test_fetch_df_missing_pandas_propagates_unchanged(
-        self, make_stub_async_connection: _StubFactory
+        self, anyio_backend_name: str
     ) -> None:
         """
         A worker `ModuleNotFoundError('...pandas')` reaches the caller as-is (not wrapped).
 
         The stub's `fetch_df` worker raises the injected native error AFTER `_block`
-        releases, so it crosses the real `to_thread.run_sync` boundary. The caller
-        must observe the exact native `ModuleNotFoundError` with `.name == "pandas"`
-        and NOT a `PoolhouseError` --- proving poolhouse neither pre-checks nor wraps
-        (D-31-05).
+        releases, so it crosses the real `to_thread.run_sync` boundary. Once the
+        worker is inside the block (`df_call_count >= 1`), the test releases the gate
+        so the injected raise fires and propagates. The caller must observe the exact
+        native `ModuleNotFoundError` with `.name == "pandas"` and NOT a
+        `PoolhouseError` --- proving poolhouse neither pre-checks nor wraps (D-31-05).
         """
-        async_conn, stub_conn = make_stub_async_connection()
+        del anyio_backend_name
+        limiter = anyio.CapacityLimiter(4)
+        stub_conn = BlockingStubConnection()
+        async_conn = AsyncConnection(stub_conn, limiter)  # type: ignore[arg-type]
         cur = async_conn.cursor()
-        # Zero-arg factory: inject the raise on the freshly built stub cursor.
-        stub_conn.cursors[-1]._fetch_df_raises = ModuleNotFoundError(  # noqa: SLF001
+        stub = stub_conn.cursors[-1]
+        stub._fetch_df_raises = ModuleNotFoundError(  # noqa: SLF001
             "No module named 'pandas'", name="pandas"
         )
-        with pytest.raises(ModuleNotFoundError) as ei:
-            await cur.fetch_df()
-        assert ei.value.name == "pandas"  # exact native error
-        assert not isinstance(ei.value, PoolhouseError)  # no wrapping (DF-03)
+        captured: list[BaseException] = []
+
+        async def _drive() -> None:
+            try:
+                await cur.fetch_df()
+            except BaseException as exc:  # noqa: BLE001  (assert the exact type below)
+                captured.append(exc)
+
+        async with anyio.create_task_group() as tg:
+            tg.start_soon(_drive)
+            # Release only once the worker is genuinely inside `_block`, so the raise
+            # crosses the real `to_thread.run_sync` boundary (not a synchronous raise).
+            await await_inside(lambda: stub.df_call_count >= 1)
+            stub.release()
+
+        assert len(captured) == 1
+        exc = captured[0]
+        assert isinstance(exc, ModuleNotFoundError)
+        assert exc.name == "pandas"  # exact native error
+        assert not isinstance(exc, PoolhouseError)  # no wrapping (DF-03)
 
     @pytest.mark.anyio
     async def test_fetch_polars_missing_polars_propagates_unchanged(
-        self, make_stub_async_connection: _StubFactory
+        self, anyio_backend_name: str
     ) -> None:
         """
         A worker `ModuleNotFoundError('...polars')` reaches the caller as-is (not wrapped).
 
-        The `fetch_polars` twin of the pandas propagation proof: the injected native
-        error crosses the real `to_thread` boundary and reaches the caller with
-        `.name == "polars"`, not a `PoolhouseError` (D-31-05).
+        The `fetch_polars` twin of the pandas propagation proof: once the worker is
+        inside the block (`polars_call_count >= 1`) the gate is released, the injected
+        native error crosses the real `to_thread` boundary, and it reaches the caller
+        with `.name == "polars"`, not a `PoolhouseError` (D-31-05).
         """
-        async_conn, stub_conn = make_stub_async_connection()
+        del anyio_backend_name
+        limiter = anyio.CapacityLimiter(4)
+        stub_conn = BlockingStubConnection()
+        async_conn = AsyncConnection(stub_conn, limiter)  # type: ignore[arg-type]
         cur = async_conn.cursor()
-        stub_conn.cursors[-1]._fetch_polars_raises = ModuleNotFoundError(  # noqa: SLF001
+        stub = stub_conn.cursors[-1]
+        stub._fetch_polars_raises = ModuleNotFoundError(  # noqa: SLF001
             "No module named 'polars'", name="polars"
         )
-        with pytest.raises(ModuleNotFoundError) as ei:
-            await cur.fetch_polars()
-        assert ei.value.name == "polars"  # exact native error
-        assert not isinstance(ei.value, PoolhouseError)  # no wrapping (DF-03)
+        captured: list[BaseException] = []
+
+        async def _drive() -> None:
+            try:
+                await cur.fetch_polars()
+            except BaseException as exc:  # noqa: BLE001  (assert the exact type below)
+                captured.append(exc)
+
+        async with anyio.create_task_group() as tg:
+            tg.start_soon(_drive)
+            await await_inside(lambda: stub.polars_call_count >= 1)
+            stub.release()
+
+        assert len(captured) == 1
+        exc = captured[0]
+        assert isinstance(exc, ModuleNotFoundError)
+        assert exc.name == "polars"  # exact native error
+        assert not isinstance(exc, PoolhouseError)  # no wrapping (DF-03)
