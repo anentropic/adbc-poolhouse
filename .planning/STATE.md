@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.5.0
 milestone_name: Async Cursor Completion
 status: executing
-stopped_at: Completed 32-02-PLAN.md — EDGE-31/32/24 pinned on the streaming-pull + ingest offload paths, dual-backend, x20. test_edge_timeout_precision.py (EDGE-31 move_on_after deadline on a BLOCKED pull/ingest fires adbc_cancel once + invalidates; EDGE-32 deadline−ε op released by a real thread is NOT over-cancelled); test_edge_shutdown.py (EDGE-24 pending ingest/stream at task-group teardown raises no library-attributable warning, workers released in the teardown window; real duckdb drained-close raises nothing, checkedout()==0). 14 tests, 280 passed under x20 (0 hangs); basedpyright + ruff clean; mkdocs --strict rc 0; test-only, no production change. Deviation (Rule 1, both EDGE-31 legs): move_on_after(N>0) under the AUTOJUMPING virtual_clock, not literal move_on_after(0) — an expired scope is delivered at the first checkpoint before the worker dispatches (read/ingest_call_count==0, adbc_cancel==0) = the cancel-before-offload case (EDGE-08, 32-01), not a BLOCKED-op cancel. CONTINGENCY untriggered.
-last_updated: "2026-07-02T21:13:57.000Z"
-last_activity: 2026-07-02 -- Completed 32-02 (EDGE-31/32/24)
+stopped_at: Completed 32-03-PLAN.md — Phase 32 CLOSED. Full-suite x20 gate green on macOS (2702 passed, 0 hangs) proving the four Wave 1 modules (test_edge_checkpoint/contextvars/timeout_precision/shutdown) hold together with no cross-test interaction; authoritative Linux-CI x20 confirmed green on Python 3.11 AND 3.14 (run 28622475955, 0 hangs) — closes the platform-dependent lost-wakeup gate for EDGE-24/31/32. Task 2 blocking checkpoint APPROVED. Import-lint (PKG-03) + basedpyright-strict + mkdocs --strict all green. Task 3 docs gate reduced to strict-build + docstring-style (no RST roles in the new modules, no new public symbol, no guide edit) — no file change, no commit (the passing build IS the gate). DISCOVERED-NECESSITY contingency confirmed NOT fired: test-only phase, zero production change. All six EDGE requirements (08/13/14/24/31/32) complete.
+last_updated: "2026-07-02T22:26:00.000Z"
+last_activity: 2026-07-02 -- Completed 32-03 (Phase 32 CLOSED — full-suite x20 + Linux-CI gate + docs gate)
 progress:
   total_phases: 5
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 11
-  completed_plans: 9
-  percent: 60
+  completed_plans: 10
+  percent: 80
 ---
 
 # Project State
@@ -25,12 +25,12 @@ See: .planning/PROJECT.md (updated 2026-07-01)
 
 ## Current Position
 
-Phase: 32 (P2 Edge Hardening) — EXECUTING
-Plan: 3 of 3
-Status: Executing Phase 32 — 32-01 + 32-02 complete (EDGE-08/13/14/31/32/24); Wave 2 (32-03 gate) next
-Last activity: 2026-07-02 -- Completed 32-02 (EDGE-31/32/24)
+Phase: 32 (P2 Edge Hardening) — COMPLETE
+Plan: 3 of 3 (all complete)
+Status: Phase 32 CLOSED — all six EDGE requirements (08/13/14/24/31/32) green x20 on macOS + Linux CI; test-only, zero production change. Next: Phase 33 (Documentation)
+Last activity: 2026-07-02 -- Completed 32-03 (Phase 32 CLOSED)
 
-Progress: [██████████░░░░░░░░░░] 60% (3 of 5 phases complete: 29, 30, 31)
+Progress: [████████████████░░░░] 80% (4 of 5 phases complete: 29, 30, 31, 32)
 
 ## Accumulated Context
 
@@ -88,6 +88,6 @@ Pre-v1.4.0 tracking cruft plus one non-functional docstring; run `/gsd-cleanup` 
 
 ## Session Continuity
 
-Last session: 2026-07-02T21:09:00Z
-Stopped at: Completed 32-01-PLAN.md — EDGE-08/13/14 anyio-chokepoint guarantees pinned on new-method offloads. `tests/async/test_edge_checkpoint.py` (EDGE-08: cancel set before the `adbc_ingest` offload is delivered at the offload boundary, `ingest_call_count == 0`, dual-backend, trio discriminator noted, `concurrency_marks` + `real_clock_watchdog`). `tests/async/test_edge_contextvars.py` (EDGE-13 copy-in + EDGE-14 no-leak-back on `fetch_df`, `-k copied_in`/`no_leak`, no gating). 6 passed; 44 under `ADBC_ASYNC_REPEAT=20` with 0 hangs; basedpyright 0 errors; test-only (no production change). Commits 6dce5f2, aedbc2b. Deviation (Rule 3): `register_on_enter` keys its hook by the CALLING (loop) thread id while `_block` dispatches per-thread hooks by the WORKER thread id, so the contextvar probe used the shared `on_enter` fallback instead — resolved entirely in-test, no harness change.
-Next step: Execute 32-02-PLAN.md — EDGE-31/32 (`move_on_after(0)` cancels a blocked streaming pull + ingest; a deadline−ε op is NOT over-cancelled) + EDGE-24 (loop-shutdown cleanliness mid-stream/mid-ingest + real drained-close), looped x20. Reuse `real_clock_watchdog` (never `anyio.fail_after` as watchdog), `virtual_clock` for the deadline trigger, `concurrency_marks` on every leg.
+Last session: 2026-07-02T22:26:00Z
+Stopped at: Completed 32-03-PLAN.md — Phase 32 CLOSED. Wave-2 gate plan: proved the four Wave 1 modules hold together in the full async suite under `ADBC_ASYNC_REPEAT=20` on macOS (2702 passed, 0 hangs, no cross-test interaction, no regression) and — authoritatively — on Linux CI (run 28622475955, Python 3.11 + 3.14, 0 hangs), closing the platform-dependent lost-wakeup gate for EDGE-24/31/32. Task 2 blocking human-verify checkpoint APPROVED (contingency confirmed NOT fired; both Wave 1 SUMMARYs state zero production change). Import-lint (PKG-03) + basedpyright-strict + `mkdocs --strict` (exit 0) all green. Task 3 docs gate ran in reduced test-only form: no RST roles in the new modules, no new public symbol, no guide edit — no file change, no commit (the passing strict build IS the gate). All six EDGE requirements (08/13/14/24/31/32) complete; zero production change across the whole phase (the new-method offloads share the already-proven `cancellable_offload`/`offload` chokepoint).
+Next step: Execute Phase 33 — Documentation (DOCS-01..04): Arrow streaming guide (reader-lifetime contract + honest concurrency framing), `adbc_ingest` mode Literal table + explicit `replace`-drops-the-table warning, DataFrame user-supplied note, API reference for `AsyncRecordBatchReader` + the four new `AsyncCursor` methods, `mkdocs build --strict` gate, humanizer pass. This is the docs consolidation point; run `/gsd-plan-phase 33` to plan it.
