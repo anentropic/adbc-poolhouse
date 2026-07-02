@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.5.0
 milestone_name: Async Cursor Completion
-status: executing
-stopped_at: Completed 32-03-PLAN.md — Phase 32 CLOSED. Full-suite x20 gate green on macOS (2702 passed, 0 hangs) proving the four Wave 1 modules (test_edge_checkpoint/contextvars/timeout_precision/shutdown) hold together with no cross-test interaction; authoritative Linux-CI x20 confirmed green on Python 3.11 AND 3.14 (run 28622475955, 0 hangs) — closes the platform-dependent lost-wakeup gate for EDGE-24/31/32. Task 2 blocking checkpoint APPROVED. Import-lint (PKG-03) + basedpyright-strict + mkdocs --strict all green. Task 3 docs gate reduced to strict-build + docstring-style (no RST roles in the new modules, no new public symbol, no guide edit) — no file change, no commit (the passing build IS the gate). DISCOVERED-NECESSITY contingency confirmed NOT fired: test-only phase, zero production change. All six EDGE requirements (08/13/14/24/31/32) complete.
-last_updated: "2026-07-02T22:26:00.000Z"
-last_activity: 2026-07-02 -- Completed 32-03 (Phase 32 CLOSED — full-suite x20 + Linux-CI gate + docs gate)
+status: "Phase 32 CLOSED — all six EDGE requirements (08/13/14/24/31/32) green x20 on macOS + Linux CI; test-only, zero production change. Next: Phase 33 (Documentation)"
+stopped_at: "Completed 32-03-PLAN.md — Phase 32 CLOSED. Wave-2 gate plan: proved the four Wave 1 modules hold together in the full async suite under `ADBC_ASYNC_REPEAT=20` on macOS (2702 passed, 0 hangs, no cross-test interaction, no regression) and — authoritatively — on Linux CI (run 28622475955, Python 3.11 + 3.14, 0 hangs), closing the platform-dependent lost-wakeup gate for EDGE-24/31/32. Task 2 blocking human-verify checkpoint APPROVED (contingency confirmed NOT fired; both Wave 1 SUMMARYs state zero production change). Import-lint (PKG-03) + basedpyright-strict + `mkdocs --strict` (exit 0) all green. Task 3 docs gate ran in reduced test-only form: no RST roles in the new modules, no new public symbol, no guide edit — no file change, no commit (the passing strict build IS the gate). All six EDGE requirements (08/13/14/24/31/32) complete; zero production change across the whole phase (the new-method offloads share the already-proven `cancellable_offload`/`offload` chokepoint)."
+last_updated: "2026-07-02T22:59:26.416Z"
+last_activity: 2026-07-02
 progress:
   total_phases: 5
   completed_phases: 4
   total_plans: 11
-  completed_plans: 10
+  completed_plans: 11
   percent: 80
 ---
 
@@ -25,10 +25,10 @@ See: .planning/PROJECT.md (updated 2026-07-01)
 
 ## Current Position
 
-Phase: 32 (P2 Edge Hardening) — COMPLETE
-Plan: 3 of 3 (all complete)
+Phase: 33
+Plan: Not started
 Status: Phase 32 CLOSED — all six EDGE requirements (08/13/14/24/31/32) green x20 on macOS + Linux CI; test-only, zero production change. Next: Phase 33 (Documentation)
-Last activity: 2026-07-02 -- Completed 32-03 (Phase 32 CLOSED)
+Last activity: 2026-07-02
 
 Progress: [████████████████░░░░] 80% (4 of 5 phases complete: 29, 30, 31, 32)
 
