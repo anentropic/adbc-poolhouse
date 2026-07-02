@@ -326,17 +326,19 @@ async def main():
 | A2 | The harness needs no extension — all four new-method stubs + counters (`ingest_call_count`, `df_call_count`, `polars_call_count`, `record_batch_batches`, `adbc_cancel_call_count`, `invalidate_call_count`) already exist. | Standard Stack | LOW — verified by reading `stubs.py`. Only possible gap: a contextvar *read* probe in the stub worker body for EDGE-13 (one line, or use Pattern 1(b)). Flagged as Claude's discretion. |
 | A3 | EDGE-24 is best proven by releasing the worker in the teardown window (clean join) + asserting no stray exception/warning, NOT by racing a genuinely-wedged worker at shutdown. | Pattern 3 / Pitfall 3 | MEDIUM — if the reviewer expects a genuinely-mid-flight-at-shutdown assertion, the deterministic version is weaker. But a wedged-worker race violates the zero-hang gate (same rationale as the live-`adbc_cancel` deviation already accepted in Phases 25/29). |
 
-## Open Questions
+## Open Questions (RESOLVED)
+
+Both are discretion-level (test-shape) choices, not planning-blocking technical unknowns; each is resolved with a locked recommendation the planner adopted.
 
 1. **EDGE-13 stub probe vs. bare-`offload` mechanism**
    - What we know: The contextvar guarantees hold at the `offload()` chokepoint (verified). The ROADMAP says "asserted on a new-method offload."
    - What's unclear: Whether to add a one-line contextvar read to the stub's `fetch_df` worker body (Pattern 1(a), most end-to-end) or assert via a direct `offload()` call with a comment that the chokepoint is shared (Pattern 1(b), zero harness change).
-   - Recommendation: Prefer 1(a) if a one-line stub probe passes review; else 1(b). Either satisfies EDGE-13/14. This is Claude's discretion.
+   - RESOLVED: Prefer Pattern 1(a) (one-line stub probe via `register_on_enter`) if it passes review; fall back to 1(b) otherwise. Either satisfies EDGE-13/14 — Claude's discretion at execution.
 
 2. **EDGE-24 real-driver leg scope**
    - What we know: The stub leg deterministically proves "no stray exception/warning at teardown with a released worker." The real `duckdb_async_pool` leg proves `pool.close()` with an open-but-drained connection raises nothing.
    - What's unclear: Whether to attempt any real mid-stream/mid-ingest-at-shutdown leg beyond the drained-close (would risk a nondeterministic wedge).
-   - Recommendation: Stub legs for mid-stream + mid-ingest (deterministic); one real drained-close leg. Do not race a wedged worker. Mark trio as the canary leg.
+   - RESOLVED: Stub legs for mid-stream + mid-ingest (deterministic) + one real drained-close leg; do NOT race a wedged worker (violates the zero-hang gate). Mark trio as the canary leg.
 
 ## Discovered-Necessity Contingency (per locked decision #3)
 
