@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v1.5.0
 milestone_name: Async Cursor Completion
-status: completed
+status: executing
 stopped_at: Completed 31-01-PLAN.md — Wave-0 RED scaffolding for DataFrame convenience. Added pandas>=2.0/polars>=1.0 to the dev group (no extra; PKG-02/D-31-08); extended `BlockingStubCursor` with blockable `fetch_df`/`fetch_polars` (counters + worker-raise injection); landed six RED test files (round-trip, lifetime, signature+import-surface, missing-dep, busy, cancel) — 30 failed / 1 passed (import_surface), all failing solely on the missing `AsyncCursor.fetch_df`/`fetch_polars`. basedpyright 0 errors (Wave-0 RED pragmas); existing async suite unaffected (162 passed / 4 skipped).
-last_updated: "2026-07-02T09:19:56.371Z"
-last_activity: 2026-07-02
+last_updated: "2026-07-02T20:55:23.359Z"
+last_activity: 2026-07-02 -- Phase 32 planning complete
 progress:
   total_phases: 5
   completed_phases: 3
@@ -27,8 +27,8 @@ See: .planning/PROJECT.md (updated 2026-07-01)
 
 Phase: 32
 Plan: Not started
-Status: Phase 31 complete — next up Phase 32 (P2 edge hardening)
-Last activity: 2026-07-02
+Status: Ready to execute
+Last activity: 2026-07-02 -- Phase 32 planning complete
 
 Progress: [██████████░░░░░░░░░░] 60% (3 of 5 phases complete: 29, 30, 31)
 
