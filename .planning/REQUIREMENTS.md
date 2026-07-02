@@ -97,12 +97,12 @@ Every v1.5.0 requirement maps to exactly one phase (Phases 29–33). PKG-* are c
 | INGEST-02 | Phase 30 | ✅ Complete (30-01 RED → 30-02 GREEN) |
 | INGEST-03 | Phase 30 | ✅ Complete (30-01 RED → 30-02 GREEN) |
 | INGEST-04 | Phase 30 | ✅ Complete (30-01 RED → 30-02 GREEN) |
-| DF-01 | Phase 31 | Pending |
-| DF-02 | Phase 31 | Pending |
-| DF-03 | Phase 31 | Pending |
-| DF-04 | Phase 31 | Pending |
+| DF-01 | Phase 31 | RED pinned (31-01); GREEN in 31-02 |
+| DF-02 | Phase 31 | RED pinned (31-01); GREEN in 31-02 |
+| DF-03 | Phase 31 | RED pinned (31-01); GREEN in 31-02 |
+| DF-04 | Phase 31 | RED pinned (31-01); GREEN in 31-02 |
 | PKG-01 | Phase 29 | Complete (29-03) |
-| PKG-02 | Phase 31 | Pending |
+| PKG-02 | Phase 31 | RED pinned (31-01: dev deps + importorskip guards landed); GREEN in 31-02 |
 | PKG-03 | Phase 29 | Complete (29-03); guard passes over `_async/`, re-verified each phase |
 | EDGE-08 | Phase 32 | Pending |
 | EDGE-13 | Phase 32 | Pending |

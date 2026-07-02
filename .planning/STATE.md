@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.5.0
 milestone_name: Async Cursor Completion
 status: executing
-stopped_at: "Completed 30-02-PLAN.md — GREEN implementation of async bulk write. `AsyncCursor.adbc_ingest` landed as a `fetch_arrow_table` clone (only deltas: the `functools.partial(self._cursor.adbc_ingest, ...)` callable, the `-> int` return, and the docstring); `_SyncCursor` Protocol extended; `import functools` runtime + `Literal`/`CapsuleType` under `TYPE_CHECKING`. All 20 asyncio×trio RED cases from 30-01 are GREEN (round-trip/modes/signature 14 passed; cancel/invalidate 20/20 looped, 0 hangs — INGEST-04/T-30-01). The four RED pyright pragma blocks are deleted (replaced by targeted inline `# type: ignore[index]` for the permanent object-fetch typing). Import-lint guard re-passes with `functools` present (T-30-02). Docs gate satisfied: async guide documents `adbc_ingest` with the `replace`-drops-table warning; `mkdocs build --strict` exit 0. Full async suite 162 passed / 4 skipped. Phase 30 complete (INGEST-01..04 done)."
-last_updated: "2026-07-02T08:20:07.549Z"
-last_activity: 2026-07-02 -- Phase 31 planning complete
+stopped_at: "Completed 31-01-PLAN.md — Wave-0 RED scaffolding for DataFrame convenience. Added pandas>=2.0/polars>=1.0 to `[dependency-groups].dev` (no extra; PKG-02/D-31-08) and `uv sync`ed (pandas 3.0.3, polars 1.42.1). Extended `BlockingStubCursor` with blockable `fetch_df`/`fetch_polars` (`df_call_count`/`polars_call_count` counters + `fetch_df_raises`/`fetch_polars_raises` worker-raise injection — raise AFTER `_block` so the native error crosses the real to_thread boundary; no cancel machinery added). Landed six RED test files (round-trip DF-01/02, lifetime DF-04, signature+import-surface PKG-02, missing-dep DF-03, busy T-31-03, cancel T-31-01): 30 failed / 1 passed (import_surface, acceptable), all failing solely on the missing `AsyncCursor.fetch_df`/`fetch_polars`. basedpyright 0 errors (Wave-0 RED pragmas, delete-on-GREEN); existing async suite unaffected (162 passed / 4 skipped); mkdocs --strict passes."
+last_updated: "2026-07-02T08:31:32Z"
+last_activity: 2026-07-02 -- Completed 31-01-PLAN.md (Wave-0 RED)
 progress:
   total_phases: 5
   completed_phases: 2
-  total_plans: 6
-  completed_plans: 6
+  total_plans: 8
+  completed_plans: 7
   percent: 40
 ---
 
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-01)
 
 **Core value:** One config in, one pool out — `create_pool(SnowflakeConfig(...))` returns a ready-to-use SQLAlchemy QueuePool in a single call.
-**Current focus:** Phase 30 complete — next is Phase 31 (DataFrame Convenience)
+**Current focus:** Phase 31 — dataframe-convenience
 
 ## Current Position
 
-Phase: 31
-Plan: Not started
-Status: Ready to execute
-Last activity: 2026-07-02 -- Phase 31 planning complete
+Phase: 31 (dataframe-convenience) — EXECUTING
+Plan: 2 of 2 (31-01 complete; 31-02 GREEN next)
+Status: Executing Phase 31
+Last activity: 2026-07-02 -- Completed 31-01-PLAN.md (Wave-0 RED)
 
 Progress: [████████░░] 40% (2 of 5 phases complete: 29, 30)
 
@@ -88,6 +88,6 @@ Pre-v1.4.0 tracking cruft plus one non-functional docstring; run `/gsd-cleanup` 
 
 ## Session Continuity
 
-Last session: 2026-07-01T21:15:30Z
-Stopped at: Completed 30-02-PLAN.md — GREEN implementation of async bulk write. `AsyncCursor.adbc_ingest` landed as a `fetch_arrow_table` clone (only deltas: the `functools.partial(self._cursor.adbc_ingest, ...)` callable, the `-> int` return, and the docstring); `_SyncCursor` Protocol extended; `import functools` runtime + `Literal`/`CapsuleType` under `TYPE_CHECKING`. All 20 asyncio×trio RED cases from 30-01 are GREEN (round-trip/modes/signature 14 passed; cancel/invalidate 20/20 looped, 0 hangs — INGEST-04/T-30-01). The four RED pyright pragma blocks are deleted (replaced by targeted inline `# type: ignore[index]` for the permanent object-fetch typing). Import-lint guard re-passes with `functools` present (T-30-02). Docs gate satisfied: async guide documents `adbc_ingest` with the `replace`-drops-table warning; `mkdocs build --strict` exit 0. Full async suite 162 passed / 4 skipped. Phase 30 complete (INGEST-01..04 done).
-Next step: Phase 30 is complete. Proceed to Phase 31 (DataFrame Convenience — `fetch_df`/`fetch_polars`, PKG-02), which can reuse this phase's whole-op offload shape and the `functools.partial` keyword-binding pattern.
+Last session: 2026-07-02T08:31:32Z
+Stopped at: Completed 31-01-PLAN.md — Wave-0 RED scaffolding for DataFrame convenience. Added pandas>=2.0/polars>=1.0 to the dev group (no extra; PKG-02/D-31-08); extended `BlockingStubCursor` with blockable `fetch_df`/`fetch_polars` (counters + worker-raise injection); landed six RED test files (round-trip, lifetime, signature+import-surface, missing-dep, busy, cancel) — 30 failed / 1 passed (import_surface), all failing solely on the missing `AsyncCursor.fetch_df`/`fetch_polars`. basedpyright 0 errors (Wave-0 RED pragmas); existing async suite unaffected (162 passed / 4 skipped).
+Next step: Execute 31-02-PLAN.md (GREEN) — implement `AsyncCursor.fetch_df`/`fetch_polars` as `fetch_arrow_table` clones (bare method ref, NO `functools.partial`, NO `find_spec`/wrapping — D-31-03/05); extend `_SyncCursor` Protocol with two `-> object` members; add `import pandas`/`import polars` under `TYPE_CHECKING` + `-> "pandas.DataFrame"`/`-> "polars.DataFrame"` annotations; delete the Wave-0 RED pyright pragmas in all five test files; loop-verify busy/cancel (`ADBC_ASYNC_REPEAT`, `rc=$?`+grep); apply the docs gate.
