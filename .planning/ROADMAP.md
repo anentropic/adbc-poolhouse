@@ -143,9 +143,13 @@ Plans:
   4. pandas and polars are added to the dev dependency group only; `[project.dependencies]`, `[project.optional-dependencies]`, and the `__init__.py` lazy-import surface are unchanged, and `import adbc_poolhouse` with pandas/polars absent is unaffected (positive tests guarded by `importorskip`) (PKG-02)
 
 **Plans**: 2 plans
-
 Plans:
+**Wave 1**
+
 - [ ] 31-01-PLAN.md — Wave 0 RED scaffolding: pandas/polars dev-group deps + BlockingStubCursor fetch_df/fetch_polars stubs (counters + raise-injection) + seven failing tests (round-trip, lifetime, missing-dep, busy, cancel, signature) pinning DF-01..04/PKG-02
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 31-02-PLAN.md — Wave 2 GREEN: AsyncCursor.fetch_df/fetch_polars (fetch_arrow_table clones) + _SyncCursor Protocol members + TYPE_CHECKING pandas/polars imports + docs section
 
 **UI hint**: no

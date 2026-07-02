@@ -333,7 +333,7 @@ def fetch_polars(self) -> object: ...
 | A2 | The package-legitimacy seam would return OK for pandas/polars (not re-run live this session) | Package Legitimacy Audit | NEGLIGIBLE — both are top-download PyPI packages with canonical repos; verified live-on-PyPI in STACK.md 2026-07-01 |
 | A3 | `make_stub_async_connection` can be extended with a `fetch_df_raises` injection hook for the DF-03 test | Validation Architecture | LOW — the conftest helper already parametrizes stub behaviour (Phase 29/30 precedent); the exact kwarg name is the planner's to fix |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Exact injection API for the raising stub (DF-03).**
    - What we know: `BlockingStubCursor` already has blockable `fetch_arrow_table`/`adbc_ingest` with counters (`stubs.py:304,317`); `make_stub_async_connection` builds a stub-backed `AsyncConnection` (conftest).
