@@ -277,6 +277,34 @@ cannot, since the write is not wrapped in a transaction it controls. After a
 cancelled ingest, treat the target table as being in an undefined state and clean
 it up yourself before retrying.
 
+## Fetching a DataFrame
+
+`fetch_df` returns a `pandas.DataFrame` and `fetch_polars` returns a
+`polars.DataFrame`. Each is a single offloaded call, like `fetch_arrow_table` — the
+driver materializes the frame on the worker thread, and the connection checks back
+in the moment the call returns:
+
+```python
+from adbc_poolhouse import DuckDBConfig, managed_async_pool
+
+async with managed_async_pool(DuckDBConfig(database=":memory:")) as pool:
+    async with await pool.connect() as conn:
+        cursor = conn.cursor()
+        await cursor.execute("SELECT 1 AS a, 2 AS b")
+        df = await cursor.fetch_df()  # a pandas.DataFrame
+```
+
+Swap `fetch_df` for `fetch_polars` when you want a polars frame instead. The
+returned frame owns its buffers, so it stays valid after the connection is checked
+in — you can read it outside the `async with` block, the same way a
+`fetch_arrow_table` result survives checkin.
+
+pandas and polars are not poolhouse dependencies. You install whichever you use.
+Poolhouse never imports them: the driver imports pandas or polars on the worker
+thread as part of the fetch, so a missing install surfaces the native
+`ModuleNotFoundError` unchanged. Poolhouse adds no availability pre-check and no
+wrapping, exactly as the underlying sync ADBC method behaves.
+
 ## Do not share one async connection across concurrent tasks
 
 An ADBC connection permits serialized access (one call at a time) but not
