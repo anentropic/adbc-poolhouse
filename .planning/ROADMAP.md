@@ -170,7 +170,7 @@ Plans:
 Plans:
 **Wave 1** *(parallel RED — no file overlap)*
 
-- [ ] 32-01-PLAN.md — EDGE-08 (cancel-at-offload on adbc_ingest) + EDGE-13/14 (contextvar copy-in / no-leak-back on fetch_df); deterministic, dual-backend
+- [x] 32-01-PLAN.md — EDGE-08 (cancel-at-offload on adbc_ingest) + EDGE-13/14 (contextvar copy-in / no-leak-back on fetch_df); deterministic, dual-backend
 - [ ] 32-02-PLAN.md — EDGE-31/32 (move_on_after(0) cancels / deadline−ε not over-cancelled on streaming pull + ingest) + EDGE-24 (loop-shutdown cleanliness mid-stream/mid-ingest + real drained-close); looped x20
 
 **Wave 2** *(blocked on Wave 1)*

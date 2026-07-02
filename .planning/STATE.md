@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.5.0
 milestone_name: Async Cursor Completion
 status: executing
-stopped_at: Completed 31-01-PLAN.md — Wave-0 RED scaffolding for DataFrame convenience. Added pandas>=2.0/polars>=1.0 to the dev group (no extra; PKG-02/D-31-08); extended `BlockingStubCursor` with blockable `fetch_df`/`fetch_polars` (counters + worker-raise injection); landed six RED test files (round-trip, lifetime, signature+import-surface, missing-dep, busy, cancel) — 30 failed / 1 passed (import_surface), all failing solely on the missing `AsyncCursor.fetch_df`/`fetch_polars`. basedpyright 0 errors (Wave-0 RED pragmas); existing async suite unaffected (162 passed / 4 skipped).
-last_updated: "2026-07-02T20:55:23.359Z"
-last_activity: 2026-07-02 -- Phase 32 planning complete
+stopped_at: Completed 32-01-PLAN.md — EDGE-08/13/14 anyio-chokepoint guarantees pinned on new-method offloads. test_edge_checkpoint.py (EDGE-08 cancel-before-adbc_ingest delivered at the offload boundary, ingest_call_count == 0, dual-backend, trio discriminator); test_edge_contextvars.py (EDGE-13 copy-in + EDGE-14 no-leak-back on fetch_df, -k copied_in/no_leak). 6 passed (44 under x20 loop, 0 hangs); basedpyright 0 errors; test-only, no production change. Deviation: register_on_enter keys by the CALLING-thread id (loop) while _block dispatches by the WORKER-thread id, so the probe used the shared on_enter fallback (Rule 3, resolved in-test).
+last_updated: "2026-07-02T21:09:00.000Z"
+last_activity: 2026-07-02 -- Completed 32-01 (EDGE-08/13/14)
 progress:
   total_phases: 5
   completed_phases: 3
-  total_plans: 8
+  total_plans: 11
   completed_plans: 8
   percent: 60
 ---
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-01)
 
 **Core value:** One config in, one pool out — `create_pool(SnowflakeConfig(...))` returns a ready-to-use SQLAlchemy QueuePool in a single call.
-**Current focus:** Phase 31 — dataframe-convenience
+**Current focus:** Phase 32 — P2 Edge Hardening
 
 ## Current Position
 
-Phase: 32
-Plan: Not started
-Status: Ready to execute
-Last activity: 2026-07-02 -- Phase 32 planning complete
+Phase: 32 (P2 Edge Hardening) — EXECUTING
+Plan: 2 of 3
+Status: Executing Phase 32 — 32-01 complete (EDGE-08/13/14)
+Last activity: 2026-07-02 -- Completed 32-01 (EDGE-08/13/14)
 
 Progress: [██████████░░░░░░░░░░] 60% (3 of 5 phases complete: 29, 30, 31)
 
@@ -88,6 +88,6 @@ Pre-v1.4.0 tracking cruft plus one non-functional docstring; run `/gsd-cleanup` 
 
 ## Session Continuity
 
-Last session: 2026-07-02T08:31:32Z
-Stopped at: Completed 31-01-PLAN.md — Wave-0 RED scaffolding for DataFrame convenience. Added pandas>=2.0/polars>=1.0 to the dev group (no extra; PKG-02/D-31-08); extended `BlockingStubCursor` with blockable `fetch_df`/`fetch_polars` (counters + worker-raise injection); landed six RED test files (round-trip, lifetime, signature+import-surface, missing-dep, busy, cancel) — 30 failed / 1 passed (import_surface), all failing solely on the missing `AsyncCursor.fetch_df`/`fetch_polars`. basedpyright 0 errors (Wave-0 RED pragmas); existing async suite unaffected (162 passed / 4 skipped).
-Next step: Execute 31-02-PLAN.md (GREEN) — implement `AsyncCursor.fetch_df`/`fetch_polars` as `fetch_arrow_table` clones (bare method ref, NO `functools.partial`, NO `find_spec`/wrapping — D-31-03/05); extend `_SyncCursor` Protocol with two `-> object` members; add `import pandas`/`import polars` under `TYPE_CHECKING` + `-> "pandas.DataFrame"`/`-> "polars.DataFrame"` annotations; delete the Wave-0 RED pyright pragmas in all five test files; loop-verify busy/cancel (`ADBC_ASYNC_REPEAT`, `rc=$?`+grep); apply the docs gate.
+Last session: 2026-07-02T21:09:00Z
+Stopped at: Completed 32-01-PLAN.md — EDGE-08/13/14 anyio-chokepoint guarantees pinned on new-method offloads. `tests/async/test_edge_checkpoint.py` (EDGE-08: cancel set before the `adbc_ingest` offload is delivered at the offload boundary, `ingest_call_count == 0`, dual-backend, trio discriminator noted, `concurrency_marks` + `real_clock_watchdog`). `tests/async/test_edge_contextvars.py` (EDGE-13 copy-in + EDGE-14 no-leak-back on `fetch_df`, `-k copied_in`/`no_leak`, no gating). 6 passed; 44 under `ADBC_ASYNC_REPEAT=20` with 0 hangs; basedpyright 0 errors; test-only (no production change). Commits 6dce5f2, aedbc2b. Deviation (Rule 3): `register_on_enter` keys its hook by the CALLING (loop) thread id while `_block` dispatches per-thread hooks by the WORKER thread id, so the contextvar probe used the shared `on_enter` fallback instead — resolved entirely in-test, no harness change.
+Next step: Execute 32-02-PLAN.md — EDGE-31/32 (`move_on_after(0)` cancels a blocked streaming pull + ingest; a deadline−ε op is NOT over-cancelled) + EDGE-24 (loop-shutdown cleanliness mid-stream/mid-ingest + real drained-close), looped x20. Reuse `real_clock_watchdog` (never `anyio.fail_after` as watchdog), `virtual_clock` for the deadline trigger, `concurrency_marks` on every leg.

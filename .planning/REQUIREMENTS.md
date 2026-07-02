@@ -48,9 +48,9 @@ Scope constraints (maintainer-confirmed):
 
 Deterministic arrange/trigger/assert tests, each run under **both** asyncio and trio, extending coverage to the new streaming/ingest/DataFrame paths. Full designs in `.planning/research/ASYNC-EDGE-CASES.md`. No new production machinery beyond the `AsyncRecordBatchReader` `__aexit__`/`__del__` surface.
 
-- [ ] **EDGE-08**: A trio checkpoint is delivered at the offload boundary even with no intervening checkpoint — no starvation, no missing cancellation point
-- [ ] **EDGE-13**: contextvars set before an offload are visible to the worker thread (copied in), asserted on a new-method offload
-- [ ] **EDGE-14**: Mutations a worker makes to contextvars do not leak back to the calling task after the offload returns
+- [x] **EDGE-08**: A trio checkpoint is delivered at the offload boundary even with no intervening checkpoint — no starvation, no missing cancellation point
+- [x] **EDGE-13**: contextvars set before an offload are visible to the worker thread (copied in), asserted on a new-method offload
+- [x] **EDGE-14**: Mutations a worker makes to contextvars do not leak back to the calling task after the offload returns
 - [x] **EDGE-20**: An exception during shielded cleanup does not mask the body error — the body exception is chained via `__context__` and the connection is still released/invalidated
 - [x] **EDGE-22**: `__del__` of an un-closed `AsyncCursor` / `AsyncRecordBatchReader` emits a `ResourceWarning`, never a "coroutine was never awaited" `RuntimeWarning`
 - [x] **EDGE-23**: The happy path (properly closed via context manager) emits no `ResourceWarning` and no `RuntimeWarning`
@@ -104,9 +104,9 @@ Every v1.5.0 requirement maps to exactly one phase (Phases 29–33). PKG-* are c
 | PKG-01 | Phase 29 | Complete (29-03) |
 | PKG-02 | Phase 31 | ✅ Complete (31-01 RED → 31-02 GREEN) |
 | PKG-03 | Phase 29 | Complete (29-03); guard passes over `_async/`, re-verified each phase |
-| EDGE-08 | Phase 32 | Pending |
-| EDGE-13 | Phase 32 | Pending |
-| EDGE-14 | Phase 32 | Pending |
+| EDGE-08 | Phase 32 | Complete (32-01) |
+| EDGE-13 | Phase 32 | Complete (32-01) |
+| EDGE-14 | Phase 32 | Complete (32-01) |
 | EDGE-20 | Phase 29 | Complete (29-03) |
 | EDGE-22 | Phase 29 | Complete (29-03) |
 | EDGE-23 | Phase 29 | Complete (29-03) |
