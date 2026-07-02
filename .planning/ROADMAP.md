@@ -142,7 +142,12 @@ Plans:
   3. The returned frame is self-owning and valid after checkin (materialized in the worker, not bound to the connection) — same guarantee as `fetch_arrow_table` (EDGE-21) (DF-04)
   4. pandas and polars are added to the dev dependency group only; `[project.dependencies]`, `[project.optional-dependencies]`, and the `__init__.py` lazy-import surface are unchanged, and `import adbc_poolhouse` with pandas/polars absent is unaffected (positive tests guarded by `importorskip`) (PKG-02)
 
-**Plans**: TBD
+**Plans**: 2 plans
+
+Plans:
+- [ ] 31-01-PLAN.md — Wave 0 RED scaffolding: pandas/polars dev-group deps + BlockingStubCursor fetch_df/fetch_polars stubs (counters + raise-injection) + seven failing tests (round-trip, lifetime, missing-dep, busy, cancel, signature) pinning DF-01..04/PKG-02
+- [ ] 31-02-PLAN.md — Wave 2 GREEN: AsyncCursor.fetch_df/fetch_polars (fetch_arrow_table clones) + _SyncCursor Protocol members + TYPE_CHECKING pandas/polars imports + docs section
+
 **UI hint**: no
 
 ### Phase 32: P2 Edge Hardening
@@ -184,7 +189,7 @@ Phases execute in numeric order: 29 → 30 → 31 → 32 → 33
 |-------|-----------|----------------|--------|-----------|
 | 29. Arrow Streaming | v1.5.0 | 4/4 | Complete    | 2026-07-01 |
 | 30. Async Bulk Write | v1.5.0 | 2/2 | Complete    | 2026-07-01 |
-| 31. DataFrame Convenience | v1.5.0 | 0/TBD | Not started | - |
+| 31. DataFrame Convenience | v1.5.0 | 0/2 | Not started | - |
 | 32. P2 Edge Hardening | v1.5.0 | 0/TBD | Not started | - |
 | 33. Documentation | v1.5.0 | 0/TBD | Not started | - |
 | 22-28. Async API | v1.4.0 | 29/29 | Complete | 2026-07-01 |
