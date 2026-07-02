@@ -47,7 +47,7 @@ One config in, one pool out — `create_pool(SnowflakeConfig(...))` returns a re
 
 - [ ] Arrow streaming — `await cursor.fetch_record_batch()` + `async for batch in ...` (RecordBatchReader lifetime vs. reset-event checkin is the headline design)
 - [ ] Async bulk write — `await cursor.adbc_ingest(table_name, data, mode=...)`
-- [ ] DataFrame convenience — `await cursor.fetch_df()` / `await cursor.fetch_polars()` (pandas/polars user-supplied at runtime; no new poolhouse extras)
+- [x] DataFrame convenience — `await cursor.fetch_df()` / `await cursor.fetch_polars()` (pandas/polars user-supplied at runtime; no new poolhouse extras) — validated in Phase 31 (2026-07-02)
 - [ ] P2 async edge-case suite — EDGE-08, 13/14, 20, 22/23, 24, 31/32 (designs in `.planning/research/ASYNC-EDGE-CASES.md`)
 
 **Carried (externally blocked):**
@@ -137,4 +137,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-07-01 — v1.5.0 Async Cursor Completion milestone started. Active scope set to the four v1.4.0-deferred cursor methods (fetch_record_batch, adbc_ingest, fetch_df, fetch_polars) + the P2 edge-case suite; confirmed as pure offload wrappers with no dependency or sync-core changes. Phase numbering continues from 28. Next: requirements → roadmap.*
+*Last updated: 2026-07-02 — Phase 31 (DataFrame Convenience) complete: `await cursor.fetch_df()` / `fetch_polars()` shipped as byte-for-byte `fetch_arrow_table` offload clones; pandas/polars remain user-supplied (native `ModuleNotFoundError` propagates unchanged), dev-group-only, `__init__` surface untouched. Three of the four deferred cursor methods now landed (arrow streaming P29, bulk write P30, DataFrame convenience P31). Next: Phase 32 — P2 async edge-case hardening.*
