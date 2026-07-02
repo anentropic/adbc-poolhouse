@@ -54,9 +54,9 @@ Deterministic arrange/trigger/assert tests, each run under **both** asyncio and 
 - [x] **EDGE-20**: An exception during shielded cleanup does not mask the body error — the body exception is chained via `__context__` and the connection is still released/invalidated
 - [x] **EDGE-22**: `__del__` of an un-closed `AsyncCursor` / `AsyncRecordBatchReader` emits a `ResourceWarning`, never a "coroutine was never awaited" `RuntimeWarning`
 - [x] **EDGE-23**: The happy path (properly closed via context manager) emits no `ResourceWarning` and no `RuntimeWarning`
-- [ ] **EDGE-24**: An open pool or a pending offload at event-loop shutdown raises no library-attributable exception
-- [ ] **EDGE-31**: `move_on_after(0)` still cancels a blocked `execute`/streaming pull cleanly — `adbc_cancel` fires, connection invalidates
-- [ ] **EDGE-32**: An operation that completes at deadline−ε is not over-cancelled — no spurious `adbc_cancel`, no invalidate, connection returns clean
+- [x] **EDGE-24**: An open pool or a pending offload at event-loop shutdown raises no library-attributable exception
+- [x] **EDGE-31**: `move_on_after(0)` still cancels a blocked `execute`/streaming pull cleanly — `adbc_cancel` fires, connection invalidates
+- [x] **EDGE-32**: An operation that completes at deadline−ε is not over-cancelled — no spurious `adbc_cancel`, no invalidate, connection returns clean
 - [x] **EDGE-33**: (extends EDGE-21) On an `AsyncRecordBatchReader`, a read after checkin surfaces the driver's native closed-stream error (a clean exception, not a crash); drain-then-checkin yields the correct rows — proven on both DuckDB and the Snowflake cassette
 
 ### Documentation
@@ -110,9 +110,9 @@ Every v1.5.0 requirement maps to exactly one phase (Phases 29–33). PKG-* are c
 | EDGE-20 | Phase 29 | Complete (29-03) |
 | EDGE-22 | Phase 29 | Complete (29-03) |
 | EDGE-23 | Phase 29 | Complete (29-03) |
-| EDGE-24 | Phase 32 | Pending |
-| EDGE-31 | Phase 32 | Pending |
-| EDGE-32 | Phase 32 | Pending |
+| EDGE-24 | Phase 32 | Complete (32-02) |
+| EDGE-31 | Phase 32 | Complete (32-02; blocked-op cancel fired via move_on_after(N>0) under the autojumping virtual_clock — move_on_after(0) delivers before dispatch = EDGE-08) |
+| EDGE-32 | Phase 32 | Complete (32-02) |
 | EDGE-33 | Phase 29 | Complete (29-03, DuckDB; Snowflake leg manual-only per A1) |
 | DOCS-01 | Phase 33 | Pending |
 | DOCS-02 | Phase 33 | Pending |

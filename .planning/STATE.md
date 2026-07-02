@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.5.0
 milestone_name: Async Cursor Completion
 status: executing
-stopped_at: Completed 32-01-PLAN.md — EDGE-08/13/14 anyio-chokepoint guarantees pinned on new-method offloads. test_edge_checkpoint.py (EDGE-08 cancel-before-adbc_ingest delivered at the offload boundary, ingest_call_count == 0, dual-backend, trio discriminator); test_edge_contextvars.py (EDGE-13 copy-in + EDGE-14 no-leak-back on fetch_df, -k copied_in/no_leak). 6 passed (44 under x20 loop, 0 hangs); basedpyright 0 errors; test-only, no production change. Deviation: register_on_enter keys by the CALLING-thread id (loop) while _block dispatches by the WORKER-thread id, so the probe used the shared on_enter fallback (Rule 3, resolved in-test).
-last_updated: "2026-07-02T21:09:00.000Z"
-last_activity: 2026-07-02 -- Completed 32-01 (EDGE-08/13/14)
+stopped_at: Completed 32-02-PLAN.md — EDGE-31/32/24 pinned on the streaming-pull + ingest offload paths, dual-backend, x20. test_edge_timeout_precision.py (EDGE-31 move_on_after deadline on a BLOCKED pull/ingest fires adbc_cancel once + invalidates; EDGE-32 deadline−ε op released by a real thread is NOT over-cancelled); test_edge_shutdown.py (EDGE-24 pending ingest/stream at task-group teardown raises no library-attributable warning, workers released in the teardown window; real duckdb drained-close raises nothing, checkedout()==0). 14 tests, 280 passed under x20 (0 hangs); basedpyright + ruff clean; mkdocs --strict rc 0; test-only, no production change. Deviation (Rule 1, both EDGE-31 legs): move_on_after(N>0) under the AUTOJUMPING virtual_clock, not literal move_on_after(0) — an expired scope is delivered at the first checkpoint before the worker dispatches (read/ingest_call_count==0, adbc_cancel==0) = the cancel-before-offload case (EDGE-08, 32-01), not a BLOCKED-op cancel. CONTINGENCY untriggered.
+last_updated: "2026-07-02T21:13:57.000Z"
+last_activity: 2026-07-02 -- Completed 32-02 (EDGE-31/32/24)
 progress:
   total_phases: 5
   completed_phases: 3
   total_plans: 11
-  completed_plans: 8
+  completed_plans: 9
   percent: 60
 ---
 
@@ -26,9 +26,9 @@ See: .planning/PROJECT.md (updated 2026-07-01)
 ## Current Position
 
 Phase: 32 (P2 Edge Hardening) — EXECUTING
-Plan: 2 of 3
-Status: Executing Phase 32 — 32-01 complete (EDGE-08/13/14)
-Last activity: 2026-07-02 -- Completed 32-01 (EDGE-08/13/14)
+Plan: 3 of 3
+Status: Executing Phase 32 — 32-01 + 32-02 complete (EDGE-08/13/14/31/32/24); Wave 2 (32-03 gate) next
+Last activity: 2026-07-02 -- Completed 32-02 (EDGE-31/32/24)
 
 Progress: [██████████░░░░░░░░░░] 60% (3 of 5 phases complete: 29, 30, 31)
 
