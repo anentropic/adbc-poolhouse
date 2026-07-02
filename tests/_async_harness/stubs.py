@@ -110,6 +110,11 @@ class BlockingStubCursor:
         fetch_call_count: Number of `fetch_arrow_table` calls.
         ingest_call_count: Number of `adbc_ingest` calls --- the in-flight gate the
             Phase 30 cancel test polls (`await_inside(... >= 1)`) before cancelling.
+        df_call_count: Number of `fetch_df` calls --- the Phase 31 in-flight gate the
+            DataFrame busy/cancel tests poll (`await_inside(... >= 1)`) before
+            cancelling or asserting busy.
+        polars_call_count: Number of `fetch_polars` calls --- the `fetch_polars` twin
+            of `df_call_count`.
         adbc_cancel_call_count: Number of `adbc_cancel` calls.
         close_call_count: Number of `close` calls.
         execute_thread_ids: The `threading.get_ident()` of each `execute` caller,
@@ -140,6 +145,8 @@ class BlockingStubCursor:
         *,
         entered: threading.Event | None = None,
         on_enter: Callable[[], None] | None = None,
+        fetch_df_raises: BaseException | None = None,
+        fetch_polars_raises: BaseException | None = None,
     ) -> None:
         """
         Create a fresh cursor with all counters zeroed.
@@ -150,6 +157,15 @@ class BlockingStubCursor:
             on_enter: Optional zero-argument callback invoked inside `_block`
                 before the worker waits (see the `on_enter` attribute). Defaults
                 to `None`; it can also be set later via the public attribute.
+            fetch_df_raises: Optional exception the `fetch_df` worker raises AFTER
+                `_block` releases, so the error crosses the real
+                `to_thread.run_sync` boundary (proving the `_offload.py` EDGE-17
+                re-raise). Defaults to `None` (return `None`). Set it to a native
+                `ModuleNotFoundError("No module named 'pandas'")` to drive the DF-03
+                missing-dependency propagation test. It can also be set later via
+                the `_fetch_df_raises` attribute (the zero-arg stub factory does
+                this on `cursors[-1]`).
+            fetch_polars_raises: The `fetch_polars` twin of `fetch_df_raises`.
         """
         self._event = threading.Event()
         self._lock = threading.Lock()
@@ -160,6 +176,13 @@ class BlockingStubCursor:
         self.execute_call_count: int = 0
         self.fetch_call_count: int = 0
         self.ingest_call_count: int = 0
+        self.df_call_count: int = 0
+        self.polars_call_count: int = 0
+        # Optional native exceptions the fetch_df/fetch_polars workers raise AFTER
+        # `_block` releases, so the error crosses the real `to_thread.run_sync`
+        # boundary (DF-03). `None` = return `None`. Public-settable on `cursors[-1]`.
+        self._fetch_df_raises: BaseException | None = fetch_df_raises
+        self._fetch_polars_raises: BaseException | None = fetch_polars_raises
         self.adbc_cancel_call_count: int = 0
         self.close_call_count: int = 0
         self.execute_thread_ids: list[int] = []
@@ -312,6 +335,63 @@ class BlockingStubCursor:
         with self._lock:
             self.fetch_call_count += 1
         self._block()
+        return None
+
+    def fetch_df(self) -> object:
+        """
+        Record the call, block until released, then raise or return `None`.
+
+        The `fetch_arrow_table` twin for the pandas materialization path (Phase 31):
+        it records the call under the lock (bumping `df_call_count`), parks on the
+        same sticky-release `_block` gate, then --- if `_fetch_df_raises` is set ---
+        raises that exception. The raise happens AFTER `_block` releases so the error
+        crosses the real `to_thread.run_sync` boundary, proving the `_offload.py`
+        EDGE-17 re-raise contract (a synchronous raise would not exercise it). The
+        error is NOT wrapped, so the DF-03 test observes the exact native
+        `ModuleNotFoundError` (`.name == "pandas"`) it injected.
+
+        No cancel wiring lives here: `adbc_cancel` / `close` / `release` already latch
+        the sticky `_cancelled` / `_closed` flags that `_block` honours, so a cancel
+        fired against this cursor unblocks the parked call through the existing
+        machinery.
+
+        Returns:
+            `None` when no exception is injected. Later phases may inject a real
+            `pandas.DataFrame` where a result is needed; the bare fake returns `None`.
+
+        Raises:
+            BaseException: The `_fetch_df_raises` exception, unwrapped, when set ---
+                e.g. `ModuleNotFoundError("No module named 'pandas'")` for DF-03.
+        """
+        with self._lock:
+            self.df_call_count += 1
+        self._block()
+        if self._fetch_df_raises is not None:
+            raise self._fetch_df_raises
+        return None
+
+    def fetch_polars(self) -> object:
+        """
+        Record the call, block until released, then raise or return `None`.
+
+        The `fetch_polars` twin of `fetch_df`: records the call under the lock
+        (bumping `polars_call_count`), parks on the sticky-release `_block` gate,
+        then --- if `_fetch_polars_raises` is set --- raises that exception AFTER
+        `_block` releases, so the native error crosses the real `to_thread.run_sync`
+        boundary (DF-03). The error is NOT wrapped.
+
+        Returns:
+            `None` when no exception is injected.
+
+        Raises:
+            BaseException: The `_fetch_polars_raises` exception, unwrapped, when set
+                --- e.g. `ModuleNotFoundError("No module named 'polars'")` for DF-03.
+        """
+        with self._lock:
+            self.polars_call_count += 1
+        self._block()
+        if self._fetch_polars_raises is not None:
+            raise self._fetch_polars_raises
         return None
 
     def adbc_ingest(
