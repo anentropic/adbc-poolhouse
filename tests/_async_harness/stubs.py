@@ -110,6 +110,13 @@ class BlockingStubCursor:
         fetch_call_count: Number of `fetch_arrow_table` calls.
         ingest_call_count: Number of `adbc_ingest` calls --- the in-flight gate the
             Phase 30 cancel test polls (`await_inside(... >= 1)`) before cancelling.
+        prepare_call_count: Number of `adbc_prepare` calls --- the Phase 35 in-flight
+            gate the prepared-statement cancel test polls (`await_inside(... >= 1)`)
+            before cancelling. NEVER coupled to `execute_call_count` (the PREP-02
+            no-execute proof reads `execute_call_count == 0`).
+        execute_schema_call_count: Number of `adbc_execute_schema` calls --- the
+            `adbc_prepare` twin, likewise decoupled from `execute_call_count` so the
+            no-execute proof holds for either method.
         df_call_count: Number of `fetch_df` calls --- the Phase 31 in-flight gate the
             DataFrame busy/cancel tests poll (`await_inside(... >= 1)`) before
             cancelling or asserting busy.
@@ -176,6 +183,8 @@ class BlockingStubCursor:
         self.execute_call_count: int = 0
         self.fetch_call_count: int = 0
         self.ingest_call_count: int = 0
+        self.prepare_call_count: int = 0
+        self.execute_schema_call_count: int = 0
         self.df_call_count: int = 0
         self.polars_call_count: int = 0
         # Optional native exceptions the fetch_df/fetch_polars workers raise AFTER
@@ -183,6 +192,14 @@ class BlockingStubCursor:
         # boundary (DF-03). `None` = return `None`. Public-settable on `cursors[-1]`.
         self._fetch_df_raises: BaseException | None = fetch_df_raises
         self._fetch_polars_raises: BaseException | None = fetch_polars_raises
+        # Injectable results the Phase-35 `adbc_prepare` / `adbc_execute_schema`
+        # workers return AFTER `_block` releases (mirrors `_fetch_df_raises` --- a
+        # per-cursor public-settable knob on `cursors[-1]`). `adbc_prepare` tolerates
+        # a `pyarrow.Schema` OR `None` (D-35-02); `adbc_execute_schema` returns the
+        # injected sentinel `pyarrow.Schema` while NEVER touching `execute_call_count`
+        # --- the PREP-02 no-execute proof reads that counter as `0`.
+        self._prepare_result: object = None
+        self._execute_schema_result: object = None
         self.adbc_cancel_call_count: int = 0
         self.close_call_count: int = 0
         self.execute_thread_ids: list[int] = []
@@ -439,6 +456,67 @@ class BlockingStubCursor:
             self.ingest_call_count += 1
         self._block()
         return 3
+
+    def adbc_prepare(self, operation: object = None) -> object:
+        """
+        Record the prepare call, block until released/cancelled, then return the injected result.
+
+        The blocking twin of `adbc_ingest` for the prepared-statement read path
+        (Phase 35, PREP-01): it records the call under the lock (bumping
+        `prepare_call_count`), parks on the same sticky-release `_block` gate, then
+        returns the injectable `_prepare_result`. That gives the Phase 35 cancel test
+        a DETERMINISTIC in-flight window --- the test gates on `prepare_call_count >= 1`
+        (the worker is provably inside the blocked prepare) before cancelling.
+
+        No cancel wiring lives here: `adbc_cancel` / `close` / `release` already latch
+        the sticky `_cancelled` / `_closed` flags that `_block` honours, so a cancel
+        fired against this cursor unblocks the parked prepare through the existing
+        machinery. This method NEVER touches `execute_call_count` --- the PREP-02
+        no-execute proof depends on that counter staying `0`.
+
+        Args:
+            operation: The SQL text (recorded only by the call count; never run).
+
+        Returns:
+            The injectable `_prepare_result` (a sentinel `pyarrow.Schema` OR `None`,
+            mirroring the sync `adbc_prepare` return of `Optional[pyarrow.Schema]`,
+            D-35-02). Defaults to `None`.
+        """
+        del operation
+        with self._lock:
+            self.prepare_call_count += 1
+        self._block()
+        return self._prepare_result
+
+    def adbc_execute_schema(self, operation: object = None, parameters: object = None) -> object:
+        """
+        Record the execute-schema call, block until released, then return the injected result.
+
+        The blocking twin of `adbc_prepare` for the result-schema read path (Phase 35,
+        PREP-02): it records the call under the lock (bumping `execute_schema_call_count`),
+        parks on the same sticky-release `_block` gate, then returns the injectable
+        `_execute_schema_result`. The no-execute proof injects a sentinel
+        `pyarrow.Schema` and asserts the awaited value IS that object WHILE
+        `execute_call_count == 0` --- proving the schema was resolved without executing
+        the query (D-35-06).
+
+        No cancel wiring lives here: `adbc_cancel` / `close` / `release` already latch
+        the sticky `_cancelled` / `_closed` flags that `_block` honours. This method
+        NEVER touches `execute_call_count`.
+
+        Args:
+            operation: The SQL text (recorded only by the call count; never run).
+            parameters: Optional bound parameters (ignored by the fake).
+
+        Returns:
+            The injectable `_execute_schema_result` (a sentinel `pyarrow.Schema`,
+            D-35-03). Defaults to `None`.
+        """
+        del operation, parameters
+        with self._lock:
+            self.execute_schema_call_count += 1
+        self._block()
+        return self._execute_schema_result
 
     def adbc_cancel(self) -> None:
         """
