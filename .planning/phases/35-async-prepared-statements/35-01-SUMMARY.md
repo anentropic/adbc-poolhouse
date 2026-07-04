@@ -123,6 +123,10 @@ N/A for this test-only plan — no new public consumer-facing symbol, no guide/p
 - Plan 35-02 has a fixed, un-fakeable GREEN target: five RED test files + the harness counters they read. Implementation clones `AsyncCursor.execute` twice (swap callable + return type, drop `on_abort`) and extends the `_SyncCursor` Protocol (D-35-01..05).
 - Green-wave TODO carried into 35-02: delete the Wave-0 pyright pragma blocks from the four test files once `adbc_prepare` / `adbc_execute_schema` land, and mark PREP-01/02 complete in REQUIREMENTS.md.
 
+## Self-Check: PASSED
+
+All five test files + SUMMARY.md exist on disk; all four commits (`c7e517e`, `1279e2a`, `7114f62`, `a6e53e5`) present in git; `BlockingStubCursor.adbc_prepare` confirmed in `stubs.py`.
+
 ---
 *Phase: 35-async-prepared-statements*
 *Completed: 2026-07-04*
