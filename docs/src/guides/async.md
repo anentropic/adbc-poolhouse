@@ -20,16 +20,13 @@ awaited.
     The async API is experimental. Its surface may change between minor releases,
     so pin the version you build against and read the changelog before you upgrade.
 
-    It is also incomplete. The following are not available yet on the async side:
-
-    - **Async prepared statements** — `adbc_prepare`, `adbc_execute_schema`
-
-    What you get today is checkout, `execute` / `executemany`, the `fetch*` methods,
+    The async surface covers checkout, `execute` / `executemany`, the `fetch*` methods,
     `fetch_arrow_table`, Arrow streaming through `fetch_record_batch`, bulk write
-    through `adbc_ingest`, the six `adbc_get_*` connection-metadata methods (see
+    through `adbc_ingest`, prepared statements through `adbc_prepare` /
+    `adbc_execute_schema`, the six `adbc_get_*` connection-metadata methods (see
     [Connection metadata](#connection-metadata)), DataFrame convenience through
-    `fetch_df` / `fetch_polars`, and cooperative cancellation. The rest is on the
-    roadmap.
+    `fetch_df` / `fetch_polars`, and cooperative cancellation. Only partitioned result
+    sets (`adbc_execute_partitions`) stay deferred.
 
 ## Install
 
@@ -351,6 +348,48 @@ but not every backend implements them. DuckDB raises the driver's native
   for the reader-lifetime rules the metadata stream inherits
 - [API Reference](../reference/) for the generated `AsyncConnection` metadata methods
   with their Parameters / Returns / Raises
+
+## Prepared statements
+
+Two cursor methods inspect a query without running it. `adbc_prepare` prepares the
+statement on the driver and returns the schema of its bind parameters. `adbc_execute_schema`
+returns the result-set schema, so you can read the columns a query would produce before you
+fetch any rows.
+
+```python
+from adbc_poolhouse import DuckDBConfig, managed_async_pool
+
+async with managed_async_pool(DuckDBConfig(database="/tmp/warehouse.db")) as pool:
+    async with await pool.connect() as conn:
+        cursor = conn.cursor()
+
+        # Prepare once, then run the prepared operation with bound parameters.
+        param_schema = await cursor.adbc_prepare("SELECT * FROM t WHERE id = ?")
+        await cursor.execute("SELECT * FROM t WHERE id = ?", [1])
+        rows = await cursor.fetch_arrow_table()
+
+        # Resolve the result columns without executing the query.
+        result_schema = await cursor.adbc_execute_schema("SELECT id, name FROM t")
+```
+
+`adbc_prepare` returns a `pyarrow.Schema` for the bind parameters, or `None` when the driver
+cannot report one. A `None` result means the backend does not describe parameters, not that
+something failed.
+
+`adbc_execute_schema` returns the result schema without executing the query. No rows are
+fetched and no side effects run, so you can read a query's output shape without paying for the
+query itself. Not every backend implements it: DuckDB raises the driver's native
+`NotSupportedError`, which poolhouse passes through unwrapped.
+
+Both calls are cooperatively cancellable but non-poisoning. A surrounding `fail_after` or
+`move_on_after` aborts the in-flight call through the cursor's `adbc_cancel`, and because
+neither method writes state, the connection returns to the pool clean. There is no invalidate,
+unlike a cancelled `execute` or `fetch_arrow_table`.
+
+### See also
+
+- [API Reference](../reference/) for the generated `AsyncCursor` `adbc_prepare` and
+  `adbc_execute_schema` docs with their Parameters / Returns / Raises
 
 ## Do not share one async connection across concurrent tasks
 
