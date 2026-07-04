@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.5.0
 milestone_name: Async Cursor Completion
 status: executing
-stopped_at: "Completed 34-02-PLAN.md — implementation (GREEN). Added to src/adbc_poolhouse/_async/_connection.py: the _SyncConnection structural Protocol (six adbc_get_* signatures), the module-level _noop_cancel cancel hook, and the six AsyncConnection metadata methods. Value trio (adbc_get_info->dict[str|int,Any], adbc_get_table_types->list[str], adbc_get_table_schema->pyarrow.Schema) clone commit/rollback: plain offload inside self._offloading(); adbc_get_table_schema forwards kw-only filters via functools.partial. Streaming trio (adbc_get_objects/adbc_get_statistics/adbc_get_statistic_names->AsyncRecordBatchReader) clone fetch_record_batch: plain offload (connection has no adbc_cancel, so _noop_cancel is the reader's 4th arg), _reader_open=True set AFTER the span, success-path only. All six carry Google-style Markdown docstrings (non-cancellable caveat + reader-lifetime lock + Example). Dropped the phase-29 RED pyright pragma blocks from all four test files. Verification: 16/16 meta tests GREEN (asyncio+trio); basedpyright 0 errors on _connection.py + the test files; test_meta_guard.py passes; ADBC_ASYNC_REPEAT=20 loop gate 20x = 0 hangs (2718 passed each). Commits: be3a51f (value trio + Protocol), fa0c899 (streaming trio). META-01/02/03 marked Complete; META-04 (docs) remains for 34-03. Deviation: _noop_cancel + AsyncRecordBatchReader import deferred from task 1 to task 2 (first use) so each commit's basedpyright gate stays clean. Env note: uv-run basedpyright pre-commit hook panics under the command sandbox; commits made with sandbox disabled so the hook ran natively (no --no-verify)."
-last_updated: "2026-07-04T17:00:00.000Z"
-last_activity: 2026-07-04 -- Completed 34-02-PLAN.md (async metadata implementation, all 16 tests GREEN)
+stopped_at: "Completed 34-03-PLAN.md — docs (META-04), closing Phase 34. Edited docs/src/guides/async.md: removed the 'Async ADBC metadata' bullet from the Experimental caveat (kept the prepared-statements bullet — Phase 35 removes it), added connection metadata to the 'What you get today' paragraph, and added a new '## Connection metadata' how-to section covering the value trio (adbc_get_info/adbc_get_table_schema/adbc_get_table_types) plus the streaming adbc_get_objects (async with ... as reader), with the non-cancellable and reader-lifetime caveats and a See also cross-reference. Plain fenced python blocks (no !!! example box). Humanizer pass needed no prose changes (written clean by construction). API reference: the existing AsyncConnection mkdocstrings block auto-renders all six adbc_get_* methods (14-16 hits each) with Parameters/Returns/Raises + Example, 0 rogue RST roles — no gen_ref_pages.py change. Gate: DISABLE_MKDOCS_2_WARNING=true .venv/bin/mkdocs build --strict exits 0. Commit: 360bd84 (async.md; blacken-docs reformatted the code-block comments, re-staged). Phase 34 COMPLETE (META-01..04). Next: Phase 35 (Async Prepared Statements). Env note: blacken-docs pre-commit hook reformats python code fences; re-stage and re-commit (no --no-verify)."
+last_updated: "2026-07-04T18:00:00.000Z"
+last_activity: 2026-07-04 -- Completed 34-03-PLAN.md (async metadata docs, META-04; Phase 34 complete)
 progress:
   total_phases: 7
-  completed_phases: 5
+  completed_phases: 6
   total_plans: 16
-  completed_plans: 15
-  percent: 74
+  completed_plans: 16
+  percent: 86
 ---
 
 # Project State
@@ -25,13 +25,13 @@ See: .planning/PROJECT.md (updated 2026-07-01)
 
 ## Current Position
 
-Phase: 34 (Async Metadata) — EXECUTING
-Plan: 3 of 3 (34-01, 34-02 complete)
-Next: Execute 34-03 (docs — shrink the async caveat, add the Connection metadata how-to, API-reference render + `mkdocs build --strict` gate, META-04)
-Status: Executing Phase 34
-Last activity: 2026-07-04 -- Completed 34-02-PLAN.md (async metadata implementation, all 16 tests GREEN)
+Phase: 34 (Async Metadata) — COMPLETE
+Plan: 3 of 3 (34-01, 34-02, 34-03 complete)
+Next: Phase 35 (Async Prepared Statements) — plan the phase
+Status: Phase 34 complete (META-01..04); ready for Phase 35
+Last activity: 2026-07-04 -- Completed 34-03-PLAN.md (async metadata docs, META-04; Phase 34 complete)
 
-Progress: [██████████████░░░░░░] 74% (5 of 7 phases complete: 29, 30, 31, 32, 33; Phase 34 in progress, 2 of 3 plans done)
+Progress: [█████████████████░░░] 86% (6 of 7 phases complete: 29, 30, 31, 32, 33, 34; Phase 35 remaining)
 
 ## Accumulated Context
 
