@@ -250,7 +250,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 35-02-PLAN.md — Implement AsyncCursor.adbc_prepare + adbc_execute_schema (clone execute, drop on_abort) + _SyncCursor Protocol (PREP-01/02)
+- [x] 35-02-PLAN.md — Implement AsyncCursor.adbc_prepare + adbc_execute_schema (clone execute, drop on_abort) + _SyncCursor Protocol (PREP-01/02) — completed 2026-07-04
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
@@ -271,7 +271,7 @@ Phases execute in numeric order: 29 → 30 → 31 → 32 → 33 → 34 → 35
 | 32. P2 Edge Hardening | v1.5.0 | 3/3 | Complete    | 2026-07-02 |
 | 33. Documentation | v1.5.0 | 2/2 | Complete    | 2026-07-04 |
 | 34. Async Metadata | v1.5.0 | 3/3 | Complete    | 2026-07-04 |
-| 35. Async Prepared Statements | v1.5.0 | 0/3 | Planned | - |
+| 35. Async Prepared Statements | v1.5.0 | 2/3 | In Progress | - |
 | 22-28. Async API | v1.4.0 | 29/29 | Complete | 2026-07-01 |
 | 21.1. ADBC dispatch URI-positional fix | v1.3.0 | 3/3 | Complete | 2026-05-20 |
 | 21. Quack Backend | v1.3.0 | 3/3 | Complete | 2026-05-19 |
