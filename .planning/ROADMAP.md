@@ -216,7 +216,13 @@ Plans:
   3. A backend that does not implement a metadata method surfaces the driver's native error unchanged (META-03)
   4. The async guide + API reference document the async metadata methods and the v1.5.0 caveat shrinks accordingly; `mkdocs build --strict` passes; humanizer pass applied (META-04)
 
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+- [ ] 34-01-PLAN.md — Wave-0 RED test scaffolding: signature, value round-trip, streaming, unsupported (META-01/02/03)
+- [ ] 34-02-PLAN.md — Implementation: `_SyncConnection` Protocol, `_noop_cancel`, and the six `adbc_get_*` methods with docstrings (META-01/02/03)
+- [ ] 34-03-PLAN.md — Docs: shrink the async caveat, add the Connection metadata how-to, API-reference render + strict-build gate (META-04)
+
 **UI hint**: no
 
 ### Phase 35: Async Prepared Statements
