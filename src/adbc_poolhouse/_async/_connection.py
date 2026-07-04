@@ -35,7 +35,8 @@ DuckDB driver).
 from __future__ import annotations
 
 import contextlib
-from typing import TYPE_CHECKING, cast
+import functools
+from typing import TYPE_CHECKING, Protocol, cast
 
 import anyio
 
@@ -46,11 +47,56 @@ from adbc_poolhouse._exceptions import ConnectionBusyError
 if TYPE_CHECKING:
     from collections.abc import Generator
     from types import TracebackType
+    from typing import Any, Literal
 
+    import pyarrow
     from anyio import CapacityLimiter
     from sqlalchemy.pool import PoolProxiedConnection
 
     from adbc_poolhouse._async._cursor import _SyncCursor
+
+
+class _SyncConnection(Protocol):
+    """
+    Structural type for the sync ADBC dbapi Connection metadata surface.
+
+    Mirrors `_SyncCursor`: declared structurally (a `Protocol`) rather than
+    imported from a concrete driver, so the async layer stays driver-agnostic ---
+    the dbapi module is resolved dynamically by the sync core, so there is no single
+    class to import. Any object exposing this surface (the ADBC dbapi `Connection`,
+    or a test stub) satisfies it. `AsyncConnection` casts its SQLAlchemy fairy to
+    this Protocol so each offloaded metadata call stays arity-checked under
+    basedpyright.
+    """
+
+    def adbc_get_info(self) -> dict[str | int, Any]: ...
+    def adbc_get_objects(
+        self,
+        *,
+        depth: Literal["all", "catalogs", "db_schemas", "tables", "columns"] = ...,
+        catalog_filter: str | None = ...,
+        db_schema_filter: str | None = ...,
+        table_name_filter: str | None = ...,
+        table_types_filter: list[str] | None = ...,
+        column_name_filter: str | None = ...,
+    ) -> pyarrow.RecordBatchReader: ...
+    def adbc_get_table_schema(
+        self,
+        table_name: str,
+        *,
+        catalog_filter: str | None = ...,
+        db_schema_filter: str | None = ...,
+    ) -> pyarrow.Schema: ...
+    def adbc_get_table_types(self) -> list[str]: ...
+    def adbc_get_statistics(
+        self,
+        *,
+        catalog_filter: str | None = ...,
+        db_schema_filter: str | None = ...,
+        table_name_filter: str | None = ...,
+        approximate: bool = ...,
+    ) -> pyarrow.RecordBatchReader: ...
+    def adbc_get_statistic_names(self) -> pyarrow.RecordBatchReader: ...
 
 
 class AsyncConnection:
@@ -282,6 +328,127 @@ class AsyncConnection:
         """
         with self._offloading():
             await offload(self._fairy.rollback, limiter=self._limiter)
+
+    async def adbc_get_info(self) -> dict[str | int, Any]:
+        """
+        Read the driver and vendor info codes on a worker thread.
+
+        Offloads the sync `adbc_get_info()` through the pool limiter while holding
+        the `_in_use` guard, so a concurrent call on this connection is rejected with
+        `ConnectionBusyError`. The driver's own `dict` is returned unchanged --- keys
+        are ADBC info codes (`str` or `int`), values the backend's reported metadata.
+
+        Like `commit`, this call is **not** cooperatively cancellable: it runs
+        through the non-interruptible `offload` with no cancel hook, so a surrounding
+        timeout or cancellation cannot abort an in-flight metadata read. The loop
+        defers the cancellation and waits for the driver call to return before
+        raising it.
+
+        Returns:
+            The driver's info mapping, keyed by ADBC info code. Returned unchanged.
+
+        Raises:
+            ConnectionBusyError: If another offloaded call on this connection is
+                already in flight.
+
+        Example:
+            ```python
+            async with await pool.connect() as conn:
+                info = await conn.adbc_get_info()
+                print(info)  # a dict of driver/vendor codes
+            ```
+        """
+        sync_conn = cast("_SyncConnection", self._fairy)
+        with self._offloading():
+            return await offload(sync_conn.adbc_get_info, limiter=self._limiter)
+
+    async def adbc_get_table_types(self) -> list[str]:
+        """
+        List the backend's table-type names on a worker thread.
+
+        Offloads the sync `adbc_get_table_types()` through the pool limiter while
+        holding the `_in_use` guard, so a concurrent call on this connection is
+        rejected with `ConnectionBusyError`. The driver's own `list` of table-type
+        strings (for example `"table"`, `"view"`) is returned unchanged.
+
+        Like `commit`, this call is **not** cooperatively cancellable: a surrounding
+        timeout or cancellation cannot abort an in-flight metadata read. The loop
+        defers the cancellation and waits for the driver call to return before
+        raising it.
+
+        Returns:
+            The backend's table-type strings, in the driver's order. Returned
+            unchanged.
+
+        Raises:
+            ConnectionBusyError: If another offloaded call on this connection is
+                already in flight.
+
+        Example:
+            ```python
+            async with await pool.connect() as conn:
+                types = await conn.adbc_get_table_types()
+                print(types)  # e.g. ["table", "view"]
+            ```
+        """
+        sync_conn = cast("_SyncConnection", self._fairy)
+        with self._offloading():
+            return await offload(sync_conn.adbc_get_table_types, limiter=self._limiter)
+
+    async def adbc_get_table_schema(
+        self,
+        table_name: str,
+        *,
+        catalog_filter: str | None = None,
+        db_schema_filter: str | None = None,
+    ) -> pyarrow.Schema:
+        """
+        Read a single table's Arrow schema on a worker thread.
+
+        Offloads the sync `adbc_get_table_schema()` through the pool limiter while
+        holding the `_in_use` guard, so a concurrent call on this connection is
+        rejected with `ConnectionBusyError`. The driver's own `pyarrow.Schema` is
+        returned unchanged. The arguments forward through `functools.partial` so the
+        keyword-only filters reach the driver arity-checked.
+
+        Like `commit`, this call is **not** cooperatively cancellable: a surrounding
+        timeout or cancellation cannot abort an in-flight metadata read. The loop
+        defers the cancellation and waits for the driver call to return before
+        raising it.
+
+        Args:
+            table_name: The table to describe. Passed straight to the driver as an
+                identifier; poolhouse does not quote or sanitize it.
+            catalog_filter: Restrict the lookup to this catalog. Forwarded to the
+                driver unchanged; `None` (the default) leaves it unrestricted.
+            db_schema_filter: Restrict the lookup to this schema. Forwarded to the
+                driver unchanged; `None` (the default) leaves it unrestricted.
+
+        Returns:
+            The table's `pyarrow.Schema`, returned unchanged from the driver.
+
+        Raises:
+            ConnectionBusyError: If another offloaded call on this connection is
+                already in flight.
+
+        Example:
+            ```python
+            async with await pool.connect() as conn:
+                schema = await conn.adbc_get_table_schema("people")
+                print(schema.names)  # e.g. ["id", "name"]
+            ```
+        """
+        sync_conn = cast("_SyncConnection", self._fairy)
+        with self._offloading():
+            return await offload(
+                functools.partial(
+                    sync_conn.adbc_get_table_schema,
+                    table_name,
+                    catalog_filter=catalog_filter,
+                    db_schema_filter=db_schema_filter,
+                ),
+                limiter=self._limiter,
+            )
 
     async def close(self) -> None:
         """

@@ -25,15 +25,6 @@ every test here FAILS (RED) with `AttributeError`. That is the acceptance signal
 
 from __future__ import annotations
 
-# Wave-0 RED scaffolding: the `adbc_get_*` methods on `AsyncConnection` do not
-# exist until plan 34-02 lands them, so every reference to them is statically
-# "unknown". These pragmas suppress ONLY the errors that are a direct consequence
-# of those not-yet-existing symbols; delete this block once the production symbols
-# land and the file type-checks cleanly under the strict whole-project gate.
-# pyright: reportAttributeAccessIssue=false
-# pyright: reportUnknownVariableType=false
-# pyright: reportUnknownMemberType=false
-# pyright: reportUnknownArgumentType=false
 from typing import TYPE_CHECKING
 
 import pyarrow
