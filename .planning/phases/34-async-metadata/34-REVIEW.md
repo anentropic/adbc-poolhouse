@@ -3,13 +3,24 @@ title: Phase 34 Async Metadata — Code Review
 phase: 34-async-metadata
 depth: standard
 files_reviewed: 6
-status: issues_found
+status: resolved
 findings:
   blocker: 1
   warning: 2
   info: 2
   total: 5
+resolution: All 5 findings fixed in commit 5cf854a (CR-01 via poison_on_cancel=False on the metadata reader + regression test; WR-01/WR-02/IN-01/IN-02 addressed). Gates re-run green.
 ---
+
+> **RESOLVED (commit `5cf854a`).** CR-01 fixed by adding `poison_on_cancel` to
+> `AsyncRecordBatchReader` (default `True` = cursor path unchanged); the three
+> streaming metadata methods build it `poison_on_cancel=False`, so a cancelled
+> pull re-raises without a concurrent `invalidate`. `test_meta_cancel.py` guards
+> the regression (deterministic stub cancel, `invalidate` not called, x20 loop);
+> `test_reader_cancel.py` confirms the cursor path is unregressed. WR-01 (docstring),
+> WR-02 (filter-forwarding + wiring tests), IN-01 (docs list), IN-02 (cursor leak)
+> all fixed. Full async suite 235 passed/4 skipped; basedpyright 0 errors;
+> `mkdocs --strict` exit 0.
 
 # Phase 34: Code Review Report
 
