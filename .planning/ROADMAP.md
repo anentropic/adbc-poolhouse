@@ -18,7 +18,7 @@
 - [x] **Phase 30: Async Bulk Write** — `await cursor.adbc_ingest(table, data, mode=...)`, single whole-op offload, typed `Literal` mode, `on_abort=invalidate` on cancel (2/2 plans) — completed 2026-07-01
 - [x] **Phase 31: DataFrame Convenience** — `await cursor.fetch_df()` / `await cursor.fetch_polars()`, single-offload wrappers returning self-owning frames; pandas/polars user-supplied
 - [x] **Phase 32: P2 Edge Hardening** — remaining deferred P2 edge cases (contextvars, trio-checkpoint, timeout precision, loop-shutdown) extended across the new streaming/ingest/DataFrame paths; all six EDGE requirements green x20 on macOS + Linux CI, test-only (zero production change) — completed 2026-07-02
-- [ ] **Phase 33: Documentation** — streaming guide, ingest mode table + replace warning, DataFrame user-supplied note, API reference for the new symbols, `mkdocs build --strict` gate, humanizer pass
+- [x] **Phase 33: Documentation** — streaming guide, ingest mode table + replace warning, DataFrame user-supplied note, API reference for the new symbols, `mkdocs build --strict` gate, humanizer pass
 
 <details>
 <summary>✅ v1.4.0 Async API (Phases 22-28) — SHIPPED 2026-07-01</summary>
@@ -198,7 +198,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 33-02-PLAN.md — API-reference render-fidelity audit + strict-build completion gate (DOCS-04, DOCS-02 reference half)
+- [x] 33-02-PLAN.md — API-reference render-fidelity audit + strict-build completion gate (DOCS-04, DOCS-02 reference half) — completed 2026-07-04
 
 **UI hint**: no
 
@@ -213,7 +213,7 @@ Phases execute in numeric order: 29 → 30 → 31 → 32 → 33
 | 30. Async Bulk Write | v1.5.0 | 2/2 | Complete    | 2026-07-01 |
 | 31. DataFrame Convenience | v1.5.0 | 2/2 | Complete    | 2026-07-02 |
 | 32. P2 Edge Hardening | v1.5.0 | 3/3 | Complete    | 2026-07-02 |
-| 33. Documentation | v1.5.0 | 1/2 | In progress | - |
+| 33. Documentation | v1.5.0 | 2/2 | Complete    | 2026-07-04 |
 | 22-28. Async API | v1.4.0 | 29/29 | Complete | 2026-07-01 |
 | 21.1. ADBC dispatch URI-positional fix | v1.3.0 | 3/3 | Complete | 2026-05-20 |
 | 21. Quack Backend | v1.3.0 | 3/3 | Complete | 2026-05-19 |

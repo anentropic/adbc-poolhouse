@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.5.0
 milestone_name: Async Cursor Completion
 status: executing
-stopped_at: "Completed 33-01-PLAN.md (Wave 1 of Phase 33). Audit + reconcile + humanize pass over the consumer-facing async prose. Task 1: fixed the index.md line-71 contradiction — DataFrame fetches (shipped Phase 31) are no longer listed as unavailable; only async ADBC metadata + async prepared statements are named as not-yet-shipped; the literal 'not available' string is gone (60a0569). Task 2: audited the three async.md DOCS sections (streaming / adbc_ingest / DataFrame) against 33-RESEARCH — all facts present and accurate (4-mode table, 'replace drops the table' warning unsoftened, native ModuleNotFoundError note, reader-lifetime + ArrowInvalid contract, honest concurrency framing), em-dashes already within the one-per-paragraph cap, no AI-writing tells — no content edit required (Pitfall 1: do not re-author correct prose), so no commit. Task 3: humanized the index.md availability paragraph — dropped the vague 'several features (...)' quantifier and rule-of-three, naming the two deferred surfaces directly to match async.md's experimental block (7a43e2c). `.venv/bin/mkdocs build --strict` exits 0 after every edit. DOCS-01 and DOCS-03 fully complete; DOCS-02 guide half done (reference half is 33-02); DOCS-04 is 33-02."
-last_updated: "2026-07-04T01:45:00.000Z"
-last_activity: 2026-07-04 -- Completed 33-01 (async prose reconcile + humanize); 33-02 remains
+stopped_at: "Completed 33-02-PLAN.md (Wave 2 of Phase 33) — Phase 33 CLOSED. API-reference render-fidelity audit + strict-build completion gate (DOCS-04 and the DOCS-02 reference half). Both tasks were verify-only: research predicted the docstrings + gen_ref_pages.py injection block were already complete, and the render audit confirmed it — no docstring edits needed, no source commits (the plan's blessed 'render verified, no edits' outcome). Task 1: built the site with `.venv/bin/mkdocs build --strict` (exit 0) and audited site/reference/adbc_poolhouse/index.html — AsyncRecordBatchReader + all four new AsyncCursor methods (fetch_record_batch, adbc_ingest, fetch_df, fetch_polars) render with Google-style Parameters/Returns/Raises tables (17 Parameters, 28 Returns, 21 Raises section titles) + 31 Example blocks; the adbc_ingest reference carries all four mode Literal values (create/append/replace/create_append) and the destructive 'replace drops' warning; ModuleNotFoundError + ConnectionBusyError render on the DataFrame/stream methods. Task 2: final phase gate — strict build exit 0, `grep 'not available' docs/src/index.md` empty (33-01 invariant holds), async.md still carries the replace-drops warning + ModuleNotFoundError note. DOCS-01..04 all complete; the async docs milestone is documentation-complete. Version bump + changelog remain explicitly OUT OF SCOPE (deferred to a separate release step)."
+last_updated: "2026-07-04T02:05:00.000Z"
+last_activity: 2026-07-04 -- Completed 33-02 (API-reference render audit + strict-build gate); Phase 33 complete
 progress:
   total_phases: 5
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 13
-  completed_plans: 12
-  percent: 80
+  completed_plans: 13
+  percent: 100
 ---
 
 # Project State
@@ -25,12 +25,12 @@ See: .planning/PROJECT.md (updated 2026-07-01)
 
 ## Current Position
 
-Phase: 33 (documentation) — EXECUTING
-Plan: 2 of 2 (33-01 complete; 33-02 next)
-Status: Executing Phase 33
-Last activity: 2026-07-04 -- Completed 33-01 (async prose reconcile + humanize)
+Phase: 33 (documentation) — COMPLETE
+Plan: 2 of 2 (33-01 and 33-02 both complete)
+Status: Phase 33 complete — all v1.5.0 requirements satisfied (release step: version bump + changelog, remains)
+Last activity: 2026-07-04 -- Completed 33-02 (API-reference render audit + strict-build gate)
 
-Progress: [████████████████░░░░] 80% (4 of 5 phases complete: 29, 30, 31, 32)
+Progress: [████████████████████] 100% (5 of 5 phases complete: 29, 30, 31, 32, 33)
 
 ## Accumulated Context
 
@@ -88,6 +88,6 @@ Pre-v1.4.0 tracking cruft plus one non-functional docstring; run `/gsd-cleanup` 
 
 ## Session Continuity
 
-Last session: 2026-07-04T01:45:00Z
-Stopped at: Completed 33-01-PLAN.md — reconciled + humanized the async guide/index prose and fixed the index.md DataFrame-availability contradiction (DOCS-01/03 complete; DOCS-02 guide half done). Previously: Completed 32-03-PLAN.md — Phase 32 CLOSED. Wave-2 gate plan: proved the four Wave 1 modules hold together in the full async suite under `ADBC_ASYNC_REPEAT=20` on macOS (2702 passed, 0 hangs, no cross-test interaction, no regression) and — authoritatively — on Linux CI (run 28622475955, Python 3.11 + 3.14, 0 hangs), closing the platform-dependent lost-wakeup gate for EDGE-24/31/32. Task 2 blocking human-verify checkpoint APPROVED (contingency confirmed NOT fired; both Wave 1 SUMMARYs state zero production change). Import-lint (PKG-03) + basedpyright-strict + `mkdocs --strict` (exit 0) all green. Task 3 docs gate ran in reduced test-only form: no RST roles in the new modules, no new public symbol, no guide edit — no file change, no commit (the passing strict build IS the gate). All six EDGE requirements (08/13/14/24/31/32) complete; zero production change across the whole phase (the new-method offloads share the already-proven `cancellable_offload`/`offload` chokepoint).
-Next step: Execute 33-02-PLAN.md (Wave 2) — API-reference render-fidelity audit + strict-build completion gate (DOCS-04 and the DOCS-02 reference half): build the site, confirm `AsyncRecordBatchReader` + the four new `AsyncCursor` methods render with Args/Returns/Raises/Example, confirm the `adbc_ingest` docstring renders the mode table + `replace`-drops warning, and close out `.venv/bin/mkdocs build --strict` as the phase gate. Guide-side prose (DOCS-01/02/03) is done as of 33-01.
+Last session: 2026-07-04T02:05:00Z
+Stopped at: Completed 33-02-PLAN.md — Phase 33 CLOSED. API-reference render-fidelity audit + strict-build completion gate. Both tasks verify-only (docstrings + gen_ref_pages.py injection already complete; render confirmed AsyncRecordBatchReader + the four AsyncCursor methods with Parameters/Returns/Raises tables + Example blocks, the adbc_ingest mode table + replace-drops warning, ModuleNotFoundError/ConnectionBusyError) — no docstring edits, no source commits. `.venv/bin/mkdocs build --strict` exit 0 as the phase's single automated gate; index.md 'not available' invariant from 33-01 holds. DOCS-01..04 all complete. Previously: Completed 33-01-PLAN.md — reconciled + humanized the async guide/index prose and fixed the index.md DataFrame-availability contradiction (DOCS-01/03 complete; DOCS-02 guide half done). Previously: Completed 32-03-PLAN.md — Phase 32 CLOSED. Wave-2 gate plan: proved the four Wave 1 modules hold together in the full async suite under `ADBC_ASYNC_REPEAT=20` on macOS (2702 passed, 0 hangs, no cross-test interaction, no regression) and — authoritatively — on Linux CI (run 28622475955, Python 3.11 + 3.14, 0 hangs), closing the platform-dependent lost-wakeup gate for EDGE-24/31/32. Task 2 blocking human-verify checkpoint APPROVED (contingency confirmed NOT fired; both Wave 1 SUMMARYs state zero production change). Import-lint (PKG-03) + basedpyright-strict + `mkdocs --strict` (exit 0) all green. Task 3 docs gate ran in reduced test-only form: no RST roles in the new modules, no new public symbol, no guide edit — no file change, no commit (the passing strict build IS the gate). All six EDGE requirements (08/13/14/24/31/32) complete; zero production change across the whole phase (the new-method offloads share the already-proven `cancellable_offload`/`offload` chokepoint).
+Next step: Phase 33 and all v1.5.0 documentation requirements (DOCS-01..04) are complete. The remaining v1.5.0 milestone work is the deferred release step — bump `pyproject.toml` to 1.5.0 and add the `[1.5.0]` changelog entry — which was held out of the docs scope by user decision (33-RESEARCH Open Question 1). Run `/gsd-*` milestone-close / release flow when ready.
