@@ -191,10 +191,15 @@ Plans:
   3. `fetch_df` / `fetch_polars` are documented, noting pandas/polars are user-supplied (install-it-yourself) and that a missing dep surfaces a native `ModuleNotFoundError` (DOCS-03)
   4. The API reference renders `AsyncRecordBatchReader` and the four new `AsyncCursor` methods with Google-style docstrings (Args/Returns/Raises + Example); `mkdocs build --strict` passes; a humanizer pass is applied to all new or substantially rewritten prose (DOCS-04)
 
-**Plans**: 2 plans
-Plans:
+**Plans**: 2 plansPlans:
+**Wave 1**
+
 - [ ] 33-01-PLAN.md — Reconcile + humanize async guide/index prose (DOCS-01/02/03; fix index.md DataFrame-availability contradiction)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 33-02-PLAN.md — API-reference render-fidelity audit + strict-build completion gate (DOCS-04, DOCS-02 reference half)
+
 **UI hint**: no
 
 ## Progress

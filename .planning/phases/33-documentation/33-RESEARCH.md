@@ -252,7 +252,7 @@ the strict build as the gate.
 | A2 | The injected "ProperDocs" build warning is cosmetic and not a `--strict` failure | Strict Build Gate | Low — verified build reports success this session; if CI treats stderr as failure, set `DISABLE_MKDOCS_2_WARNING=true` |
 | A3 | No `33-CONTEXT.md` means no additional user-locked constraints beyond CLAUDE.md/REQUIREMENTS | User Constraints | Low — if a CONTEXT is added later, re-read it before planning |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Is the changelog + version bump in scope for Phase 33?**
    - What we know: DOCS-01..04 do not mention the changelog; the changelog is stale at 1.4.0 and
@@ -261,12 +261,16 @@ the strict build as the gate.
    - Recommendation: Include a changelog `[1.5.0]` (or `[Unreleased]`) entry summarizing STREAM/INGEST/DF
      as a low-cost consolidation win; leave the actual `pyproject` version bump + tag to the release step
      unless the planner confirms Phase 33 owns the release. Flag explicitly in the plan.
+   - **RESOLVED (2026-07-04, user decision): OUT OF SCOPE.** Phase 33 is docs-only (DOCS-01..04). No
+     changelog entry and no `pyproject.toml` version bump — both deferred to a separate release step.
 
 2. **Does the `index.md` async code example need updating beyond the "not available" line?**
    - What we know: The example uses `fetch_arrow_table`, which is fine. Only the availability sentence is
      wrong.
    - Recommendation: Minimal edit — correct the availability list; optionally add a one-line pointer to
      the new streaming/ingest/DataFrame sections. Keep the quickstart short.
+   - **RESOLVED (planned): minimal edit only.** Plan 33-01 Task 1 scopes the change to correcting the
+     availability sentence; the code example is left unchanged.
 
 ## Environment Availability
 
