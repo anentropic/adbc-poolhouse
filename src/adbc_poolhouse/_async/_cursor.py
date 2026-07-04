@@ -91,6 +91,8 @@ class _SyncCursor(Protocol):
         db_schema_name: str | None = ...,
         temporary: bool = ...,
     ) -> int: ...
+    def adbc_prepare(self, operation: bytes | str, /) -> object: ...
+    def adbc_execute_schema(self, operation: str, parameters: object = ..., /) -> object: ...
     def adbc_cancel(self) -> None: ...
     def close(self) -> None: ...
 
@@ -561,6 +563,129 @@ class AsyncCursor:
                 ),
                 limiter=self._limiter,
                 on_abort=self._owner.invalidate,  # poison recovery on a real abort (D-25-03)
+            )
+
+    async def adbc_prepare(self, operation: bytes | str) -> pyarrow.Schema | None:
+        """
+        Prepare a statement without executing it, on a worker thread.
+
+        Offloads the dbapi `adbc_prepare` through the pool limiter while holding the
+        parent connection's `_in_use` guard, so a concurrent call on the same
+        connection is rejected with `ConnectionBusyError` (EDGE-15). The query is
+        prepared but NOT executed --- no rows are read and no data is written.
+
+        Returns the schema of the query's BIND PARAMETERS, or `None` when the driver
+        cannot determine it. Poolhouse forwards the driver's value unchanged; treat a
+        `None` result as "the backend does not report a parameter schema", not an
+        error.
+
+        If the surrounding scope is cancelled or times out while the prepare is in
+        flight, the in-flight C call is aborted with `cursor.adbc_cancel` and the
+        cancellation is re-raised. Because a prepare writes no state, the connection
+        is NOT invalidated --- it is cancellable but non-poisoning, returning clean to
+        the pool (D-35-04). This is the deliberate difference from `execute`, which
+        invalidates on abort.
+
+        Args:
+            operation: The SQL text to prepare. Passed to the driver verbatim;
+                poolhouse constructs no SQL and adds no sanitization.
+
+        Returns:
+            The `pyarrow.Schema` describing the query's bind parameters, or `None`
+            when the driver cannot determine a parameter schema.
+
+        Raises:
+            ConnectionBusyError: If another offloaded call on the owning connection
+                is already in flight.
+
+        Example:
+            ```python
+            async with await pool.connect() as conn:
+                cursor = conn.cursor()
+                schema = await cursor.adbc_prepare("SELECT * FROM t WHERE id = ?")
+                # `schema` describes the `?` bind parameters (or is None).
+            ```
+        """
+        with self._owner._offloading():  # noqa: SLF001
+            # `_SyncCursor.adbc_prepare` is typed `-> object` to keep the Protocol
+            # driver-agnostic (D-35-05); cast back to the public return type. No
+            # runtime effect --- the driver returns the pyarrow.Schema (or None).
+            return cast(
+                "pyarrow.Schema | None",
+                await cancellable_offload(
+                    self._adbc_cancel,
+                    self._cursor.adbc_prepare,
+                    operation,
+                    limiter=self._limiter,
+                    # on_abort OMITTED (D-35-04): cancellable but non-poisoning ---
+                    # a prepare writes no state, so an aborted call leaves the
+                    # connection clean; do NOT invalidate (unlike execute).
+                ),
+            )
+
+    async def adbc_execute_schema(
+        self, operation: str, parameters: object = None
+    ) -> pyarrow.Schema:
+        """
+        Get a query's result-set schema without executing it, on a worker thread.
+
+        Offloads the dbapi `adbc_execute_schema` through the pool limiter while
+        holding the parent connection's `_in_use` guard, so a concurrent call on the
+        same connection is rejected with `ConnectionBusyError` (EDGE-15). The query is
+        planned but NOT run --- no rows are fetched and no side effects occur; only the
+        result-set schema is returned.
+
+        If the surrounding scope is cancelled or times out while the call is in
+        flight, the in-flight C call is aborted with `cursor.adbc_cancel` and the
+        cancellation is re-raised. Because the query never executes, the connection is
+        NOT invalidated --- it is cancellable but non-poisoning, returning clean to the
+        pool (D-35-04).
+
+        An unsupported backend surfaces the driver's native error unchanged: poolhouse
+        does not catch, wrap, or `find_spec`-pre-check it (D-35-06). DuckDB, for
+        example, does not implement result-schema introspection and raises
+        `NotSupportedError` straight through the single offload chokepoint (EDGE-17).
+
+        Args:
+            operation: The SQL text whose result schema to resolve. Passed to the
+                driver verbatim; poolhouse constructs no SQL and adds no sanitization.
+            parameters: Optional bound parameters, forwarded to the dbapi cursor.
+
+        Returns:
+            The `pyarrow.Schema` describing the query's result set, resolved without
+            executing the query.
+
+        Raises:
+            ConnectionBusyError: If another offloaded call on the owning connection
+                is already in flight.
+            NotSupportedError: If the driver does not implement result-schema
+                introspection (e.g. DuckDB). Raised by the driver in the worker and
+                propagated unchanged through the offload chokepoint (EDGE-17).
+
+        Example:
+            ```python
+            async with await pool.connect() as conn:
+                cursor = conn.cursor()
+                schema = await cursor.adbc_execute_schema("SELECT id, name FROM t")
+                # `schema` is the result-set schema; the query never ran.
+            ```
+        """
+        with self._owner._offloading():  # noqa: SLF001
+            # `_SyncCursor.adbc_execute_schema` is typed `-> object` to keep the
+            # Protocol driver-agnostic (D-35-05); cast back to the public return type.
+            # No runtime effect --- the driver returns the pyarrow.Schema itself.
+            return cast(
+                "pyarrow.Schema",
+                await cancellable_offload(
+                    self._adbc_cancel,
+                    self._cursor.adbc_execute_schema,
+                    operation,
+                    parameters,
+                    limiter=self._limiter,
+                    # on_abort OMITTED (D-35-04): cancellable but non-poisoning ---
+                    # the query never executes, so an aborted call leaves the
+                    # connection clean; do NOT invalidate (unlike execute).
+                ),
             )
 
     async def fetch_record_batch(self) -> AsyncRecordBatchReader:
