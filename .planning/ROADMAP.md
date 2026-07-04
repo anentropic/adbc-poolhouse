@@ -206,13 +206,13 @@ Plans:
 
 ### Phase 34: Async Metadata
 
-**Goal**: The six ADBC connection-level metadata methods (`adbc_get_info`, `adbc_get_objects`, `adbc_get_table_schema`, `adbc_get_table_types`, `adbc_get_statistics`, `adbc_get_statistic_names`) are available on the async connection as pure offload wrappers over the wrapped sync `dbapi.Connection`, routed through the existing v1.4.0 `offload`/`cancellable_offload` chokepoint and per-pool `CapacityLimiter`. Behavior mirrors the underlying sync method — Arrow-returning metadata surfaces its native reader/schema — with no invented async-specific error types and no `find_spec` pre-checks. Closes the async/sync parity gap for metadata introspection named in the v1.5.0 docs caveat.
+**Goal**: The six ADBC connection-level metadata methods (`adbc_get_info`, `adbc_get_objects`, `adbc_get_table_schema`, `adbc_get_table_types`, `adbc_get_statistics`, `adbc_get_statistic_names`) are available on the async connection as pure offload wrappers over the wrapped sync `dbapi.Connection`, routed through the existing v1.4.0 `offload`/`cancellable_offload` chokepoint and per-pool `CapacityLimiter`. Behavior mirrors the underlying sync method — the three Arrow-streaming methods (`adbc_get_objects`, `adbc_get_statistics`, `adbc_get_statistic_names`) surface their native `RecordBatchReader` without eager materialization, while `adbc_get_info` returns a dict, `adbc_get_table_schema` a `pyarrow.Schema`, and `adbc_get_table_types` a list — with no invented async-specific error types and no `find_spec` pre-checks. Closes the async/sync parity gap for metadata introspection named in the v1.5.0 docs caveat.
 **Depends on**: Phase 33
 **Requirements**: META-01, META-02, META-03, META-04
 **Success Criteria** (what must be TRUE):
 
   1. All six `adbc_get_*` methods are awaitable on the async connection, each offloading its sync counterpart through the established chokepoint (META-01)
-  2. Return types mirror the sync methods; Arrow-returning metadata (`adbc_get_objects`, `adbc_get_info`, `adbc_get_statistics`) surfaces its native reader without eager materialization; no async-specific error types invented (META-02)
+  2. Return types mirror the sync methods; the three Arrow-streaming methods (`adbc_get_objects`, `adbc_get_statistics`, `adbc_get_statistic_names`) surface their native `RecordBatchReader` without eager materialization, while `adbc_get_info`/`adbc_get_table_schema`/`adbc_get_table_types` return dict/`Schema`/list respectively; no async-specific error types invented (META-02)
   3. A backend that does not implement a metadata method surfaces the driver's native error unchanged (META-03)
   4. The async guide + API reference document the async metadata methods and the v1.5.0 caveat shrinks accordingly; `mkdocs build --strict` passes; humanizer pass applied (META-04)
 
