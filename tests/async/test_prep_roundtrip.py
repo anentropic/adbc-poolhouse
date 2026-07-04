@@ -21,15 +21,6 @@ real driver leg.
 
 from __future__ import annotations
 
-# Wave-0 RED scaffolding: `AsyncCursor.adbc_prepare` does not exist until Plan 35-02
-# lands, so every reference to it is statically "unknown". These pragmas suppress
-# ONLY the errors that are a direct consequence of that not-yet-existing method;
-# delete them once the production method lands and the file type-checks cleanly
-# under the strict whole-project gate (PKG-01). Matches the Phase 30 RED precedent
-# (`test_ingest_roundtrip.py`).
-# pyright: reportAttributeAccessIssue=false
-# pyright: reportUnknownMemberType=false
-# pyright: reportUnknownVariableType=false
 from typing import TYPE_CHECKING
 
 import pyarrow
