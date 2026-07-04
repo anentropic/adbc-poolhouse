@@ -217,10 +217,17 @@ Plans:
   4. The async guide + API reference document the async metadata methods and the v1.5.0 caveat shrinks accordingly; `mkdocs build --strict` passes; humanizer pass applied (META-04)
 
 **Plans**: 3 plans
-
 Plans:
+**Wave 1**
+
 - [ ] 34-01-PLAN.md — Wave-0 RED test scaffolding: signature, value round-trip, streaming, unsupported (META-01/02/03)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 34-02-PLAN.md — Implementation: `_SyncConnection` Protocol, `_noop_cancel`, and the six `adbc_get_*` methods with docstrings (META-01/02/03)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
 - [ ] 34-03-PLAN.md — Docs: shrink the async caveat, add the Connection metadata how-to, API-reference render + strict-build gate (META-04)
 
 **UI hint**: no

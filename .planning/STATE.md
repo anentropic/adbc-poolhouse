@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v1.5.0
 milestone_name: Async Cursor Completion
-status: ready-to-plan
-stopped_at: "Phase 33 (Documentation) COMPLETE — verification passed, UAT passed. DOCS-01..04 all satisfied; strict build green; humanizer pass applied. UAT read-through surfaced one accuracy nit (front-page async note called the API 'experimental and incomplete') — fixed inline (commit 0a65d00): dropped 'and incomplete', kept the precise 'async ADBC metadata and prepared statements have not shipped yet' caveat. That read-through also triggered a scope decision: async metadata + prepared statements (available on the sync raw-cursor path but never wrapped for async) are now IN SCOPE for v1.5.0 as Phases 34 + 35 to finish async/sync parity. Partitioned result sets deferred (niche Flight-SQL-only). Next: plan Phase 34 (Async Metadata)."
-last_updated: "2026-07-04T13:00:00.000Z"
-last_activity: 2026-07-04 -- Phase 33 complete (verification + UAT passed); v1.5.0 extended with Phases 34 (Async Metadata) + 35 (Async Prepared Statements)
+status: ready-to-execute
+stopped_at: "Phase 34 (Async Metadata) PLANNED — 3 plans in 3 sequential waves, all passed the plan-checker (one trivial RESEARCH-marker blocker fixed on re-verify). 34-01: Wave-0 RED test scaffolding (test_meta_signature/roundtrip/stream/unsupported) covering META-01/02/03. 34-02: implementation — `_SyncConnection` Protocol + `_noop_cancel` + the six `adbc_get_*` methods with Google-style docstrings (META-01/02/03). 34-03: docs — shrink the async caveat, add the Connection-metadata how-to, API-reference render + strict-build gate (META-04). Locked decisions from `/gsd-discuss-phase 34 --assumptions` (no CONTEXT.md — assumptions mode): streaming trio (get_objects/get_statistics/get_statistic_names) wrapped in AsyncRecordBatchReader (option a, no eager materialization); plain non-cancellable `offload` mirroring commit/rollback with a `_noop_cancel` for the reader (connection has no adbc_cancel); fairy-cast access via a `_SyncConnection` Protocol; corrected return types (get_info→dict, get_table_schema→Schema, get_table_types→list); two-tier `_offloading()` guard with `_reader_open` set after the span on success only; no new error types / no find_spec. REQUIREMENTS.md META-02 + ROADMAP corrected to match real ADBC return types before planning. Next: execute Phase 34."
+last_updated: "2026-07-04T16:15:01.000Z"
+last_activity: 2026-07-04 -- Phase 34 (Async Metadata) planned; 3 plans in 3 waves, plan-checker passed
 progress:
   total_phases: 7
   completed_phases: 5
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-01)
 
 **Core value:** One config in, one pool out — `create_pool(SnowflakeConfig(...))` returns a ready-to-use SQLAlchemy QueuePool in a single call.
-**Current focus:** Phase 34 — async metadata (next; not yet planned)
+**Current focus:** Phase 34 — async metadata (planned; ready to execute)
 
 ## Current Position
 
-Phase: 33 (documentation) — COMPLETE (verification + UAT passed 2026-07-04)
-Next: Phase 34 (async metadata) — Pending, needs discuss/plan
+Phase: 34 (async metadata) — PLANNED (3 plans in 3 waves; plan-checker passed 2026-07-04)
+Next: Execute Phase 34 (`/gsd-execute-phase 34`), then Phase 35 (Async Prepared Statements, PREP-01..03)
 Status: v1.5.0 extended to complete async/sync parity — Phase 34 (Async Metadata, META-01..04) then Phase 35 (Async Prepared Statements, PREP-01..03). Partitions deferred. Release step (version bump + changelog) still remains after 35.
-Last activity: 2026-07-04 -- Phase 33 complete; roadmap extended with Phases 34 + 35
+Last activity: 2026-07-04 -- Phase 34 (Async Metadata) planned; 3 plans in 3 waves, plan-checker passed
 
 Progress: [██████████████░░░░░░] 71% (5 of 7 phases complete: 29, 30, 31, 32, 33; next: 34, 35)
 
