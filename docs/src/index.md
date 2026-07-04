@@ -68,7 +68,7 @@ close_pool(pool)
 
 For asyncio or trio code, [`create_async_pool`][adbc_poolhouse.create_async_pool], [`managed_async_pool`][adbc_poolhouse.managed_async_pool], and [`close_async_pool`][adbc_poolhouse.close_async_pool] mirror the sync entry points and run each blocking ADBC call on a worker thread. Install the `[async]` extra (`pip install adbc-poolhouse[async]`) and see the [async pool guide](guides/async.md).
 
-The async API is experimental and incomplete. Its surface may change between minor releases, and async ADBC metadata and prepared statements have not shipped yet. See the [async pool guide](guides/async.md) for the full caveat.
+The async API is experimental. Its surface may change between minor releases, and async ADBC metadata and prepared statements have not shipped yet. See the [async pool guide](guides/async.md) for the full caveat.
 
 ```python
 import anyio
