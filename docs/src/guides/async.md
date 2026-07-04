@@ -357,19 +357,27 @@ returns the result-set schema, so you can read the columns a query would produce
 fetch any rows.
 
 ```python
+from adbc_driver_manager import NotSupportedError
+
 from adbc_poolhouse import DuckDBConfig, managed_async_pool
 
 async with managed_async_pool(DuckDBConfig(database="/tmp/warehouse.db")) as pool:
     async with await pool.connect() as conn:
         cursor = conn.cursor()
+        await cursor.execute("CREATE TABLE IF NOT EXISTS t (id INTEGER, name TEXT)")
 
-        # Prepare once, then run the prepared operation with bound parameters.
+        # adbc_prepare reports the bind-parameter schema. It does not pre-stage the
+        # execute below — execute prepares its own statement independently.
         param_schema = await cursor.adbc_prepare("SELECT * FROM t WHERE id = ?")
         await cursor.execute("SELECT * FROM t WHERE id = ?", [1])
         rows = await cursor.fetch_arrow_table()
 
-        # Resolve the result columns without executing the query.
-        result_schema = await cursor.adbc_execute_schema("SELECT id, name FROM t")
+        # Resolve the result columns without executing the query. Not every backend
+        # implements it — DuckDB raises the driver's native NotSupportedError.
+        try:
+            result_schema = await cursor.adbc_execute_schema("SELECT id, name FROM t")
+        except NotSupportedError:
+            result_schema = None  # backend has no result-schema introspection
 ```
 
 `adbc_prepare` returns a `pyarrow.Schema` for the bind parameters, or `None` when the driver
@@ -383,8 +391,11 @@ query itself. Not every backend implements it: DuckDB raises the driver's native
 
 Both calls are cooperatively cancellable but non-poisoning. A surrounding `fail_after` or
 `move_on_after` aborts the in-flight call through the cursor's `adbc_cancel`, and because
-neither method writes state, the connection returns to the pool clean. There is no invalidate,
-unlike a cancelled `execute` or `fetch_arrow_table`.
+neither method writes table data, the connection returns to the pool without an invalidate,
+unlike a cancelled `execute` or `fetch_arrow_table`. This assumes the driver leaves no
+lingering session state after a cancelled prepare — which holds for DuckDB. A backend whose
+cancel aborts the surrounding transaction (PostgreSQL, for one) may hand back a connection
+that needs a rollback; validate that behavior before relying on it on such a driver.
 
 ### See also
 

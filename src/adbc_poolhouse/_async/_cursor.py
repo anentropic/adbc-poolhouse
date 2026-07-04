@@ -92,7 +92,9 @@ class _SyncCursor(Protocol):
         temporary: bool = ...,
     ) -> int: ...
     def adbc_prepare(self, operation: bytes | str, /) -> object: ...
-    def adbc_execute_schema(self, operation: str, parameters: object = ..., /) -> object: ...
+    def adbc_execute_schema(
+        self, operation: bytes | str, parameters: object = ..., /
+    ) -> object: ...
     def adbc_cancel(self) -> None: ...
     def close(self) -> None: ...
 
@@ -581,10 +583,13 @@ class AsyncCursor:
 
         If the surrounding scope is cancelled or times out while the prepare is in
         flight, the in-flight C call is aborted with `cursor.adbc_cancel` and the
-        cancellation is re-raised. Because a prepare writes no state, the connection
-        is NOT invalidated --- it is cancellable but non-poisoning, returning clean to
-        the pool (D-35-04). This is the deliberate difference from `execute`, which
-        invalidates on abort.
+        cancellation is re-raised. Because a prepare writes no table data, the
+        connection is NOT invalidated --- it is cancellable but non-poisoning, returning
+        clean to the pool (D-35-04). This is the deliberate difference from `execute`,
+        which invalidates on abort. The non-poisoning guarantee assumes the driver
+        leaves no lingering session state after a cancelled prepare (true for DuckDB); a
+        backend whose cancel aborts the surrounding transaction may need the connection
+        rolled back before reuse.
 
         Args:
             operation: The SQL text to prepare. Passed to the driver verbatim;
@@ -624,7 +629,7 @@ class AsyncCursor:
             )
 
     async def adbc_execute_schema(
-        self, operation: str, parameters: object = None
+        self, operation: bytes | str, parameters: object = None
     ) -> pyarrow.Schema:
         """
         Get a query's result-set schema without executing it, on a worker thread.
@@ -639,7 +644,9 @@ class AsyncCursor:
         flight, the in-flight C call is aborted with `cursor.adbc_cancel` and the
         cancellation is re-raised. Because the query never executes, the connection is
         NOT invalidated --- it is cancellable but non-poisoning, returning clean to the
-        pool (D-35-04).
+        pool (D-35-04). As with `adbc_prepare`, this assumes the driver leaves no
+        lingering session state after a cancelled call (true for DuckDB); a backend
+        whose cancel aborts the surrounding transaction may need a rollback before reuse.
 
         An unsupported backend surfaces the driver's native error unchanged: poolhouse
         does not catch, wrap, or `find_spec`-pre-check it (D-35-06). DuckDB, for
