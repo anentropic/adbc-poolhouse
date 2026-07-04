@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v1.5.0
 milestone_name: Async Cursor Completion
-status: executing
-stopped_at: "Completed 34-03-PLAN.md — docs (META-04), closing Phase 34. Edited docs/src/guides/async.md: removed the 'Async ADBC metadata' bullet from the Experimental caveat (kept the prepared-statements bullet — Phase 35 removes it), added connection metadata to the 'What you get today' paragraph, and added a new '## Connection metadata' how-to section covering the value trio (adbc_get_info/adbc_get_table_schema/adbc_get_table_types) plus the streaming adbc_get_objects (async with ... as reader), with the non-cancellable and reader-lifetime caveats and a See also cross-reference. Plain fenced python blocks (no !!! example box). Humanizer pass needed no prose changes (written clean by construction). API reference: the existing AsyncConnection mkdocstrings block auto-renders all six adbc_get_* methods (14-16 hits each) with Parameters/Returns/Raises + Example, 0 rogue RST roles — no gen_ref_pages.py change. Gate: DISABLE_MKDOCS_2_WARNING=true .venv/bin/mkdocs build --strict exits 0. Commit: 360bd84 (async.md; blacken-docs reformatted the code-block comments, re-staged). Phase 34 COMPLETE (META-01..04). Next: Phase 35 (Async Prepared Statements). Env note: blacken-docs pre-commit hook reformats python code fences; re-stage and re-commit (no --no-verify)."
-last_updated: "2026-07-04T18:00:00.000Z"
-last_activity: 2026-07-04 -- Completed 34-03-PLAN.md (async metadata docs, META-04; Phase 34 complete)
+status: completed
+stopped_at: "Phase 34 (Async Metadata) COMPLETE — verification passed 4/4 must-haves (META-01..04). Shipped the six adbc_get_* connection-metadata methods on AsyncConnection as offload wrappers over the sync dbapi.Connection (via the SQLAlchemy fairy + a _SyncConnection Protocol): value trio (get_info→dict, get_table_schema→pyarrow.Schema, get_table_types→list) as plain non-cancellable offload like commit/rollback; streaming trio (get_objects/get_statistics/get_statistic_names) wraps the native RecordBatchReader in AsyncRecordBatchReader with no eager materialization. Unsupported backends surface the driver's native NotSupportedError unchanged (DuckDB: the two statistics methods). Docs: async guide caveat shrunk (metadata bullet removed; prepared-statements bullet kept for Phase 35), Connection-metadata how-to added, API reference auto-renders all six; mkdocs --strict exit 0. Code review found + FIXED a real concurrency blocker (CR-34-01, commit 5cf854a): the streaming metadata readers reused the cursor reader's on_abort=invalidate with a no-op cancel, which would run fairy.invalidate() on a second thread against a connection whose worker was still blocked in read_next_batch (the concurrent single-connection access ADBC forbids) and drop a never-poisoned connection. Fix: poison_on_cancel flag on AsyncRecordBatchReader (default True = cursor path unchanged); metadata readers use poison_on_cancel=False so a cancelled pull re-raises without invalidate. Guarded by test_meta_cancel.py (deterministic stub, invalidate NOT called, x20 loop); test_reader_cancel.py confirms the cursor path is unregressed. Gates: full async suite 235 passed/4 skipped, basedpyright 0 errors on _async/, mkdocs --strict exit 0. Next: Phase 35 (Async Prepared Statements, PREP-01..03), then the v1.5.0 release step (version bump + changelog)."
+last_updated: "2026-07-04T18:05:00.000Z"
+last_activity: 2026-07-04 -- Phase 34 (Async Metadata) complete; code-review blocker CR-34-01 fixed + verified
 progress:
   total_phases: 7
   completed_phases: 6
@@ -21,15 +21,15 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-01)
 
 **Core value:** One config in, one pool out — `create_pool(SnowflakeConfig(...))` returns a ready-to-use SQLAlchemy QueuePool in a single call.
-**Current focus:** Phase 34 — Async Metadata
+**Current focus:** Phase 35 — Async Prepared Statements (Phase 34 complete)
 
 ## Current Position
 
-Phase: 34 (Async Metadata) — COMPLETE
-Plan: 3 of 3 (34-01, 34-02, 34-03 complete)
+Phase: 35
+Plan: Not started
 Next: Phase 35 (Async Prepared Statements) — plan the phase
 Status: Phase 34 complete (META-01..04); ready for Phase 35
-Last activity: 2026-07-04 -- Completed 34-03-PLAN.md (async metadata docs, META-04; Phase 34 complete)
+Last activity: 2026-07-04
 
 Progress: [█████████████████░░░] 86% (6 of 7 phases complete: 29, 30, 31, 32, 33, 34; Phase 35 remaining)
 

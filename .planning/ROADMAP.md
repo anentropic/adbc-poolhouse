@@ -19,7 +19,7 @@
 - [x] **Phase 31: DataFrame Convenience** — `await cursor.fetch_df()` / `await cursor.fetch_polars()`, single-offload wrappers returning self-owning frames; pandas/polars user-supplied
 - [x] **Phase 32: P2 Edge Hardening** — remaining deferred P2 edge cases (contextvars, trio-checkpoint, timeout precision, loop-shutdown) extended across the new streaming/ingest/DataFrame paths; all six EDGE requirements green x20 on macOS + Linux CI, test-only (zero production change) — completed 2026-07-02
 - [x] **Phase 33: Documentation** — streaming guide, ingest mode table + replace warning, DataFrame user-supplied note, API reference for the new symbols, `mkdocs build --strict` gate, humanizer pass — completed 2026-07-04
-- [ ] **Phase 34: Async Metadata** — the six `adbc_get_*` connection metadata methods as async offload wrappers over the sync `dbapi.Connection` (parity gap named in the docs caveat) — executed; code review found a blocker (CR-01), pending fix + verification
+- [x] **Phase 34: Async Metadata** — the six `adbc_get_*` connection metadata methods as async offload wrappers over the sync `dbapi.Connection`; streaming trio wrapped in `AsyncRecordBatchReader` (code review fixed CR-34-01: metadata readers are non-poisoning on cancel) — completed 2026-07-04
 - [ ] **Phase 35: Async Prepared Statements** — `adbc_prepare` + `adbc_execute_schema` as async offload wrappers over the sync `dbapi.Cursor` (second parity gap named in the docs caveat)
 
 <details>
@@ -258,7 +258,7 @@ Phases execute in numeric order: 29 → 30 → 31 → 32 → 33 → 34 → 35
 | 31. DataFrame Convenience | v1.5.0 | 2/2 | Complete    | 2026-07-02 |
 | 32. P2 Edge Hardening | v1.5.0 | 3/3 | Complete    | 2026-07-02 |
 | 33. Documentation | v1.5.0 | 2/2 | Complete    | 2026-07-04 |
-| 34. Async Metadata | v1.5.0 | 3/3 | Needs Review | - |
+| 34. Async Metadata | v1.5.0 | 3/3 | Complete    | 2026-07-04 |
 | 35. Async Prepared Statements | v1.5.0 | 0/TBD | Not started | - |
 | 22-28. Async API | v1.4.0 | 29/29 | Complete | 2026-07-01 |
 | 21.1. ADBC dispatch URI-positional fix | v1.3.0 | 3/3 | Complete | 2026-05-20 |
