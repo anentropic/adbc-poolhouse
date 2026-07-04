@@ -27,16 +27,6 @@ stays loop-safe under the `ADBC_ASYNC_REPEAT=20` wave-merge gate.
 
 from __future__ import annotations
 
-# Wave-0 RED scaffolding: `adbc_get_objects` on `AsyncConnection` does not exist
-# until plan 34-02 lands it, so every reference to it (and to the reader it
-# returns) is statically "unknown". These pragmas suppress ONLY the errors that
-# are a direct consequence of that not-yet-existing symbol; delete this block once
-# the production symbols land and the file type-checks cleanly under the strict
-# whole-project gate.
-# pyright: reportAttributeAccessIssue=false
-# pyright: reportUnknownVariableType=false
-# pyright: reportUnknownMemberType=false
-# pyright: reportUnknownArgumentType=false
 from typing import TYPE_CHECKING
 
 import pyarrow

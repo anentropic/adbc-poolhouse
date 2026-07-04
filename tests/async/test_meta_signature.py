@@ -25,15 +25,6 @@ yet, so the introspection below raises `AttributeError` and every test FAILS
 
 from __future__ import annotations
 
-# Wave-0 RED scaffolding: the six `adbc_get_*` methods on
-# `adbc_poolhouse._async._connection.AsyncConnection` do not exist until plan
-# 34-02 lands them, so every reference to them is statically "unknown". These
-# pragmas suppress ONLY the errors that are a direct consequence of those
-# not-yet-existing symbols; delete this block once the production symbols land and
-# the file type-checks cleanly under the strict whole-project gate.
-# pyright: reportAttributeAccessIssue=false
-# pyright: reportUnknownMemberType=false
-# pyright: reportUnknownArgumentType=false
 import inspect
 
 import pytest

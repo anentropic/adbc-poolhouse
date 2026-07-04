@@ -42,6 +42,7 @@ import anyio
 
 from adbc_poolhouse._async._cursor import AsyncCursor
 from adbc_poolhouse._async._offload import offload
+from adbc_poolhouse._async._reader import AsyncRecordBatchReader
 from adbc_poolhouse._exceptions import ConnectionBusyError
 
 if TYPE_CHECKING:
@@ -54,6 +55,19 @@ if TYPE_CHECKING:
     from sqlalchemy.pool import PoolProxiedConnection
 
     from adbc_poolhouse._async._cursor import _SyncCursor
+
+
+def _noop_cancel() -> None:
+    """
+    No-op cancel hook for connection-level metadata readers (no `adbc_cancel` exists).
+
+    A connection --- unlike a cursor --- exposes no `adbc_cancel`, so a metadata
+    reader has nothing to abort through. `AsyncRecordBatchReader` still requires a
+    4-argument cancel hook, so the streaming metadata methods thread this no-op in.
+    It is a module-level function (not a lambda) so it preserves the offload
+    `TypeVarTuple` arity and keeps the `scan_async_package` source guard clean,
+    mirroring `_pull` in `_reader.py`.
+    """
 
 
 class _SyncConnection(Protocol):
@@ -449,6 +463,213 @@ class AsyncConnection:
                 ),
                 limiter=self._limiter,
             )
+
+    async def adbc_get_objects(
+        self,
+        *,
+        depth: Literal["all", "catalogs", "db_schemas", "tables", "columns"] = "all",
+        catalog_filter: str | None = None,
+        db_schema_filter: str | None = None,
+        table_name_filter: str | None = None,
+        table_types_filter: list[str] | None = None,
+        column_name_filter: str | None = None,
+    ) -> AsyncRecordBatchReader:
+        """
+        Stream the catalog/schema/table hierarchy as an `AsyncRecordBatchReader`.
+
+        Offloads the sync `adbc_get_objects()` through the pool limiter to create the
+        native `pyarrow.RecordBatchReader`, then wraps it in an
+        `AsyncRecordBatchReader` whose every batch pull is itself offloaded --- the
+        result is never materialized to a `pyarrow.Table`. The filter arguments
+        forward through `functools.partial` so they reach the driver arity-checked.
+
+        Like `commit`, creating the reader is **not** cooperatively cancellable: a
+        surrounding timeout or cancellation cannot abort the in-flight metadata call,
+        which runs through the non-interruptible `offload`.
+
+        The returned reader is a live stream bound to this connection's C Arrow
+        stream, so it locks the connection for its WHOLE lifetime: a foreign op
+        (`commit`, a cursor, another metadata call) raises `ConnectionBusyError`
+        until the reader is closed (STREAM-06), and a read after the reader is closed
+        / the connection is checked in surfaces the driver's native
+        `pyarrow.lib.ArrowInvalid` (never a segfault). The `_reader_open` lifetime
+        lock is set AFTER the `_offloading()` span exits and ONLY on the success
+        path, so a failed creation leaves the connection usable.
+
+        The reader has no cancel of its own (the connection has no `adbc_cancel`), so
+        a cancelled per-batch pull cannot abort the C call; the shared reader still
+        invalidates the connection on a cancelled pull, so treat a cancelled stream
+        as leaving the connection detached from the pool.
+
+        Args:
+            depth: How deep to descend the hierarchy --- `"all"` (the default),
+                `"catalogs"`, `"db_schemas"`, `"tables"`, or `"columns"`. Forwarded
+                to the driver unchanged.
+            catalog_filter: Restrict to this catalog. Forwarded unchanged; `None`
+                (the default) leaves it unrestricted.
+            db_schema_filter: Restrict to this schema. Forwarded unchanged; `None`
+                (the default) leaves it unrestricted.
+            table_name_filter: Restrict to this table name. Forwarded unchanged;
+                `None` (the default) leaves it unrestricted.
+            table_types_filter: Restrict to these table types. Forwarded unchanged;
+                `None` (the default) leaves it unrestricted.
+            column_name_filter: Restrict to this column name. Forwarded unchanged;
+                `None` (the default) leaves it unrestricted.
+
+        Returns:
+            An `AsyncRecordBatchReader` streaming the object hierarchy, each pull
+            offloaded through the pool limiter.
+
+        Raises:
+            ConnectionBusyError: If another offloaded call on this connection is
+                already in flight.
+
+        Example:
+            ```python
+            async with await pool.connect() as conn:
+                async with await conn.adbc_get_objects(depth="tables") as reader:
+                    async for batch in reader:
+                        process(batch)  # a pyarrow.RecordBatch, each pull offloaded
+            ```
+        """
+        sync_conn = cast("_SyncConnection", self._fairy)
+        with self._offloading():
+            sync_reader = await offload(
+                functools.partial(
+                    sync_conn.adbc_get_objects,
+                    depth=depth,
+                    catalog_filter=catalog_filter,
+                    db_schema_filter=db_schema_filter,
+                    table_name_filter=table_name_filter,
+                    table_types_filter=table_types_filter,
+                    column_name_filter=column_name_filter,
+                ),
+                limiter=self._limiter,
+            )
+        # Lock the connection for the reader's WHOLE lifetime (D-29-08/09). Set AFTER
+        # the _offloading() span exits (it already cleared _in_use) and ONLY on the
+        # success path, so a cancelled/failed creation leaves _reader_open False and
+        # the connection usable (Pitfall 3).
+        self._reader_open = True
+        return AsyncRecordBatchReader(sync_reader, self._limiter, self, _noop_cancel)
+
+    async def adbc_get_statistics(
+        self,
+        *,
+        catalog_filter: str | None = None,
+        db_schema_filter: str | None = None,
+        table_name_filter: str | None = None,
+        approximate: bool = True,
+    ) -> AsyncRecordBatchReader:
+        """
+        Stream table statistics as an `AsyncRecordBatchReader`.
+
+        Offloads the sync `adbc_get_statistics()` through the pool limiter to create
+        the native `pyarrow.RecordBatchReader`, then wraps it in an
+        `AsyncRecordBatchReader` whose every batch pull is itself offloaded --- never
+        materialized. The filter arguments forward through `functools.partial`. A
+        backend that does not implement statistics (for example DuckDB) surfaces the
+        driver's native `NotSupportedError` unchanged (locked decision #6).
+
+        Like `commit`, creating the reader is **not** cooperatively cancellable: a
+        surrounding timeout or cancellation cannot abort the in-flight metadata call.
+
+        The returned reader locks the connection for its WHOLE lifetime: a foreign op
+        raises `ConnectionBusyError` until the reader is closed (STREAM-06), and a
+        read after close / check-in surfaces the driver's native
+        `pyarrow.lib.ArrowInvalid`. The `_reader_open` lifetime lock is set AFTER the
+        `_offloading()` span exits and ONLY on the success path. The reader has no
+        cancel of its own, so a cancelled per-batch pull invalidates the connection
+        (detaching it from the pool) rather than aborting the C call.
+
+        Args:
+            catalog_filter: Restrict to this catalog. Forwarded unchanged; `None`
+                (the default) leaves it unrestricted.
+            db_schema_filter: Restrict to this schema. Forwarded unchanged; `None`
+                (the default) leaves it unrestricted.
+            table_name_filter: Restrict to this table name. Forwarded unchanged;
+                `None` (the default) leaves it unrestricted.
+            approximate: Allow the backend to return approximate statistics. `True`
+                (the default) is forwarded to the driver unchanged.
+
+        Returns:
+            An `AsyncRecordBatchReader` streaming the statistics, each pull offloaded
+            through the pool limiter.
+
+        Raises:
+            ConnectionBusyError: If another offloaded call on this connection is
+                already in flight.
+
+        Example:
+            ```python
+            async with await pool.connect() as conn:
+                async with await conn.adbc_get_statistics() as reader:
+                    async for batch in reader:
+                        process(batch)  # a pyarrow.RecordBatch, each pull offloaded
+            ```
+        """
+        sync_conn = cast("_SyncConnection", self._fairy)
+        with self._offloading():
+            sync_reader = await offload(
+                functools.partial(
+                    sync_conn.adbc_get_statistics,
+                    catalog_filter=catalog_filter,
+                    db_schema_filter=db_schema_filter,
+                    table_name_filter=table_name_filter,
+                    approximate=approximate,
+                ),
+                limiter=self._limiter,
+            )
+        # Set AFTER the _offloading() span exits, success path ONLY (see
+        # `adbc_get_objects` for the lifetime-lock rationale, Pitfall 3).
+        self._reader_open = True
+        return AsyncRecordBatchReader(sync_reader, self._limiter, self, _noop_cancel)
+
+    async def adbc_get_statistic_names(self) -> AsyncRecordBatchReader:
+        """
+        Stream the backend's statistic names as an `AsyncRecordBatchReader`.
+
+        Offloads the sync `adbc_get_statistic_names()` through the pool limiter to
+        create the native `pyarrow.RecordBatchReader`, then wraps it in an
+        `AsyncRecordBatchReader` whose every batch pull is itself offloaded --- never
+        materialized. A backend that does not implement statistics (for example
+        DuckDB) surfaces the driver's native `NotSupportedError` unchanged (locked
+        decision #6).
+
+        Like `commit`, creating the reader is **not** cooperatively cancellable: a
+        surrounding timeout or cancellation cannot abort the in-flight metadata call.
+
+        The returned reader locks the connection for its WHOLE lifetime: a foreign op
+        raises `ConnectionBusyError` until the reader is closed (STREAM-06), and a
+        read after close / check-in surfaces the driver's native
+        `pyarrow.lib.ArrowInvalid`. The `_reader_open` lifetime lock is set AFTER the
+        `_offloading()` span exits and ONLY on the success path. The reader has no
+        cancel of its own, so a cancelled per-batch pull invalidates the connection
+        (detaching it from the pool) rather than aborting the C call.
+
+        Returns:
+            An `AsyncRecordBatchReader` streaming the statistic names, each pull
+            offloaded through the pool limiter.
+
+        Raises:
+            ConnectionBusyError: If another offloaded call on this connection is
+                already in flight.
+
+        Example:
+            ```python
+            async with await pool.connect() as conn:
+                async with await conn.adbc_get_statistic_names() as reader:
+                    async for batch in reader:
+                        process(batch)  # a pyarrow.RecordBatch, each pull offloaded
+            ```
+        """
+        sync_conn = cast("_SyncConnection", self._fairy)
+        with self._offloading():
+            sync_reader = await offload(sync_conn.adbc_get_statistic_names, limiter=self._limiter)
+        # Set AFTER the _offloading() span exits, success path ONLY (see
+        # `adbc_get_objects` for the lifetime-lock rationale, Pitfall 3).
+        self._reader_open = True
+        return AsyncRecordBatchReader(sync_reader, self._limiter, self, _noop_cancel)
 
     async def close(self) -> None:
         """
