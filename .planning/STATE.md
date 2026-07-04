@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.5.0
 milestone_name: Async Cursor Completion
-status: executing
-stopped_at: "Completed 33-02-PLAN.md (Wave 2 of Phase 33) — Phase 33 CLOSED. API-reference render-fidelity audit + strict-build completion gate (DOCS-04 and the DOCS-02 reference half). Both tasks were verify-only: research predicted the docstrings + gen_ref_pages.py injection block were already complete, and the render audit confirmed it — no docstring edits needed, no source commits (the plan's blessed 'render verified, no edits' outcome). Task 1: built the site with `.venv/bin/mkdocs build --strict` (exit 0) and audited site/reference/adbc_poolhouse/index.html — AsyncRecordBatchReader + all four new AsyncCursor methods (fetch_record_batch, adbc_ingest, fetch_df, fetch_polars) render with Google-style Parameters/Returns/Raises tables (17 Parameters, 28 Returns, 21 Raises section titles) + 31 Example blocks; the adbc_ingest reference carries all four mode Literal values (create/append/replace/create_append) and the destructive 'replace drops' warning; ModuleNotFoundError + ConnectionBusyError render on the DataFrame/stream methods. Task 2: final phase gate — strict build exit 0, `grep 'not available' docs/src/index.md` empty (33-01 invariant holds), async.md still carries the replace-drops warning + ModuleNotFoundError note. DOCS-01..04 all complete; the async docs milestone is documentation-complete. Version bump + changelog remain explicitly OUT OF SCOPE (deferred to a separate release step)."
-last_updated: "2026-07-04T02:05:00.000Z"
-last_activity: 2026-07-04 -- Completed 33-02 (API-reference render audit + strict-build gate); Phase 33 complete
+status: ready-to-plan
+stopped_at: "Phase 33 (Documentation) COMPLETE — verification passed, UAT passed. DOCS-01..04 all satisfied; strict build green; humanizer pass applied. UAT read-through surfaced one accuracy nit (front-page async note called the API 'experimental and incomplete') — fixed inline (commit 0a65d00): dropped 'and incomplete', kept the precise 'async ADBC metadata and prepared statements have not shipped yet' caveat. That read-through also triggered a scope decision: async metadata + prepared statements (available on the sync raw-cursor path but never wrapped for async) are now IN SCOPE for v1.5.0 as Phases 34 + 35 to finish async/sync parity. Partitioned result sets deferred (niche Flight-SQL-only). Next: plan Phase 34 (Async Metadata)."
+last_updated: "2026-07-04T13:00:00.000Z"
+last_activity: 2026-07-04 -- Phase 33 complete (verification + UAT passed); v1.5.0 extended with Phases 34 (Async Metadata) + 35 (Async Prepared Statements)
 progress:
-  total_phases: 5
+  total_phases: 7
   completed_phases: 5
   total_plans: 13
   completed_plans: 13
-  percent: 100
+  percent: 71
 ---
 
 # Project State
@@ -21,28 +21,30 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-01)
 
 **Core value:** One config in, one pool out — `create_pool(SnowflakeConfig(...))` returns a ready-to-use SQLAlchemy QueuePool in a single call.
-**Current focus:** Phase 33 — documentation
+**Current focus:** Phase 34 — async metadata (next; not yet planned)
 
 ## Current Position
 
-Phase: 33 (documentation) — COMPLETE
-Plan: 2 of 2 (33-01 and 33-02 both complete)
-Status: Phase 33 complete — all v1.5.0 requirements satisfied (release step: version bump + changelog, remains)
-Last activity: 2026-07-04 -- Completed 33-02 (API-reference render audit + strict-build gate)
+Phase: 33 (documentation) — COMPLETE (verification + UAT passed 2026-07-04)
+Next: Phase 34 (async metadata) — Pending, needs discuss/plan
+Status: v1.5.0 extended to complete async/sync parity — Phase 34 (Async Metadata, META-01..04) then Phase 35 (Async Prepared Statements, PREP-01..03). Partitions deferred. Release step (version bump + changelog) still remains after 35.
+Last activity: 2026-07-04 -- Phase 33 complete; roadmap extended with Phases 34 + 35
 
-Progress: [████████████████████] 100% (5 of 5 phases complete: 29, 30, 31, 32, 33)
+Progress: [██████████████░░░░░░] 71% (5 of 7 phases complete: 29, 30, 31, 32, 33; next: 34, 35)
 
 ## Accumulated Context
 
 ### Roadmap (v1.5.0)
 
-Five phases, numbered 29–33 (monotonic continuation from v1.4.0's Phase 28). Dependency-ordered per the research consensus: highest-risk streaming first, then the trivial wrappers, then edge hardening, then docs.
+Seven phases, numbered 29–35 (monotonic continuation from v1.4.0's Phase 28). Dependency-ordered per the research consensus: highest-risk streaming first, then the trivial wrappers, then edge hardening, then docs. Extended 2026-07-04 with Phases 34 (Async Metadata) + 35 (Async Prepared Statements) to complete async/sync parity — both are pure offload wrappers over methods the sync raw-cursor path already exposes; partitioned result sets deferred (niche Flight-SQL-only).
 
 - **Phase 29 — Arrow Streaming** (STREAM-01..06, EDGE-33/20/22/23, PKG-01, PKG-03): the headline and only genuine design risk. New `AsyncRecordBatchReader` wrapper; per-batch `cancellable_offload` in `__anext__`; reader lifetime bound to the checked-out connection; reset-event checkin closes the reader first so read-after-checkin surfaces the driver's native closed-stream error (no bespoke error type — D confirmed by maintainer). Introduces the `__aexit__`/`__del__` surface (EDGE-20/22/23) that later phases reuse. First `_SyncCursor` Protocol extension (PKG-01) and owns the import-lint gate (PKG-03).
 - **Phase 30 — Async Bulk Write** (INGEST-01..04): `adbc_ingest`, single whole-op offload, `on_abort=invalidate`, typed `Literal` mode with the `replace`-drops-table warning. Implementation note: keyword-only args through the PEP 646 TypeVarTuple offload boundary — resolve via the existing explicit-arm/partial pattern (spike in phase planning).
 - **Phase 31 — DataFrame Convenience** (DF-01..04, PKG-02): `fetch_df`/`fetch_polars`, trivial single-offload wrappers; native `ModuleNotFoundError` passes through unchanged; frames self-owning after checkin. PKG-02 (pandas/polars → dev group only) lands here — first phase needing them in tests.
 - **Phase 32 — P2 Edge Hardening** (EDGE-08/13/14/24/31/32): test-only additions extending existing chokepoint coverage across the new paths, plus `__del__` finalizers. Reuses the Phase 23 `BlockingStubCursor` harness.
-- **Phase 33 — Documentation** (DOCS-01..04): consolidation point — streaming guide, ingest mode table + replace warning, DataFrame user-supplied note, API reference for the new symbols, `mkdocs build --strict`, humanizer pass.
+- **Phase 33 — Documentation** (DOCS-01..04): consolidation point — streaming guide, ingest mode table + replace warning, DataFrame user-supplied note, API reference for the new symbols, `mkdocs build --strict`, humanizer pass. COMPLETE 2026-07-04.
+- **Phase 34 — Async Metadata** (META-01..04): the six `adbc_get_*` connection metadata methods as async offload wrappers over the sync `dbapi.Connection`; Arrow-returning metadata surfaces its native reader; native error on unsupported backends; docs updated. Pending.
+- **Phase 35 — Async Prepared Statements** (PREP-01..03): `adbc_prepare` + `adbc_execute_schema` as async offload wrappers over the sync `dbapi.Cursor`; `adbc_execute_schema` returns the result schema without executing; docs updated. Pending.
 
 ### Roadmap Decisions (v1.5.0)
 

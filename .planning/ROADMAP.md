@@ -2,7 +2,7 @@
 
 ## Milestones
 
-- 🚧 **v1.5.0 Async Cursor Completion** — Phases 29–33 (in progress)
+- 🚧 **v1.5.0 Async Cursor Completion** — Phases 29–35 (in progress)
 - ✅ **v1.4.0 Async API** — Phases 22–28 (shipped 2026-07-01)
 - ✅ **v1.3.0 Quack Backend** — Phases 21–21.1 (shipped 2026-05-21)
 - ✅ **v1.2.0 Plugin/Extensibility API** — Phases 16-20 (shipped 2026-03-15)
@@ -12,13 +12,15 @@
 
 ### 🚧 v1.5.0 Async Cursor Completion (In Progress)
 
-**Milestone Goal:** Complete the async cursor surface by offloading the four v1.4.0-deferred ADBC cursor methods (`fetch_record_batch` Arrow streaming, `adbc_ingest` bulk write, `fetch_df`/`fetch_polars` DataFrame convenience) and land the deferred P2 async edge-case hardening suite. Every new method is a pure offload wrapper over a method that already exists on the wrapped sync `dbapi.Cursor`, routed through the existing v1.4.0 `offload`/`cancellable_offload` chokepoint and per-pool `CapacityLimiter` — no new runtime deps, no new extras, no sync-core change. Async methods mirror the underlying sync method's behavior: no invented async-specific error types, no `find_spec` pre-checks, no bespoke wrapping.
+**Milestone Goal:** Complete the async cursor surface by offloading the four v1.4.0-deferred ADBC cursor methods (`fetch_record_batch` Arrow streaming, `adbc_ingest` bulk write, `fetch_df`/`fetch_polars` DataFrame convenience) and land the deferred P2 async edge-case hardening suite. Every new method is a pure offload wrapper over a method that already exists on the wrapped sync `dbapi.Cursor`, routed through the existing v1.4.0 `offload`/`cancellable_offload` chokepoint and per-pool `CapacityLimiter` — no new runtime deps, no new extras, no sync-core change. Async methods mirror the underlying sync method's behavior: no invented async-specific error types, no `find_spec` pre-checks, no bespoke wrapping. **Extended (2026-07-04):** the milestone now also closes async/sync parity for the remaining ADBC surface exposed by the sync raw-cursor path — connection-level metadata introspection (Phase 34) and cursor-level prepared statements (Phase 35) — following the same offload-wrapper pattern. Partitioned result sets (`adbc_execute_partitions`/`adbc_read_partition`) remain deferred: they are a niche Flight-SQL-oriented feature that most supported backends return unsupported for.
 
 - [x] **Phase 29: Arrow Streaming** — `await cursor.fetch_record_batch()` → `AsyncRecordBatchReader` with per-batch offloaded `async for`, reader-lifetime bound to checkout, read-after-checkin surfaces the driver's native closed-stream error — completed 2026-07-01
 - [x] **Phase 30: Async Bulk Write** — `await cursor.adbc_ingest(table, data, mode=...)`, single whole-op offload, typed `Literal` mode, `on_abort=invalidate` on cancel (2/2 plans) — completed 2026-07-01
 - [x] **Phase 31: DataFrame Convenience** — `await cursor.fetch_df()` / `await cursor.fetch_polars()`, single-offload wrappers returning self-owning frames; pandas/polars user-supplied
 - [x] **Phase 32: P2 Edge Hardening** — remaining deferred P2 edge cases (contextvars, trio-checkpoint, timeout precision, loop-shutdown) extended across the new streaming/ingest/DataFrame paths; all six EDGE requirements green x20 on macOS + Linux CI, test-only (zero production change) — completed 2026-07-02
-- [x] **Phase 33: Documentation** — streaming guide, ingest mode table + replace warning, DataFrame user-supplied note, API reference for the new symbols, `mkdocs build --strict` gate, humanizer pass
+- [x] **Phase 33: Documentation** — streaming guide, ingest mode table + replace warning, DataFrame user-supplied note, API reference for the new symbols, `mkdocs build --strict` gate, humanizer pass — completed 2026-07-04
+- [ ] **Phase 34: Async Metadata** — the six `adbc_get_*` connection metadata methods as async offload wrappers over the sync `dbapi.Connection` (parity gap named in the docs caveat)
+- [ ] **Phase 35: Async Prepared Statements** — `adbc_prepare` + `adbc_execute_schema` as async offload wrappers over the sync `dbapi.Cursor` (second parity gap named in the docs caveat)
 
 <details>
 <summary>✅ v1.4.0 Async API (Phases 22-28) — SHIPPED 2026-07-01</summary>
@@ -202,10 +204,39 @@ Plans:
 
 **UI hint**: no
 
+### Phase 34: Async Metadata
+
+**Goal**: The six ADBC connection-level metadata methods (`adbc_get_info`, `adbc_get_objects`, `adbc_get_table_schema`, `adbc_get_table_types`, `adbc_get_statistics`, `adbc_get_statistic_names`) are available on the async connection as pure offload wrappers over the wrapped sync `dbapi.Connection`, routed through the existing v1.4.0 `offload`/`cancellable_offload` chokepoint and per-pool `CapacityLimiter`. Behavior mirrors the underlying sync method — Arrow-returning metadata surfaces its native reader/schema — with no invented async-specific error types and no `find_spec` pre-checks. Closes the async/sync parity gap for metadata introspection named in the v1.5.0 docs caveat.
+**Depends on**: Phase 33
+**Requirements**: META-01, META-02, META-03, META-04
+**Success Criteria** (what must be TRUE):
+
+  1. All six `adbc_get_*` methods are awaitable on the async connection, each offloading its sync counterpart through the established chokepoint (META-01)
+  2. Return types mirror the sync methods; Arrow-returning metadata (`adbc_get_objects`, `adbc_get_info`, `adbc_get_statistics`) surfaces its native reader without eager materialization; no async-specific error types invented (META-02)
+  3. A backend that does not implement a metadata method surfaces the driver's native error unchanged (META-03)
+  4. The async guide + API reference document the async metadata methods and the v1.5.0 caveat shrinks accordingly; `mkdocs build --strict` passes; humanizer pass applied (META-04)
+
+**Plans**: TBD
+**UI hint**: no
+
+### Phase 35: Async Prepared Statements
+
+**Goal**: `adbc_prepare` and `adbc_execute_schema` are available on the async cursor as pure offload wrappers over the wrapped sync `dbapi.Cursor`, routed through the existing `offload`/`cancellable_offload` chokepoint and per-pool `CapacityLimiter`. Behavior mirrors the sync statement lifecycle — `adbc_execute_schema` returns the result Arrow schema without executing the query — with no invented async-specific error types. Closes the second async/sync parity gap named in the v1.5.0 docs caveat.
+**Depends on**: Phase 34
+**Requirements**: PREP-01, PREP-02, PREP-03
+**Success Criteria** (what must be TRUE):
+
+  1. `adbc_prepare` and `adbc_execute_schema` are awaitable on the async cursor, each offloading its sync counterpart through the established chokepoint (PREP-01)
+  2. Behavior mirrors the sync methods — `adbc_execute_schema` returns the result Arrow schema without executing; no async-specific error types invented (PREP-02)
+  3. The async guide + API reference document the async prepared-statement methods and remove the corresponding caveat line; `mkdocs build --strict` passes; humanizer pass applied (PREP-03)
+
+**Plans**: TBD
+**UI hint**: no
+
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 29 → 30 → 31 → 32 → 33
+Phases execute in numeric order: 29 → 30 → 31 → 32 → 33 → 34 → 35
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -214,6 +245,8 @@ Phases execute in numeric order: 29 → 30 → 31 → 32 → 33
 | 31. DataFrame Convenience | v1.5.0 | 2/2 | Complete    | 2026-07-02 |
 | 32. P2 Edge Hardening | v1.5.0 | 3/3 | Complete    | 2026-07-02 |
 | 33. Documentation | v1.5.0 | 2/2 | Complete    | 2026-07-04 |
+| 34. Async Metadata | v1.5.0 | 0/TBD | Not started | - |
+| 35. Async Prepared Statements | v1.5.0 | 0/TBD | Not started | - |
 | 22-28. Async API | v1.4.0 | 29/29 | Complete | 2026-07-01 |
 | 21.1. ADBC dispatch URI-positional fix | v1.3.0 | 3/3 | Complete | 2026-05-20 |
 | 21. Quack Backend | v1.3.0 | 3/3 | Complete | 2026-05-19 |

@@ -66,6 +66,19 @@ Deterministic arrange/trigger/assert tests, each run under **both** asyncio and 
 - [x] **DOCS-03**: `fetch_df` / `fetch_polars` are documented, noting pandas/polars are user-supplied (install-it-yourself) and that a missing dep surfaces a native `ModuleNotFoundError`
 - [x] **DOCS-04**: API reference renders `AsyncRecordBatchReader` and the four new `AsyncCursor` methods with Google-style docstrings (Args/Returns/Raises + Example); `uv run mkdocs build --strict` passes; humanizer pass applied to all new or substantially rewritten prose
 
+### Async Metadata (parity — added 2026-07-04)
+
+- [ ] **META-01**: The six ADBC connection-level metadata methods (`adbc_get_info`, `adbc_get_objects`, `adbc_get_table_schema`, `adbc_get_table_types`, `adbc_get_statistics`, `adbc_get_statistic_names`) are awaitable on the async connection, each a pure offload wrapper over the wrapped sync `dbapi.Connection` method routed through the existing `offload`/`cancellable_offload` chokepoint and per-pool `CapacityLimiter`
+- [ ] **META-02**: Return types mirror the sync methods; Arrow-returning metadata (`adbc_get_objects`, `adbc_get_info`, `adbc_get_statistics`) surfaces its native reader without eager materialization; no invented async-specific error types and no `find_spec` pre-checks
+- [ ] **META-03**: A backend that does not implement a metadata method surfaces the driver's native error unchanged (mirrors sync)
+- [ ] **META-04**: The async guide and API reference document the async metadata methods and the v1.5.0 caveat shrinks accordingly; `mkdocs build --strict` passes; humanizer pass applied to new/rewritten prose
+
+### Async Prepared Statements (parity — added 2026-07-04)
+
+- [ ] **PREP-01**: `adbc_prepare` and `adbc_execute_schema` are awaitable on the async cursor, each a pure offload wrapper over the wrapped sync `dbapi.Cursor` method routed through the existing `offload`/`cancellable_offload` chokepoint and per-pool `CapacityLimiter`
+- [ ] **PREP-02**: Behavior mirrors the sync methods — `adbc_execute_schema` returns the result Arrow schema without executing the query; no invented async-specific error types
+- [ ] **PREP-03**: The async guide and API reference document the async prepared-statement methods and remove the corresponding caveat line; `mkdocs build --strict` passes; humanizer pass applied to new/rewritten prose
+
 ## Out of Scope
 
 Explicit exclusions for this milestone (with reasoning):
@@ -77,13 +90,14 @@ Explicit exclusions for this milestone (with reasoning):
 | Bespoke async-only error types (e.g. `ReaderClosedError`) | Async mirrors the sync method's native errors; the reset-event checkin already makes read-after-checkin a clean driver exception (STREAM-04), so no new error class is warranted |
 | Sync-core cursor abstraction | The sync library stays pool-only; `AsyncCursor` remains the only cursor abstraction. These methods extend the async surface, not the sync one |
 | Write-side GIL micro-benchmark for `adbc_ingest` | SPIKE-02 (v1.4.0) already measured read materialization; docs disclaim write-throughput parallelism rather than re-spike. Revisit only if a consumer reports an ingest bottleneck |
-| Async ADBC metadata (`adbc_get_objects`, `adbc_get_table_schema`, `adbc_get_info`) | Deferred to v2+ per v1.4.0 Future Requirements; not part of the "deferred cursor methods" scope |
-| Async prepared statements (`adbc_prepare`, `adbc_execute_schema`) | Deferred to v2+ per v1.4.0 Future Requirements |
+| Async partitioned result sets (`adbc_execute_partitions`, `adbc_read_partition`) | Deferred: a niche Flight-SQL-oriented distributed-read feature. Of the 13 supported backends, only Flight SQL clearly implements it (partitions = Arrow Flight endpoints); BigQuery is a maybe, the embedded/OLTP backends (DuckDB, SQLite, PostgreSQL, MySQL, Quack) return unsupported. Revisit as its own phase only if a Flight SQL/BigQuery consumer needs it |
 | anyio-native checkout limiter | v1.4.0 deferral; only if offloaded checkout proves a measured bottleneck |
+
+> **Note (2026-07-04):** Async ADBC metadata and async prepared statements were previously listed here as deferred to v2+. They have been **pulled into v1.5.0 scope** as Phases 34 and 35 to complete async/sync parity (the sync raw-cursor path exposes both natively). See the Async Metadata and Async Prepared Statements requirement groups above.
 
 ## Traceability
 
-Every v1.5.0 requirement maps to exactly one phase (Phases 29–33). PKG-* are cross-cutting gates enforced in every phase but assigned to a single phase each for coverage: PKG-01 (first Protocol extension) and PKG-03 (import-lint guard, owned early) → Phase 29; PKG-02 (pandas/polars first needed in tests) → Phase 31.
+Every v1.5.0 requirement maps to exactly one phase (Phases 29–35). PKG-* are cross-cutting gates enforced in every phase but assigned to a single phase each for coverage: PKG-01 (first Protocol extension) and PKG-03 (import-lint guard, owned early) → Phase 29; PKG-02 (pandas/polars first needed in tests) → Phase 31. META-* → Phase 34, PREP-* → Phase 35 (async/sync parity extension added 2026-07-04).
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
@@ -118,6 +132,13 @@ Every v1.5.0 requirement maps to exactly one phase (Phases 29–33). PKG-* are c
 | DOCS-02 | Phase 33 | ✅ Complete (guide half 33-01; reference half 33-02) |
 | DOCS-03 | Phase 33 | Complete (33-01) |
 | DOCS-04 | Phase 33 | ✅ Complete (33-02) |
+| META-01 | Phase 34 | Pending |
+| META-02 | Phase 34 | Pending |
+| META-03 | Phase 34 | Pending |
+| META-04 | Phase 34 | Pending |
+| PREP-01 | Phase 35 | Pending |
+| PREP-02 | Phase 35 | Pending |
+| PREP-03 | Phase 35 | Pending |
 
 **Coverage:**
 - v1.5.0 requirements: 31 total
@@ -130,7 +151,9 @@ Every v1.5.0 requirement maps to exactly one phase (Phases 29–33). PKG-* are c
 - Phase 31 (DataFrame Convenience): 5 — DF-01..04, PKG-02
 - Phase 32 (P2 Edge Hardening): 6 — EDGE-08, EDGE-13, EDGE-14, EDGE-24, EDGE-31, EDGE-32
 - Phase 33 (Documentation): 4 — DOCS-01..04
+- Phase 34 (Async Metadata): 4 — META-01..04
+- Phase 35 (Async Prepared Statements): 3 — PREP-01..03
 
 ---
 *Requirements defined: 2026-07-01*
-*Last updated: 2026-07-01 — traceability populated during roadmap creation (Phases 29–33, 100% coverage)*
+*Last updated: 2026-07-04 — Phases 34 (Async Metadata, META-01..04) and 35 (Async Prepared Statements, PREP-01..03) added to close async/sync parity; partitioned result sets deferred. Original 29–33 traceability populated during roadmap creation.*
