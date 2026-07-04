@@ -20,7 +20,7 @@
 - [x] **Phase 32: P2 Edge Hardening** — remaining deferred P2 edge cases (contextvars, trio-checkpoint, timeout precision, loop-shutdown) extended across the new streaming/ingest/DataFrame paths; all six EDGE requirements green x20 on macOS + Linux CI, test-only (zero production change) — completed 2026-07-02
 - [x] **Phase 33: Documentation** — streaming guide, ingest mode table + replace warning, DataFrame user-supplied note, API reference for the new symbols, `mkdocs build --strict` gate, humanizer pass — completed 2026-07-04
 - [x] **Phase 34: Async Metadata** — the six `adbc_get_*` connection metadata methods as async offload wrappers over the sync `dbapi.Connection`; streaming trio wrapped in `AsyncRecordBatchReader` (code review fixed CR-34-01: metadata readers are non-poisoning on cancel) — completed 2026-07-04
-- [ ] **Phase 35: Async Prepared Statements** — `adbc_prepare` + `adbc_execute_schema` as async offload wrappers over the sync `dbapi.Cursor` (second parity gap named in the docs caveat)
+- [x] **Phase 35: Async Prepared Statements** — `adbc_prepare` + `adbc_execute_schema` as async offload wrappers over the sync `dbapi.Cursor` (second parity gap named in the docs caveat)
 
 <details>
 <summary>✅ v1.4.0 Async API (Phases 22-28) — SHIPPED 2026-07-01</summary>
@@ -254,7 +254,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 35-03-PLAN.md — Docs: remove the async caveat, add prepare snippet, fix index.md, strict build + humanizer (PREP-03)
+- [x] 35-03-PLAN.md — Docs: remove the async caveat, add prepare snippet, fix index.md, strict build + humanizer (PREP-03) — completed 2026-07-04
 
 **UI hint**: no
 
@@ -271,7 +271,7 @@ Phases execute in numeric order: 29 → 30 → 31 → 32 → 33 → 34 → 35
 | 32. P2 Edge Hardening | v1.5.0 | 3/3 | Complete    | 2026-07-02 |
 | 33. Documentation | v1.5.0 | 2/2 | Complete    | 2026-07-04 |
 | 34. Async Metadata | v1.5.0 | 3/3 | Complete    | 2026-07-04 |
-| 35. Async Prepared Statements | v1.5.0 | 2/3 | In Progress | - |
+| 35. Async Prepared Statements | v1.5.0 | 3/3 | Complete    | 2026-07-04 |
 | 22-28. Async API | v1.4.0 | 29/29 | Complete | 2026-07-01 |
 | 21.1. ADBC dispatch URI-positional fix | v1.3.0 | 3/3 | Complete | 2026-05-20 |
 | 21. Quack Backend | v1.3.0 | 3/3 | Complete | 2026-05-19 |

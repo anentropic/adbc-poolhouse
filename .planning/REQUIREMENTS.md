@@ -77,7 +77,7 @@ Deterministic arrange/trigger/assert tests, each run under **both** asyncio and 
 
 - [x] **PREP-01**: `adbc_prepare` and `adbc_execute_schema` are awaitable on the async cursor, each a pure offload wrapper over the wrapped sync `dbapi.Cursor` method routed through the existing `offload`/`cancellable_offload` chokepoint and per-pool `CapacityLimiter`
 - [x] **PREP-02**: Behavior mirrors the sync methods — `adbc_execute_schema` returns the result Arrow schema without executing the query; no invented async-specific error types
-- [ ] **PREP-03**: The async guide and API reference document the async prepared-statement methods and remove the corresponding caveat line; `mkdocs build --strict` passes; humanizer pass applied to new/rewritten prose
+- [x] **PREP-03**: The async guide and API reference document the async prepared-statement methods and remove the corresponding caveat line; `mkdocs build --strict` passes; humanizer pass applied to new/rewritten prose
 
 ## Out of Scope
 
@@ -138,7 +138,7 @@ Every v1.5.0 requirement maps to exactly one phase (Phases 29–35). PKG-* are c
 | META-04 | Phase 34 | Complete (34-03) |
 | PREP-01 | Phase 35 | Complete (35-02) |
 | PREP-02 | Phase 35 | Complete (35-02) |
-| PREP-03 | Phase 35 | Pending |
+| PREP-03 | Phase 35 | Complete (35-03) |
 
 **Coverage:**
 - v1.5.0 requirements: 31 total
