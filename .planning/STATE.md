@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.5.0
 milestone_name: Async Cursor Completion
-status: "Phase 32 CLOSED — all six EDGE requirements (08/13/14/24/31/32) green x20 on macOS + Linux CI; test-only, zero production change. Next: Phase 33 (Documentation)"
-stopped_at: "Completed 32-03-PLAN.md — Phase 32 CLOSED. Wave-2 gate plan: proved the four Wave 1 modules hold together in the full async suite under `ADBC_ASYNC_REPEAT=20` on macOS (2702 passed, 0 hangs, no cross-test interaction, no regression) and — authoritatively — on Linux CI (run 28622475955, Python 3.11 + 3.14, 0 hangs), closing the platform-dependent lost-wakeup gate for EDGE-24/31/32. Task 2 blocking human-verify checkpoint APPROVED (contingency confirmed NOT fired; both Wave 1 SUMMARYs state zero production change). Import-lint (PKG-03) + basedpyright-strict + `mkdocs --strict` (exit 0) all green. Task 3 docs gate ran in reduced test-only form: no RST roles in the new modules, no new public symbol, no guide edit — no file change, no commit (the passing strict build IS the gate). All six EDGE requirements (08/13/14/24/31/32) complete; zero production change across the whole phase (the new-method offloads share the already-proven `cancellable_offload`/`offload` chokepoint)."
-last_updated: "2026-07-04T00:38:33.421Z"
-last_activity: 2026-07-04 -- Phase 33 planning complete
+status: executing
+stopped_at: "Completed 33-01-PLAN.md (Wave 1 of Phase 33). Audit + reconcile + humanize pass over the consumer-facing async prose. Task 1: fixed the index.md line-71 contradiction — DataFrame fetches (shipped Phase 31) are no longer listed as unavailable; only async ADBC metadata + async prepared statements are named as not-yet-shipped; the literal 'not available' string is gone (60a0569). Task 2: audited the three async.md DOCS sections (streaming / adbc_ingest / DataFrame) against 33-RESEARCH — all facts present and accurate (4-mode table, 'replace drops the table' warning unsoftened, native ModuleNotFoundError note, reader-lifetime + ArrowInvalid contract, honest concurrency framing), em-dashes already within the one-per-paragraph cap, no AI-writing tells — no content edit required (Pitfall 1: do not re-author correct prose), so no commit. Task 3: humanized the index.md availability paragraph — dropped the vague 'several features (...)' quantifier and rule-of-three, naming the two deferred surfaces directly to match async.md's experimental block (7a43e2c). `.venv/bin/mkdocs build --strict` exits 0 after every edit. DOCS-01 and DOCS-03 fully complete; DOCS-02 guide half done (reference half is 33-02); DOCS-04 is 33-02."
+last_updated: "2026-07-04T01:45:00.000Z"
+last_activity: 2026-07-04 -- Completed 33-01 (async prose reconcile + humanize); 33-02 remains
 progress:
   total_phases: 5
   completed_phases: 4
-  total_plans: 11
-  completed_plans: 11
+  total_plans: 13
+  completed_plans: 12
   percent: 80
 ---
 
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-01)
 
 **Core value:** One config in, one pool out — `create_pool(SnowflakeConfig(...))` returns a ready-to-use SQLAlchemy QueuePool in a single call.
-**Current focus:** Phase 32 — P2 Edge Hardening
+**Current focus:** Phase 33 — documentation
 
 ## Current Position
 
-Phase: 33
-Plan: Not started
-Status: Phase 32 CLOSED — all six EDGE requirements (08/13/14/24/31/32) green x20 on macOS + Linux CI; test-only, zero production change. Next: Phase 33 (Documentation)
-Last activity: 2026-07-04 -- Phase 33 planning complete
+Phase: 33 (documentation) — EXECUTING
+Plan: 2 of 2 (33-01 complete; 33-02 next)
+Status: Executing Phase 33
+Last activity: 2026-07-04 -- Completed 33-01 (async prose reconcile + humanize)
 
 Progress: [████████████████░░░░] 80% (4 of 5 phases complete: 29, 30, 31, 32)
 
@@ -88,6 +88,6 @@ Pre-v1.4.0 tracking cruft plus one non-functional docstring; run `/gsd-cleanup` 
 
 ## Session Continuity
 
-Last session: 2026-07-02T22:26:00Z
-Stopped at: Completed 32-03-PLAN.md — Phase 32 CLOSED. Wave-2 gate plan: proved the four Wave 1 modules hold together in the full async suite under `ADBC_ASYNC_REPEAT=20` on macOS (2702 passed, 0 hangs, no cross-test interaction, no regression) and — authoritatively — on Linux CI (run 28622475955, Python 3.11 + 3.14, 0 hangs), closing the platform-dependent lost-wakeup gate for EDGE-24/31/32. Task 2 blocking human-verify checkpoint APPROVED (contingency confirmed NOT fired; both Wave 1 SUMMARYs state zero production change). Import-lint (PKG-03) + basedpyright-strict + `mkdocs --strict` (exit 0) all green. Task 3 docs gate ran in reduced test-only form: no RST roles in the new modules, no new public symbol, no guide edit — no file change, no commit (the passing strict build IS the gate). All six EDGE requirements (08/13/14/24/31/32) complete; zero production change across the whole phase (the new-method offloads share the already-proven `cancellable_offload`/`offload` chokepoint).
-Next step: Execute Phase 33 — Documentation (DOCS-01..04): Arrow streaming guide (reader-lifetime contract + honest concurrency framing), `adbc_ingest` mode Literal table + explicit `replace`-drops-the-table warning, DataFrame user-supplied note, API reference for `AsyncRecordBatchReader` + the four new `AsyncCursor` methods, `mkdocs build --strict` gate, humanizer pass. This is the docs consolidation point; run `/gsd-plan-phase 33` to plan it.
+Last session: 2026-07-04T01:45:00Z
+Stopped at: Completed 33-01-PLAN.md — reconciled + humanized the async guide/index prose and fixed the index.md DataFrame-availability contradiction (DOCS-01/03 complete; DOCS-02 guide half done). Previously: Completed 32-03-PLAN.md — Phase 32 CLOSED. Wave-2 gate plan: proved the four Wave 1 modules hold together in the full async suite under `ADBC_ASYNC_REPEAT=20` on macOS (2702 passed, 0 hangs, no cross-test interaction, no regression) and — authoritatively — on Linux CI (run 28622475955, Python 3.11 + 3.14, 0 hangs), closing the platform-dependent lost-wakeup gate for EDGE-24/31/32. Task 2 blocking human-verify checkpoint APPROVED (contingency confirmed NOT fired; both Wave 1 SUMMARYs state zero production change). Import-lint (PKG-03) + basedpyright-strict + `mkdocs --strict` (exit 0) all green. Task 3 docs gate ran in reduced test-only form: no RST roles in the new modules, no new public symbol, no guide edit — no file change, no commit (the passing strict build IS the gate). All six EDGE requirements (08/13/14/24/31/32) complete; zero production change across the whole phase (the new-method offloads share the already-proven `cancellable_offload`/`offload` chokepoint).
+Next step: Execute 33-02-PLAN.md (Wave 2) — API-reference render-fidelity audit + strict-build completion gate (DOCS-04 and the DOCS-02 reference half): build the site, confirm `AsyncRecordBatchReader` + the four new `AsyncCursor` methods render with Args/Returns/Raises/Example, confirm the `adbc_ingest` docstring renders the mode table + `replace`-drops warning, and close out `.venv/bin/mkdocs build --strict` as the phase gate. Guide-side prose (DOCS-01/02/03) is done as of 33-01.

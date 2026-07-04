@@ -194,7 +194,7 @@ Plans:
 **Plans**: 2 plansPlans:
 **Wave 1**
 
-- [ ] 33-01-PLAN.md — Reconcile + humanize async guide/index prose (DOCS-01/02/03; fix index.md DataFrame-availability contradiction)
+- [x] 33-01-PLAN.md — Reconcile + humanize async guide/index prose (DOCS-01/02/03; fix index.md DataFrame-availability contradiction) — completed 2026-07-04
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -213,7 +213,7 @@ Phases execute in numeric order: 29 → 30 → 31 → 32 → 33
 | 30. Async Bulk Write | v1.5.0 | 2/2 | Complete    | 2026-07-01 |
 | 31. DataFrame Convenience | v1.5.0 | 2/2 | Complete    | 2026-07-02 |
 | 32. P2 Edge Hardening | v1.5.0 | 3/3 | Complete    | 2026-07-02 |
-| 33. Documentation | v1.5.0 | 0/TBD | Not started | - |
+| 33. Documentation | v1.5.0 | 1/2 | In progress | - |
 | 22-28. Async API | v1.4.0 | 29/29 | Complete | 2026-07-01 |
 | 21.1. ADBC dispatch URI-positional fix | v1.3.0 | 3/3 | Complete | 2026-05-20 |
 | 21. Quack Backend | v1.3.0 | 3/3 | Complete | 2026-05-19 |

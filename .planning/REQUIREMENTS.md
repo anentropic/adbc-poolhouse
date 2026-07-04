@@ -61,9 +61,9 @@ Deterministic arrange/trigger/assert tests, each run under **both** asyncio and 
 
 ### Documentation
 
-- [ ] **DOCS-01**: The async guide documents Arrow streaming (`fetch_record_batch` → `async for` → close), including the reader-lifetime contract and honest concurrency framing (per-batch offload; GIL re-acquired during materialization)
+- [x] **DOCS-01**: The async guide documents Arrow streaming (`fetch_record_batch` → `async for` → close), including the reader-lifetime contract and honest concurrency framing (per-batch offload; GIL re-acquired during materialization)
 - [ ] **DOCS-02**: The async guide and API reference document `adbc_ingest` with the `mode` Literal table and an explicit "`replace` drops the table" warning
-- [ ] **DOCS-03**: `fetch_df` / `fetch_polars` are documented, noting pandas/polars are user-supplied (install-it-yourself) and that a missing dep surfaces a native `ModuleNotFoundError`
+- [x] **DOCS-03**: `fetch_df` / `fetch_polars` are documented, noting pandas/polars are user-supplied (install-it-yourself) and that a missing dep surfaces a native `ModuleNotFoundError`
 - [ ] **DOCS-04**: API reference renders `AsyncRecordBatchReader` and the four new `AsyncCursor` methods with Google-style docstrings (Args/Returns/Raises + Example); `uv run mkdocs build --strict` passes; humanizer pass applied to all new or substantially rewritten prose
 
 ## Out of Scope
@@ -114,10 +114,10 @@ Every v1.5.0 requirement maps to exactly one phase (Phases 29–33). PKG-* are c
 | EDGE-31 | Phase 32 | Complete (32-02; blocked-op cancel fired via move_on_after(N>0) under the autojumping virtual_clock — move_on_after(0) delivers before dispatch = EDGE-08) |
 | EDGE-32 | Phase 32 | Complete (32-02) |
 | EDGE-33 | Phase 29 | Complete (29-03, DuckDB; Snowflake leg manual-only per A1) |
-| DOCS-01 | Phase 33 | Pending |
-| DOCS-02 | Phase 33 | Pending |
-| DOCS-03 | Phase 33 | Pending |
-| DOCS-04 | Phase 33 | Pending |
+| DOCS-01 | Phase 33 | Complete (33-01) |
+| DOCS-02 | Phase 33 | Guide half complete (33-01); reference half pending (33-02) |
+| DOCS-03 | Phase 33 | Complete (33-01) |
+| DOCS-04 | Phase 33 | Pending (33-02) |
 
 **Coverage:**
 - v1.5.0 requirements: 31 total
