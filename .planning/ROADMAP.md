@@ -224,7 +224,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 34-02-PLAN.md — Implementation: `_SyncConnection` Protocol, `_noop_cancel`, and the six `adbc_get_*` methods with docstrings (META-01/02/03)
+- [x] 34-02-PLAN.md — Implementation: `_SyncConnection` Protocol, `_noop_cancel`, and the six `adbc_get_*` methods with docstrings (META-01/02/03)
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
@@ -258,7 +258,7 @@ Phases execute in numeric order: 29 → 30 → 31 → 32 → 33 → 34 → 35
 | 31. DataFrame Convenience | v1.5.0 | 2/2 | Complete    | 2026-07-02 |
 | 32. P2 Edge Hardening | v1.5.0 | 3/3 | Complete    | 2026-07-02 |
 | 33. Documentation | v1.5.0 | 2/2 | Complete    | 2026-07-04 |
-| 34. Async Metadata | v1.5.0 | 1/3 | In progress | - |
+| 34. Async Metadata | v1.5.0 | 2/3 | In progress | - |
 | 35. Async Prepared Statements | v1.5.0 | 0/TBD | Not started | - |
 | 22-28. Async API | v1.4.0 | 29/29 | Complete | 2026-07-01 |
 | 21.1. ADBC dispatch URI-positional fix | v1.3.0 | 3/3 | Complete | 2026-05-20 |

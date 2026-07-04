@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.5.0
 milestone_name: Async Cursor Completion
 status: executing
-stopped_at: "Completed 34-01-PLAN.md — Wave-0 RED metadata test scaffolding. Four new tests/async/test_meta_*.py files encode META-01/02/03 before any production symbol exists: test_meta_signature.py (sync inspect.signature over the six adbc_get_* methods — hasattr + keyword-only filter shape + table_name positional + depth default 'all'), test_meta_roundtrip.py (adbc_get_info->dict, adbc_get_table_types->list, adbc_get_table_schema->pyarrow.Schema on DuckDB + checkedout()==0), test_meta_stream.py (drain adbc_get_objects(depth='tables') via async for + busy-guard leg: foreign commit while reader live raises ConnectionBusyError), test_meta_unsupported.py (adbc_get_statistics/adbc_get_statistic_names surface native NotSupportedError unchanged + clean check-in). All 16 tests FAIL RED with AttributeError (methods not yet on AsyncConnection) — the acceptance signal; test_meta_guard.py passes (anyio marker discipline honored). Files carry the phase-29 file-level pyright RED pragma block (delete once 34-02 lands the symbols). Requirements META-01/02/03 intentionally left UNMARKED — RED tests don't satisfy them; 34-02 (implementation) turns them GREEN. Commits: 7c0f6be, bda4ee0, f00aca6. Env note: uv-run basedpyright pre-commit hook panics under the command sandbox (known uv-sandbox gotcha); commits made with sandbox disabled so the hook ran natively and passed (no --no-verify)."
-last_updated: "2026-07-04T16:17:43.116Z"
-last_activity: 2026-07-04 -- Completed 34-01-PLAN.md (Wave-0 RED metadata test scaffolding)
+stopped_at: "Completed 34-02-PLAN.md — implementation (GREEN). Added to src/adbc_poolhouse/_async/_connection.py: the _SyncConnection structural Protocol (six adbc_get_* signatures), the module-level _noop_cancel cancel hook, and the six AsyncConnection metadata methods. Value trio (adbc_get_info->dict[str|int,Any], adbc_get_table_types->list[str], adbc_get_table_schema->pyarrow.Schema) clone commit/rollback: plain offload inside self._offloading(); adbc_get_table_schema forwards kw-only filters via functools.partial. Streaming trio (adbc_get_objects/adbc_get_statistics/adbc_get_statistic_names->AsyncRecordBatchReader) clone fetch_record_batch: plain offload (connection has no adbc_cancel, so _noop_cancel is the reader's 4th arg), _reader_open=True set AFTER the span, success-path only. All six carry Google-style Markdown docstrings (non-cancellable caveat + reader-lifetime lock + Example). Dropped the phase-29 RED pyright pragma blocks from all four test files. Verification: 16/16 meta tests GREEN (asyncio+trio); basedpyright 0 errors on _connection.py + the test files; test_meta_guard.py passes; ADBC_ASYNC_REPEAT=20 loop gate 20x = 0 hangs (2718 passed each). Commits: be3a51f (value trio + Protocol), fa0c899 (streaming trio). META-01/02/03 marked Complete; META-04 (docs) remains for 34-03. Deviation: _noop_cancel + AsyncRecordBatchReader import deferred from task 1 to task 2 (first use) so each commit's basedpyright gate stays clean. Env note: uv-run basedpyright pre-commit hook panics under the command sandbox; commits made with sandbox disabled so the hook ran natively (no --no-verify)."
+last_updated: "2026-07-04T17:00:00.000Z"
+last_activity: 2026-07-04 -- Completed 34-02-PLAN.md (async metadata implementation, all 16 tests GREEN)
 progress:
   total_phases: 7
   completed_phases: 5
   total_plans: 16
-  completed_plans: 14
+  completed_plans: 15
   percent: 74
 ---
 
@@ -26,12 +26,12 @@ See: .planning/PROJECT.md (updated 2026-07-01)
 ## Current Position
 
 Phase: 34 (Async Metadata) — EXECUTING
-Plan: 2 of 3 (34-01 complete)
-Next: Execute 34-02 (implementation — `_SyncConnection` Protocol + `_noop_cancel` + the six `adbc_get_*` methods, turns the RED tests GREEN)
+Plan: 3 of 3 (34-01, 34-02 complete)
+Next: Execute 34-03 (docs — shrink the async caveat, add the Connection metadata how-to, API-reference render + `mkdocs build --strict` gate, META-04)
 Status: Executing Phase 34
-Last activity: 2026-07-04 -- Completed 34-01-PLAN.md (Wave-0 RED metadata test scaffolding)
+Last activity: 2026-07-04 -- Completed 34-02-PLAN.md (async metadata implementation, all 16 tests GREEN)
 
-Progress: [██████████████░░░░░░] 74% (5 of 7 phases complete: 29, 30, 31, 32, 33; Phase 34 in progress, 1 of 3 plans done)
+Progress: [██████████████░░░░░░] 74% (5 of 7 phases complete: 29, 30, 31, 32, 33; Phase 34 in progress, 2 of 3 plans done)
 
 ## Accumulated Context
 

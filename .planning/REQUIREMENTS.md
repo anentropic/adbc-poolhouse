@@ -68,9 +68,9 @@ Deterministic arrange/trigger/assert tests, each run under **both** asyncio and 
 
 ### Async Metadata (parity — added 2026-07-04)
 
-- [ ] **META-01**: The six ADBC connection-level metadata methods (`adbc_get_info`, `adbc_get_objects`, `adbc_get_table_schema`, `adbc_get_table_types`, `adbc_get_statistics`, `adbc_get_statistic_names`) are awaitable on the async connection, each a pure offload wrapper over the wrapped sync `dbapi.Connection` method routed through the existing `offload`/`cancellable_offload` chokepoint and per-pool `CapacityLimiter`
-- [ ] **META-02**: Return types mirror the sync methods — `adbc_get_info` returns a dict, `adbc_get_table_schema` a `pyarrow.Schema`, `adbc_get_table_types` a list, and the three Arrow-streaming methods (`adbc_get_objects`, `adbc_get_statistics`, `adbc_get_statistic_names`) surface their native `RecordBatchReader` without eager materialization; no invented async-specific error types and no `find_spec` pre-checks
-- [ ] **META-03**: A backend that does not implement a metadata method surfaces the driver's native error unchanged (mirrors sync)
+- [x] **META-01**: The six ADBC connection-level metadata methods (`adbc_get_info`, `adbc_get_objects`, `adbc_get_table_schema`, `adbc_get_table_types`, `adbc_get_statistics`, `adbc_get_statistic_names`) are awaitable on the async connection, each a pure offload wrapper over the wrapped sync `dbapi.Connection` method routed through the existing `offload`/`cancellable_offload` chokepoint and per-pool `CapacityLimiter`
+- [x] **META-02**: Return types mirror the sync methods — `adbc_get_info` returns a dict, `adbc_get_table_schema` a `pyarrow.Schema`, `adbc_get_table_types` a list, and the three Arrow-streaming methods (`adbc_get_objects`, `adbc_get_statistics`, `adbc_get_statistic_names`) surface their native `RecordBatchReader` without eager materialization; no invented async-specific error types and no `find_spec` pre-checks
+- [x] **META-03**: A backend that does not implement a metadata method surfaces the driver's native error unchanged (mirrors sync)
 - [ ] **META-04**: The async guide and API reference document the async metadata methods and the v1.5.0 caveat shrinks accordingly; `mkdocs build --strict` passes; humanizer pass applied to new/rewritten prose
 
 ### Async Prepared Statements (parity — added 2026-07-04)
@@ -132,9 +132,9 @@ Every v1.5.0 requirement maps to exactly one phase (Phases 29–35). PKG-* are c
 | DOCS-02 | Phase 33 | ✅ Complete (guide half 33-01; reference half 33-02) |
 | DOCS-03 | Phase 33 | Complete (33-01) |
 | DOCS-04 | Phase 33 | ✅ Complete (33-02) |
-| META-01 | Phase 34 | Pending |
-| META-02 | Phase 34 | Pending |
-| META-03 | Phase 34 | Pending |
+| META-01 | Phase 34 | Complete (34-02) |
+| META-02 | Phase 34 | Complete (34-02) |
+| META-03 | Phase 34 | Complete (34-02) |
 | META-04 | Phase 34 | Pending |
 | PREP-01 | Phase 35 | Pending |
 | PREP-02 | Phase 35 | Pending |
