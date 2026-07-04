@@ -246,7 +246,7 @@ Plans:
 **Plans**: 3 plans
 **Wave 1**
 
-- [ ] 35-01-PLAN.md — Wave-0 RED test scaffolding (signature/roundtrip/no-execute/unsupported/cancel) + BlockingStubCursor extension (PREP-01/02)
+- [x] 35-01-PLAN.md — Wave-0 RED test scaffolding (signature/roundtrip/no-execute/unsupported/cancel) + BlockingStubCursor extension (PREP-01/02) — completed 2026-07-04
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
