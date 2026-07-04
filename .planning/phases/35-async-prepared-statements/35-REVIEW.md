@@ -18,12 +18,22 @@ findings:
   warning: 2
   info: 2
   total: 4
-status: issues_found
+status: resolved
+resolved_in: 1980f95
 ---
 
 # Phase 35: Code Review Report
 
-**Depth:** standard | **Files Reviewed:** 9 | **Status:** issues_found
+**Depth:** standard | **Files Reviewed:** 9 | **Status:** resolved (all 4 findings fixed in `1980f95`)
+
+> **Resolution (commit `1980f95`):** WR-01 — the prepared-statements guide example now
+> creates table `t` and wraps `adbc_execute_schema` in DuckDB's real `NotSupportedError`
+> path, so it runs end-to-end (verified). WR-02 — the non-poisoning claim is scoped in the
+> guide and both docstrings to drivers that leave no session state after a cancelled prepare,
+> with a PostgreSQL-style caveat. IN-01 — `adbc_execute_schema` `operation` widened to
+> `bytes | str` (method + Protocol) for parity. IN-02 — the misleading "prepare once then
+> run" comment reworded. `basedpyright` strict, `ruff`, the 12 prep tests, and
+> `mkdocs build --strict` all remain green after the fixes.
 
 ## Summary
 
