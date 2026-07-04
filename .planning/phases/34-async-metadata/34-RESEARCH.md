@@ -341,14 +341,16 @@ getattr(raw, "adbc_get_objects")()   # -> pyarrow.lib.RecordBatchReader
 
 **Note:** These are LOW-risk, DuckDB-verified-vs-generalization gaps, not open design questions. The design itself is fully constrained by the locked decisions and verified templates.
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Should the streaming metadata readers also get STREAM-06 (busy-while-live) and EDGE-33 (read-after-close → `ArrowInvalid`) tests?**
+   - RESOLVED: 34-01 Task 3 includes the minimal busy-guard leg in `test_meta_stream.py`; 34-02 Task 2's behavior block covers it. Full EDGE-33 clone intentionally skipped (inherited from the shared reader).
    - What we know: the shared `AsyncRecordBatchReader` already enforces both; DuckDB's `adbc_get_objects` returns a real `pyarrow.RecordBatchReader`, so the behavior is inherited.
    - What's unclear: whether META requirements alone justify the extra tests, or they're gold-plating.
    - Recommendation: add a **minimal** `test_meta_stream.py` busy-guard assertion (a foreign `await conn.commit()` while a metadata reader is live raises `ConnectionBusyError`) — it's ~10 lines and locks locked-decision #5's guarantee cheaply. Skip a full EDGE-33 clone unless the planner wants belt-and-suspenders.
 
 2. **`dict` value type annotation for `adbc_get_info`.**
+   - RESOLVED: 34-02 `interface_contracts` specifies `-> dict[str | int, Any]`, mirroring the driver.
    - What we know: driver types it `Dict[str | int, Any]`.
    - Recommendation: mirror the driver — `-> dict[str | int, Any]` (import `Any`). `dict[str | int, object]` also passes strict; either is fine.
 
