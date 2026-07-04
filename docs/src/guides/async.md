@@ -22,13 +22,14 @@ awaited.
 
     It is also incomplete. The following are not available yet on the async side:
 
-    - **Async ADBC metadata** — `adbc_get_table_schema`, `adbc_get_objects`, `adbc_get_info`
     - **Async prepared statements** — `adbc_prepare`, `adbc_execute_schema`
 
     What you get today is checkout, `execute` / `executemany`, the `fetch*` methods,
     `fetch_arrow_table`, Arrow streaming through `fetch_record_batch`, bulk write
-    through `adbc_ingest`, DataFrame convenience through `fetch_df` / `fetch_polars`,
-    and cooperative cancellation. The rest is on the roadmap.
+    through `adbc_ingest`, connection metadata through `adbc_get_info` /
+    `adbc_get_objects` / `adbc_get_table_schema`, DataFrame convenience through
+    `fetch_df` / `fetch_polars`, and cooperative cancellation. The rest is on the
+    roadmap.
 
 ## Install
 
@@ -304,6 +305,52 @@ Poolhouse never imports them: the driver imports pandas or polars on the worker
 thread as part of the fetch, so a missing install surfaces the native
 `ModuleNotFoundError` unchanged. Poolhouse adds no availability pre-check and no
 wrapping, exactly as the underlying sync ADBC method behaves.
+
+## Connection metadata
+
+The connection exposes the driver's ADBC metadata calls, each offloaded to a worker
+thread like every other blocking call. Three of them return a self-owning value you
+can read after check-in:
+
+```python
+async with await pool.connect() as conn:
+    info = await conn.adbc_get_info()  # a dict of driver/vendor codes
+    schema = await conn.adbc_get_table_schema("people")  # a pyarrow.Schema
+    types = await conn.adbc_get_table_types()  # a list of table-type names
+```
+
+`adbc_get_objects` is different. It streams the catalog/schema/table hierarchy
+through an [`AsyncRecordBatchReader`][adbc_poolhouse._async._reader.AsyncRecordBatchReader]
+instead of materializing it, so you consume it the same way as `fetch_record_batch`:
+stack `async with` over the awaited call and iterate.
+
+```python
+async with await pool.connect() as conn:
+    async with await conn.adbc_get_objects(depth="tables") as reader:
+        async for batch in reader:
+            process(batch)  # a pyarrow.RecordBatch, each pull offloaded
+```
+
+Two caveats carry over from the underlying calls. First, none of the six is
+cooperatively cancellable. They run through the same non-interruptible offload as
+`commit` and `rollback`, so a surrounding `fail_after` or `move_on_after` cannot
+abort an in-flight metadata call; the deadline waits until the driver returns.
+Second, the streaming reader locks its connection for its whole lifetime, the same
+way the reader from `fetch_record_batch` does. While it is open, a foreign call on
+the same connection raises
+[`ConnectionBusyError`][adbc_poolhouse.ConnectionBusyError], so drain and close it
+(reach for `async with`) before the next operation.
+
+`adbc_get_statistics` and `adbc_get_statistic_names` follow the same streaming shape,
+but not every backend implements them. DuckDB raises the driver's native
+`NotSupportedError`, which poolhouse passes through unwrapped.
+
+### See also
+
+- [Streaming a result set batch by batch](#streaming-a-result-set-batch-by-batch)
+  for the reader-lifetime rules the metadata stream inherits
+- [API Reference](../reference/) for the generated `AsyncConnection` metadata methods
+  with their Parameters / Returns / Raises
 
 ## Do not share one async connection across concurrent tasks
 
