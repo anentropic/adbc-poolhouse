@@ -62,11 +62,12 @@ def _noop_cancel() -> None:
     No-op cancel hook for connection-level metadata readers (no `adbc_cancel` exists).
 
     A connection --- unlike a cursor --- exposes no `adbc_cancel`, so a metadata
-    reader has nothing to abort through. `AsyncRecordBatchReader` still requires a
-    4-argument cancel hook, so the streaming metadata methods thread this no-op in.
-    It is a module-level function (not a lambda) so it preserves the offload
-    `TypeVarTuple` arity and keeps the `scan_async_package` source guard clean,
-    mirroring `_pull` in `_reader.py`.
+    reader has nothing to abort through. `AsyncRecordBatchReader` takes a
+    zero-argument cancel callback as its fourth constructor argument, so the streaming
+    metadata methods thread this no-op in and pair it with `poison_on_cancel=False` ---
+    a hook that cannot abort the worker must not trigger poison-recovery (CR-34-01).
+    It is a module-level function (not a lambda) only to keep the `scan_async_package`
+    source guard's matcher clean.
     """
 
 
@@ -497,9 +498,11 @@ class AsyncConnection:
         path, so a failed creation leaves the connection usable.
 
         The reader has no cancel of its own (the connection has no `adbc_cancel`), so
-        a cancelled per-batch pull cannot abort the C call; the shared reader still
-        invalidates the connection on a cancelled pull, so treat a cancelled stream
-        as leaving the connection detached from the pool.
+        a cancelled per-batch pull cannot abort the in-flight C call: the worker
+        finishes its read, the cancellation is then re-raised, and the pulled batch is
+        discarded. The connection is NOT invalidated --- it was never poisoned, and
+        invalidating would race a second thread against the still-running read on the
+        same connection (CR-34-01) --- so it returns to the pool on the normal checkin.
 
         Args:
             depth: How deep to descend the hierarchy --- `"all"` (the default),
@@ -551,7 +554,9 @@ class AsyncConnection:
         # success path, so a cancelled/failed creation leaves _reader_open False and
         # the connection usable (Pitfall 3).
         self._reader_open = True
-        return AsyncRecordBatchReader(sync_reader, self._limiter, self, _noop_cancel)
+        return AsyncRecordBatchReader(
+            sync_reader, self._limiter, self, _noop_cancel, poison_on_cancel=False
+        )
 
     async def adbc_get_statistics(
         self,
@@ -579,8 +584,10 @@ class AsyncConnection:
         read after close / check-in surfaces the driver's native
         `pyarrow.lib.ArrowInvalid`. The `_reader_open` lifetime lock is set AFTER the
         `_offloading()` span exits and ONLY on the success path. The reader has no
-        cancel of its own, so a cancelled per-batch pull invalidates the connection
-        (detaching it from the pool) rather than aborting the C call.
+        cancel of its own, so a cancelled per-batch pull cannot abort the C call: the
+        worker finishes its read and the cancellation is re-raised. The connection is
+        NOT invalidated (it was never poisoned) --- it returns to the pool on the
+        normal checkin (CR-34-01).
 
         Args:
             catalog_filter: Restrict to this catalog. Forwarded unchanged; `None`
@@ -623,7 +630,9 @@ class AsyncConnection:
         # Set AFTER the _offloading() span exits, success path ONLY (see
         # `adbc_get_objects` for the lifetime-lock rationale, Pitfall 3).
         self._reader_open = True
-        return AsyncRecordBatchReader(sync_reader, self._limiter, self, _noop_cancel)
+        return AsyncRecordBatchReader(
+            sync_reader, self._limiter, self, _noop_cancel, poison_on_cancel=False
+        )
 
     async def adbc_get_statistic_names(self) -> AsyncRecordBatchReader:
         """
@@ -644,8 +653,10 @@ class AsyncConnection:
         read after close / check-in surfaces the driver's native
         `pyarrow.lib.ArrowInvalid`. The `_reader_open` lifetime lock is set AFTER the
         `_offloading()` span exits and ONLY on the success path. The reader has no
-        cancel of its own, so a cancelled per-batch pull invalidates the connection
-        (detaching it from the pool) rather than aborting the C call.
+        cancel of its own, so a cancelled per-batch pull cannot abort the C call: the
+        worker finishes its read and the cancellation is re-raised. The connection is
+        NOT invalidated (it was never poisoned) --- it returns to the pool on the
+        normal checkin (CR-34-01).
 
         Returns:
             An `AsyncRecordBatchReader` streaming the statistic names, each pull
@@ -669,7 +680,9 @@ class AsyncConnection:
         # Set AFTER the _offloading() span exits, success path ONLY (see
         # `adbc_get_objects` for the lifetime-lock rationale, Pitfall 3).
         self._reader_open = True
-        return AsyncRecordBatchReader(sync_reader, self._limiter, self, _noop_cancel)
+        return AsyncRecordBatchReader(
+            sync_reader, self._limiter, self, _noop_cancel, poison_on_cancel=False
+        )
 
     async def close(self) -> None:
         """

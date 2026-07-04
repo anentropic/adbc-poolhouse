@@ -165,6 +165,8 @@ class AsyncRecordBatchReader:
         limiter: CapacityLimiter,
         owner: AsyncConnection,
         adbc_cancel: Callable[[], None],
+        *,
+        poison_on_cancel: bool = True,
     ) -> None:
         """
         Bind a sync reader to its limiter, owning connection, and the cursor's cancel.
@@ -179,18 +181,36 @@ class AsyncRecordBatchReader:
                 itself with `owner._offloading(from_reader=True)` (the reentrancy
                 exemption, so the reader does not deadlock on its own lifetime lock),
                 and `close` clears `owner._reader_open`.
-            adbc_cancel: The owning CURSOR's `adbc_cancel` bound method. The reader
-                has no `adbc_cancel` of its own (Pitfall 4) --- a cancelled pull must
-                abort the in-flight C call through the cursor's cancel, so it is
-                threaded in here at construction rather than resolved off
-                `sync_reader`.
+            adbc_cancel: The cancel callback fired to abort an in-flight pull. For a
+                cursor-backed reader this is the owning CURSOR's `adbc_cancel` bound
+                method (the reader has no `adbc_cancel` of its own, Pitfall 4). For a
+                connection-level metadata reader there is no `adbc_cancel` to thread
+                in, so a no-op is passed and `poison_on_cancel` is set `False` (see
+                below) --- the two go together.
+            poison_on_cancel: Whether a cancelled pull invalidates the owning
+                connection. `True` (the default, the cursor path) is correct when
+                `adbc_cancel` genuinely aborts the in-flight C call: the driver call
+                returns poisoned, so poison-recovery must run. `False` (the
+                connection-level metadata path) is REQUIRED when `adbc_cancel` is a
+                no-op: the worker thread cannot be aborted and stays in the driver's
+                `read_next_batch` until it returns on its own, so invalidating here
+                would drive `fairy.invalidate()` on a SECOND thread concurrently with
+                that still-running read --- the concurrent single-connection access
+                ADBC forbids. With `False`, a cancelled pull instead re-raises the
+                cancellation once the joined worker finishes, leaving the (never
+                poisoned) connection to return to the pool through the normal checkin.
         """
         self._reader = sync_reader
         self._limiter = limiter
         self._owner = owner
         # The CURSOR's cancel, NOT `self._reader.adbc_cancel` (which does not exist
-        # --- a pyarrow reader has no cancel hook). See Pitfall 4.
+        # --- a pyarrow reader has no cancel hook). See Pitfall 4. May be a no-op for a
+        # connection-level metadata reader, in which case `poison_on_cancel` is False.
         self._adbc_cancel = adbc_cancel
+        # False for connection-level metadata readers whose `adbc_cancel` is a no-op:
+        # the worker cannot be aborted, so invalidating on cancel would race a second
+        # thread against the still-running read on the same connection (CR-34-01).
+        self._poison_on_cancel = poison_on_cancel
         # Idempotency + finalizer latch: True once closed (or detached via close), so
         # `close` is a safe no-op on a second call and `__del__` warns only when the
         # reader was abandoned unclosed.
@@ -235,9 +255,20 @@ class AsyncRecordBatchReader:
         stays open until `close()` (D-29-11).
 
         If the surrounding scope is cancelled or times out while a pull is in flight,
-        the in-flight C call is aborted with the owning CURSOR's `adbc_cancel`, the
-        now-poisoned connection is invalidated (shielded), and the cancellation is
-        re-raised --- the connection never returns to the pool busy (STREAM-05).
+        behavior depends on whether this reader can actually abort its worker
+        (`poison_on_cancel`, set at construction):
+
+        - **Cursor-backed reader (`poison_on_cancel=True`).** The in-flight C call is
+          aborted with the owning CURSOR's `adbc_cancel`, the now-poisoned connection
+          is invalidated (shielded), and the cancellation is re-raised --- the
+          connection never returns to the pool busy (STREAM-05).
+        - **Connection-level metadata reader (`poison_on_cancel=False`).** There is no
+          `adbc_cancel`, so the worker cannot be aborted --- it finishes its
+          `read_next_batch` on its own (the joined worker, `abandon_on_cancel=False`)
+          and the cancellation is then re-raised. The connection is NOT invalidated:
+          it was never poisoned, and invalidating would race a second thread against
+          the still-running read on the same connection (CR-34-01). The dropped batch
+          is discarded; the connection returns to the pool through the normal checkin.
 
         Returns:
             The next `pyarrow.RecordBatch` in the stream.
@@ -249,11 +280,13 @@ class AsyncRecordBatchReader:
         """
         with self._owner._offloading(from_reader=True):  # noqa: SLF001  reader tier: _in_use only
             batch = await cancellable_offload(
-                self._adbc_cancel,  # the owning CURSOR's cancel (see __init__)
+                self._adbc_cancel,  # cursor's cancel, or a no-op for metadata readers
                 _pull,
                 self._reader,
                 limiter=self._limiter,
-                on_abort=self._owner.invalidate,  # poison recovery on a real abort (D-25-03)
+                # Poison-recover only when a real `adbc_cancel` aborted the worker; a
+                # no-op-cancel metadata reader must NOT invalidate (CR-34-01).
+                on_abort=self._owner.invalidate if self._poison_on_cancel else None,
             )
         if batch is _EXHAUSTED:
             raise StopAsyncIteration  # does NOT clear _reader_open (D-29-11)

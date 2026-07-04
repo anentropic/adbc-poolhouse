@@ -26,8 +26,8 @@ awaited.
 
     What you get today is checkout, `execute` / `executemany`, the `fetch*` methods,
     `fetch_arrow_table`, Arrow streaming through `fetch_record_batch`, bulk write
-    through `adbc_ingest`, connection metadata through `adbc_get_info` /
-    `adbc_get_objects` / `adbc_get_table_schema`, DataFrame convenience through
+    through `adbc_ingest`, the six `adbc_get_*` connection-metadata methods (see
+    [Connection metadata](#connection-metadata)), DataFrame convenience through
     `fetch_df` / `fetch_polars`, and cooperative cancellation. The rest is on the
     roadmap.
 

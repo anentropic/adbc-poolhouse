@@ -56,11 +56,18 @@ class TestMeta01ValueRoundTrip:
             table_types = await conn.adbc_get_table_types()
             assert isinstance(table_types, list)
 
-            cursor = conn.cursor()
-            await cursor.execute("CREATE TABLE t (id INTEGER, name VARCHAR)")
+            async with conn.cursor() as cursor:
+                await cursor.execute("CREATE TABLE t (id INTEGER, name VARCHAR)")
 
             schema = await conn.adbc_get_table_schema("t")
             assert isinstance(schema, pyarrow.Schema)
             assert schema.names == ["id", "name"]
+
+            # A non-default keyword filter forwarded through `functools.partial`
+            # reaches the driver arity-checked (WR-34-02): scoping to DuckDB's "main"
+            # schema still resolves the table and returns the same schema. A dropped
+            # or mis-forwarded kwarg would raise or silently ignore the filter.
+            scoped = await conn.adbc_get_table_schema("t", db_schema_filter="main")
+            assert scoped.names == ["id", "name"]
 
         assert duckdb_async_pool._pool.checkedout() == 0  # noqa: SLF001

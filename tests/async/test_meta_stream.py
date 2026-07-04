@@ -89,6 +89,50 @@ class TestMeta02Stream:
                 await conn.commit()
         assert duckdb_async_pool._pool.checkedout() == 0  # noqa: SLF001
 
+    @pytest.mark.anyio
+    async def test_get_objects_forwards_filters_duckdb(self, duckdb_async_pool: AsyncPool) -> None:
+        """
+        `adbc_get_objects` forwards its keyword filters through `functools.partial`.
+
+        Creates a table, then streams `adbc_get_objects` with explicit
+        `catalog_filter` / `db_schema_filter` / `table_name_filter` keywords (WR-34-02).
+        The reader still drains and the pool drains to 0 --- proving the non-default
+        filters reach the driver arity-checked rather than being dropped or raising.
+        """
+        async with await duckdb_async_pool.connect() as conn:
+            async with conn.cursor() as cursor:
+                await cursor.execute("CREATE TABLE scoped_t (id INTEGER)")
+            batch_count = 0
+            async with await conn.adbc_get_objects(
+                depth="columns",
+                db_schema_filter="main",
+                table_name_filter="scoped_t",
+            ) as reader:
+                async for batch in reader:
+                    assert isinstance(batch, pyarrow.RecordBatch)
+                    batch_count += 1
+            assert batch_count >= 1
+        assert duckdb_async_pool._pool.checkedout() == 0  # noqa: SLF001
+
+    @pytest.mark.anyio
+    async def test_streaming_metadata_reader_is_not_poison_on_cancel_duckdb(
+        self, duckdb_async_pool: AsyncPool
+    ) -> None:
+        """
+        The metadata reader is wired non-poisoning (CR-34-01 wiring guard).
+
+        The streaming metadata methods have no `adbc_cancel`, so their reader is built
+        with `poison_on_cancel=False`: a cancelled pull must NOT invalidate a
+        connection whose worker cannot be aborted (that would race a second thread
+        against the live read). This asserts the wiring directly; the cancel-time
+        behavior itself is exercised deterministically in `test_meta_cancel.py`.
+        """
+        async with (
+            await duckdb_async_pool.connect() as conn,
+            await conn.adbc_get_objects(depth="tables") as reader,
+        ):
+            assert reader._poison_on_cancel is False  # noqa: SLF001
+
 
 if __name__ == "__main__":  # pragma: no cover
     raise SystemExit(pytest.main([__file__, "-q"]))
