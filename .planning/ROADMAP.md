@@ -243,7 +243,10 @@ Plans:
   2. Behavior mirrors the sync methods — `adbc_execute_schema` returns the result Arrow schema without executing; no async-specific error types invented (PREP-02)
   3. The async guide + API reference document the async prepared-statement methods and remove the corresponding caveat line; `mkdocs build --strict` passes; humanizer pass applied (PREP-03)
 
-**Plans**: TBD
+**Plans**: 3 plans
+- [ ] 35-01-PLAN.md — Wave-0 RED test scaffolding (signature/roundtrip/no-execute/unsupported/cancel) + BlockingStubCursor extension (PREP-01/02)
+- [ ] 35-02-PLAN.md — Implement AsyncCursor.adbc_prepare + adbc_execute_schema (clone execute, drop on_abort) + _SyncCursor Protocol (PREP-01/02)
+- [ ] 35-03-PLAN.md — Docs: remove the async caveat, add prepare snippet, fix index.md, strict build + humanizer (PREP-03)
 **UI hint**: no
 
 ## Progress
@@ -259,7 +262,7 @@ Phases execute in numeric order: 29 → 30 → 31 → 32 → 33 → 34 → 35
 | 32. P2 Edge Hardening | v1.5.0 | 3/3 | Complete    | 2026-07-02 |
 | 33. Documentation | v1.5.0 | 2/2 | Complete    | 2026-07-04 |
 | 34. Async Metadata | v1.5.0 | 3/3 | Complete    | 2026-07-04 |
-| 35. Async Prepared Statements | v1.5.0 | 0/TBD | Not started | - |
+| 35. Async Prepared Statements | v1.5.0 | 0/3 | Planned | - |
 | 22-28. Async API | v1.4.0 | 29/29 | Complete | 2026-07-01 |
 | 21.1. ADBC dispatch URI-positional fix | v1.3.0 | 3/3 | Complete | 2026-05-20 |
 | 21. Quack Backend | v1.3.0 | 3/3 | Complete | 2026-05-19 |
