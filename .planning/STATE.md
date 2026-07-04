@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.5.0
 milestone_name: Async Cursor Completion
-status: ready-to-execute
-stopped_at: "Phase 34 (Async Metadata) PLANNED — 3 plans in 3 sequential waves, all passed the plan-checker (one trivial RESEARCH-marker blocker fixed on re-verify). 34-01: Wave-0 RED test scaffolding (test_meta_signature/roundtrip/stream/unsupported) covering META-01/02/03. 34-02: implementation — `_SyncConnection` Protocol + `_noop_cancel` + the six `adbc_get_*` methods with Google-style docstrings (META-01/02/03). 34-03: docs — shrink the async caveat, add the Connection-metadata how-to, API-reference render + strict-build gate (META-04). Locked decisions from `/gsd-discuss-phase 34 --assumptions` (no CONTEXT.md — assumptions mode): streaming trio (get_objects/get_statistics/get_statistic_names) wrapped in AsyncRecordBatchReader (option a, no eager materialization); plain non-cancellable `offload` mirroring commit/rollback with a `_noop_cancel` for the reader (connection has no adbc_cancel); fairy-cast access via a `_SyncConnection` Protocol; corrected return types (get_info→dict, get_table_schema→Schema, get_table_types→list); two-tier `_offloading()` guard with `_reader_open` set after the span on success only; no new error types / no find_spec. REQUIREMENTS.md META-02 + ROADMAP corrected to match real ADBC return types before planning. Next: execute Phase 34."
-last_updated: "2026-07-04T16:15:01.000Z"
-last_activity: 2026-07-04 -- Phase 34 (Async Metadata) planned; 3 plans in 3 waves, plan-checker passed
+status: executing
+stopped_at: "Completed 34-01-PLAN.md — Wave-0 RED metadata test scaffolding. Four new tests/async/test_meta_*.py files encode META-01/02/03 before any production symbol exists: test_meta_signature.py (sync inspect.signature over the six adbc_get_* methods — hasattr + keyword-only filter shape + table_name positional + depth default 'all'), test_meta_roundtrip.py (adbc_get_info->dict, adbc_get_table_types->list, adbc_get_table_schema->pyarrow.Schema on DuckDB + checkedout()==0), test_meta_stream.py (drain adbc_get_objects(depth='tables') via async for + busy-guard leg: foreign commit while reader live raises ConnectionBusyError), test_meta_unsupported.py (adbc_get_statistics/adbc_get_statistic_names surface native NotSupportedError unchanged + clean check-in). All 16 tests FAIL RED with AttributeError (methods not yet on AsyncConnection) — the acceptance signal; test_meta_guard.py passes (anyio marker discipline honored). Files carry the phase-29 file-level pyright RED pragma block (delete once 34-02 lands the symbols). Requirements META-01/02/03 intentionally left UNMARKED — RED tests don't satisfy them; 34-02 (implementation) turns them GREEN. Commits: 7c0f6be, bda4ee0, f00aca6. Env note: uv-run basedpyright pre-commit hook panics under the command sandbox (known uv-sandbox gotcha); commits made with sandbox disabled so the hook ran natively and passed (no --no-verify)."
+last_updated: "2026-07-04T16:17:43.116Z"
+last_activity: 2026-07-04 -- Completed 34-01-PLAN.md (Wave-0 RED metadata test scaffolding)
 progress:
   total_phases: 7
   completed_phases: 5
-  total_plans: 13
-  completed_plans: 13
-  percent: 71
+  total_plans: 16
+  completed_plans: 14
+  percent: 74
 ---
 
 # Project State
@@ -21,16 +21,17 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-01)
 
 **Core value:** One config in, one pool out — `create_pool(SnowflakeConfig(...))` returns a ready-to-use SQLAlchemy QueuePool in a single call.
-**Current focus:** Phase 34 — async metadata (planned; ready to execute)
+**Current focus:** Phase 34 — Async Metadata
 
 ## Current Position
 
-Phase: 34 (async metadata) — PLANNED (3 plans in 3 waves; plan-checker passed 2026-07-04)
-Next: Execute Phase 34 (`/gsd-execute-phase 34`), then Phase 35 (Async Prepared Statements, PREP-01..03)
-Status: v1.5.0 extended to complete async/sync parity — Phase 34 (Async Metadata, META-01..04) then Phase 35 (Async Prepared Statements, PREP-01..03). Partitions deferred. Release step (version bump + changelog) still remains after 35.
-Last activity: 2026-07-04 -- Phase 34 (Async Metadata) planned; 3 plans in 3 waves, plan-checker passed
+Phase: 34 (Async Metadata) — EXECUTING
+Plan: 2 of 3 (34-01 complete)
+Next: Execute 34-02 (implementation — `_SyncConnection` Protocol + `_noop_cancel` + the six `adbc_get_*` methods, turns the RED tests GREEN)
+Status: Executing Phase 34
+Last activity: 2026-07-04 -- Completed 34-01-PLAN.md (Wave-0 RED metadata test scaffolding)
 
-Progress: [██████████████░░░░░░] 71% (5 of 7 phases complete: 29, 30, 31, 32, 33; next: 34, 35)
+Progress: [██████████████░░░░░░] 74% (5 of 7 phases complete: 29, 30, 31, 32, 33; Phase 34 in progress, 1 of 3 plans done)
 
 ## Accumulated Context
 
@@ -90,6 +91,6 @@ Pre-v1.4.0 tracking cruft plus one non-functional docstring; run `/gsd-cleanup` 
 
 ## Session Continuity
 
-Last session: 2026-07-04T02:05:00Z
-Stopped at: Completed 33-02-PLAN.md — Phase 33 CLOSED. API-reference render-fidelity audit + strict-build completion gate. Both tasks verify-only (docstrings + gen_ref_pages.py injection already complete; render confirmed AsyncRecordBatchReader + the four AsyncCursor methods with Parameters/Returns/Raises tables + Example blocks, the adbc_ingest mode table + replace-drops warning, ModuleNotFoundError/ConnectionBusyError) — no docstring edits, no source commits. `.venv/bin/mkdocs build --strict` exit 0 as the phase's single automated gate; index.md 'not available' invariant from 33-01 holds. DOCS-01..04 all complete. Previously: Completed 33-01-PLAN.md — reconciled + humanized the async guide/index prose and fixed the index.md DataFrame-availability contradiction (DOCS-01/03 complete; DOCS-02 guide half done). Previously: Completed 32-03-PLAN.md — Phase 32 CLOSED. Wave-2 gate plan: proved the four Wave 1 modules hold together in the full async suite under `ADBC_ASYNC_REPEAT=20` on macOS (2702 passed, 0 hangs, no cross-test interaction, no regression) and — authoritatively — on Linux CI (run 28622475955, Python 3.11 + 3.14, 0 hangs), closing the platform-dependent lost-wakeup gate for EDGE-24/31/32. Task 2 blocking human-verify checkpoint APPROVED (contingency confirmed NOT fired; both Wave 1 SUMMARYs state zero production change). Import-lint (PKG-03) + basedpyright-strict + `mkdocs --strict` (exit 0) all green. Task 3 docs gate ran in reduced test-only form: no RST roles in the new modules, no new public symbol, no guide edit — no file change, no commit (the passing strict build IS the gate). All six EDGE requirements (08/13/14/24/31/32) complete; zero production change across the whole phase (the new-method offloads share the already-proven `cancellable_offload`/`offload` chokepoint).
-Next step: Phase 33 and all v1.5.0 documentation requirements (DOCS-01..04) are complete. The remaining v1.5.0 milestone work is the deferred release step — bump `pyproject.toml` to 1.5.0 and add the `[1.5.0]` changelog entry — which was held out of the docs scope by user decision (33-RESEARCH Open Question 1). Run `/gsd-*` milestone-close / release flow when ready.
+Last session: 2026-07-04T16:17:43Z
+Stopped at: Completed 34-01-PLAN.md — Wave-0 RED metadata test scaffolding (four tests/async/test_meta_*.py files, 16 tests failing RED as designed, meta-guard clean). See stopped_at frontmatter for detail. Previously: Completed 33-02-PLAN.md — Phase 33 CLOSED. API-reference render-fidelity audit + strict-build completion gate. Both tasks verify-only (docstrings + gen_ref_pages.py injection already complete; render confirmed AsyncRecordBatchReader + the four AsyncCursor methods with Parameters/Returns/Raises tables + Example blocks, the adbc_ingest mode table + replace-drops warning, ModuleNotFoundError/ConnectionBusyError) — no docstring edits, no source commits. `.venv/bin/mkdocs build --strict` exit 0 as the phase's single automated gate; index.md 'not available' invariant from 33-01 holds. DOCS-01..04 all complete. Previously: Completed 33-01-PLAN.md — reconciled + humanized the async guide/index prose and fixed the index.md DataFrame-availability contradiction (DOCS-01/03 complete; DOCS-02 guide half done). Previously: Completed 32-03-PLAN.md — Phase 32 CLOSED. Wave-2 gate plan: proved the four Wave 1 modules hold together in the full async suite under `ADBC_ASYNC_REPEAT=20` on macOS (2702 passed, 0 hangs, no cross-test interaction, no regression) and — authoritatively — on Linux CI (run 28622475955, Python 3.11 + 3.14, 0 hangs), closing the platform-dependent lost-wakeup gate for EDGE-24/31/32. Task 2 blocking human-verify checkpoint APPROVED (contingency confirmed NOT fired; both Wave 1 SUMMARYs state zero production change). Import-lint (PKG-03) + basedpyright-strict + `mkdocs --strict` (exit 0) all green. Task 3 docs gate ran in reduced test-only form: no RST roles in the new modules, no new public symbol, no guide edit — no file change, no commit (the passing strict build IS the gate). All six EDGE requirements (08/13/14/24/31/32) complete; zero production change across the whole phase (the new-method offloads share the already-proven `cancellable_offload`/`offload` chokepoint).
+Next step: Execute plan 34-02 (implementation) — add the `_SyncConnection` Protocol + `_noop_cancel` module fn + the six `adbc_get_*` methods to `_async/_connection.py` with Google-style docstrings, turning the 16 RED tests GREEN (META-01/02/03). Then 34-03 (docs). The deferred v1.5.0 release step (bump `pyproject.toml` to 1.5.0 + `[1.5.0]` changelog) remains held out of docs scope by user decision (33-RESEARCH Open Question 1).
