@@ -244,9 +244,18 @@ Plans:
   3. The async guide + API reference document the async prepared-statement methods and remove the corresponding caveat line; `mkdocs build --strict` passes; humanizer pass applied (PREP-03)
 
 **Plans**: 3 plans
+**Wave 1**
+
 - [ ] 35-01-PLAN.md — Wave-0 RED test scaffolding (signature/roundtrip/no-execute/unsupported/cancel) + BlockingStubCursor extension (PREP-01/02)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 35-02-PLAN.md — Implement AsyncCursor.adbc_prepare + adbc_execute_schema (clone execute, drop on_abort) + _SyncCursor Protocol (PREP-01/02)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
 - [ ] 35-03-PLAN.md — Docs: remove the async caveat, add prepare snippet, fix index.md, strict build + humanizer (PREP-03)
+
 **UI hint**: no
 
 ## Progress

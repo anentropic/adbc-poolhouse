@@ -345,7 +345,7 @@ def adbc_execute_schema(self, operation: object = None, parameters: object = Non
 
 **All other claims verified via live probe or source introspection this session.**
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Positive `adbc_execute_schema` on a real backend**
    - What we know: DuckDB + SQLite both return `NotSupportedError`.

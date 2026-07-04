@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v1.5.0
 milestone_name: Async Cursor Completion
-status: completed
-stopped_at: "Phase 34 (Async Metadata) COMPLETE — verification passed 4/4 must-haves (META-01..04). Shipped the six adbc_get_* connection-metadata methods on AsyncConnection as offload wrappers over the sync dbapi.Connection (via the SQLAlchemy fairy + a _SyncConnection Protocol): value trio (get_info→dict, get_table_schema→pyarrow.Schema, get_table_types→list) as plain non-cancellable offload like commit/rollback; streaming trio (get_objects/get_statistics/get_statistic_names) wraps the native RecordBatchReader in AsyncRecordBatchReader with no eager materialization. Unsupported backends surface the driver's native NotSupportedError unchanged (DuckDB: the two statistics methods). Docs: async guide caveat shrunk (metadata bullet removed; prepared-statements bullet kept for Phase 35), Connection-metadata how-to added, API reference auto-renders all six; mkdocs --strict exit 0. Code review found + FIXED a real concurrency blocker (CR-34-01, commit 5cf854a): the streaming metadata readers reused the cursor reader's on_abort=invalidate with a no-op cancel, which would run fairy.invalidate() on a second thread against a connection whose worker was still blocked in read_next_batch (the concurrent single-connection access ADBC forbids) and drop a never-poisoned connection. Fix: poison_on_cancel flag on AsyncRecordBatchReader (default True = cursor path unchanged); metadata readers use poison_on_cancel=False so a cancelled pull re-raises without invalidate. Guarded by test_meta_cancel.py (deterministic stub, invalidate NOT called, x20 loop); test_reader_cancel.py confirms the cursor path is unregressed. Gates: full async suite 235 passed/4 skipped, basedpyright 0 errors on _async/, mkdocs --strict exit 0. Next: Phase 35 (Async Prepared Statements, PREP-01..03), then the v1.5.0 release step (version bump + changelog)."
-last_updated: "2026-07-04T18:05:00.000Z"
-last_activity: 2026-07-04 -- Phase 34 (Async Metadata) complete; code-review blocker CR-34-01 fixed + verified
+status: executing
+stopped_at: "Completed 34-01-PLAN.md — Wave-0 RED metadata test scaffolding (four tests/async/test_meta_*.py files, 16 tests failing RED as designed, meta-guard clean). See stopped_at frontmatter for detail. Previously: Completed 33-02-PLAN.md — Phase 33 CLOSED. API-reference render-fidelity audit + strict-build completion gate. Both tasks verify-only (docstrings + gen_ref_pages.py injection already complete; render confirmed AsyncRecordBatchReader + the four AsyncCursor methods with Parameters/Returns/Raises tables + Example blocks, the adbc_ingest mode table + replace-drops warning, ModuleNotFoundError/ConnectionBusyError) — no docstring edits, no source commits. `.venv/bin/mkdocs build --strict` exit 0 as the phase's single automated gate; index.md 'not available' invariant from 33-01 holds. DOCS-01..04 all complete. Previously: Completed 33-01-PLAN.md — reconciled + humanized the async guide/index prose and fixed the index.md DataFrame-availability contradiction (DOCS-01/03 complete; DOCS-02 guide half done). Previously: Completed 32-03-PLAN.md — Phase 32 CLOSED. Wave-2 gate plan: proved the four Wave 1 modules hold together in the full async suite under `ADBC_ASYNC_REPEAT=20` on macOS (2702 passed, 0 hangs, no cross-test interaction, no regression) and — authoritatively — on Linux CI (run 28622475955, Python 3.11 + 3.14, 0 hangs), closing the platform-dependent lost-wakeup gate for EDGE-24/31/32. Task 2 blocking human-verify checkpoint APPROVED (contingency confirmed NOT fired; both Wave 1 SUMMARYs state zero production change). Import-lint (PKG-03) + basedpyright-strict + `mkdocs --strict` (exit 0) all green. Task 3 docs gate ran in reduced test-only form: no RST roles in the new modules, no new public symbol, no guide edit — no file change, no commit (the passing strict build IS the gate). All six EDGE requirements (08/13/14/24/31/32) complete; zero production change across the whole phase (the new-method offloads share the already-proven `cancellable_offload`/`offload` chokepoint)."
+last_updated: "2026-07-04T19:57:22.513Z"
+last_activity: 2026-07-04 -- Phase 35 planning complete
 progress:
   total_phases: 7
   completed_phases: 6
@@ -28,8 +28,8 @@ See: .planning/PROJECT.md (updated 2026-07-01)
 Phase: 35
 Plan: Not started
 Next: Phase 35 (Async Prepared Statements) — plan the phase
-Status: Phase 34 complete (META-01..04); ready for Phase 35
-Last activity: 2026-07-04
+Status: Ready to execute
+Last activity: 2026-07-04 -- Phase 35 planning complete
 
 Progress: [█████████████████░░░] 86% (6 of 7 phases complete: 29, 30, 31, 32, 33, 34; Phase 35 remaining)
 

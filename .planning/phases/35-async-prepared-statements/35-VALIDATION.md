@@ -19,7 +19,7 @@ created: 2026-07-04
 |----------|-------|
 | **Framework** | pytest 7.x (asyncio + trio via anyio) |
 | **Config file** | `pyproject.toml` / `tests/conftest.py` |
-| **Quick run command** | `.venv/bin/pytest tests/_async/ -k prepare or execute_schema -q` |
+| **Quick run command** | `.venv/bin/pytest tests/async/ -k "prep" -q` |
 | **Full suite command** | `.venv/bin/pytest -q` |
 | **Estimated runtime** | ~30–90 seconds |
 
@@ -57,7 +57,7 @@ in-flight cancel (BlockingStubCursor, asyncio + trio), and DuckDB
 
 ## Wave 0 Requirements
 
-- [ ] RED test module(s) under `tests/_async/` — stubs for PREP-01/02
+- [ ] RED test module(s) under `tests/async/` — stubs for PREP-01/02
 - [ ] `BlockingStubCursor` extension — blocking `adbc_prepare` / `adbc_execute_schema`
       + call counters (must NOT touch `execute_call_count` — the no-execute proof)
 
