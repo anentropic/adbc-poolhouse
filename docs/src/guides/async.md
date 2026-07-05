@@ -23,10 +23,16 @@ awaited.
     The async surface covers checkout, `execute` / `executemany`, the `fetch*` methods,
     `fetch_arrow_table`, Arrow streaming through `fetch_record_batch`, bulk write
     through `adbc_ingest`, prepared statements through `adbc_prepare` /
-    `adbc_execute_schema`, the six `adbc_get_*` connection-metadata methods (see
+    `adbc_execute_schema`, partitioned result sets through `adbc_execute_partitions` /
+    `adbc_read_partition`, the six `adbc_get_*` connection-metadata methods (see
     [Connection metadata](#connection-metadata)), DataFrame convenience through
-    `fetch_df` / `fetch_polars`, and cooperative cancellation. Only partitioned result
-    sets (`adbc_execute_partitions`) stay deferred.
+    `fetch_df` / `fetch_polars`, and cooperative cancellation — the full set of ADBC
+    methods the sync raw-cursor path exposes.
+
+    Partitioned execution (`adbc_execute_partitions` / `adbc_read_partition`) is an
+    ADBC extension for distributed result sets and only a few backends (Flight SQL and
+    similar) implement it. On a backend that does not — DuckDB, for example — both
+    methods raise the driver's native `NotSupportedError`, surfaced unchanged.
 
 ## Install
 
@@ -401,6 +407,47 @@ that needs a rollback; validate that behavior before relying on it on such a dri
 
 - [API Reference](../reference/) for the generated `AsyncCursor` `adbc_prepare` and
   `adbc_execute_schema` docs with their Parameters / Returns / Raises
+
+## Partitioned result sets
+
+Some backends can split a query's result into independent partitions you read
+separately — the basis for distributing a large read across workers. `adbc_execute_partitions`
+runs the query and returns a list of opaque partition descriptors plus the result-set schema;
+`adbc_read_partition` reads one descriptor into the cursor, which you then drain with the usual
+`fetch_*` methods.
+
+This is an ADBC extension for distributed result sets, and only a few backends (Flight SQL and
+similar) implement it. On a backend that does not — DuckDB, for example — both methods raise
+the driver's native `NotSupportedError`, which poolhouse passes through unwrapped.
+
+```python
+from adbc_driver_manager import NotSupportedError
+
+async with await pool.connect() as conn:
+    cursor = conn.cursor()
+    try:
+        partitions, schema = await cursor.adbc_execute_partitions("SELECT * FROM events")
+    except NotSupportedError:
+        partitions = []  # backend has no partitioned execution
+
+    for descriptor in partitions:
+        await cursor.adbc_read_partition(descriptor)
+        table = await cursor.fetch_arrow_table()  # this partition's rows
+```
+
+`adbc_execute_partitions` returns a `(partitions, schema)` tuple: `partitions` is a list of
+`bytes` descriptors, and `schema` is the result-set `pyarrow.Schema` (or `None` when the driver
+defers it). Each descriptor is opaque — hand it back to `adbc_read_partition` unchanged.
+
+Unlike `adbc_prepare` / `adbc_execute_schema`, both methods **execute** — `adbc_execute_partitions`
+runs the query and `adbc_read_partition` opens a result set — so a cancelled call is poisoning:
+the in-flight call aborts through the cursor's `adbc_cancel`, the connection is invalidated, and
+it never returns to the pool busy, exactly like a cancelled `execute`.
+
+### See also
+
+- [API Reference](../reference/) for the generated `AsyncCursor` `adbc_execute_partitions` and
+  `adbc_read_partition` docs with their Parameters / Returns / Raises
 
 ## Do not share one async connection across concurrent tasks
 
