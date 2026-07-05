@@ -6,9 +6,11 @@ A focused Python library that takes a typed warehouse configuration and returns 
 
 ## Current State
 
-**Shipped:** v1.4.0 Async API (2026-07-01) — an optional async surface behind an `[async]` extra. `create_async_pool` / `managed_async_pool` / `close_async_pool` mirror the sync trio; awaitable `AsyncPool` / `AsyncConnection` / `AsyncCursor` cover all 13 backends by offloading the unchanged sync core to worker threads via anyio (asyncio + trio). ADBC releases the GIL, so the offload delivers real concurrency, and the sync path is untouched with zero added async dependency.
+**Shipped:** v1.5.0 Async Cursor Completion (2026-07-05) — completed the async cursor surface. The four v1.4.0-deferred ADBC cursor methods (`fetch_record_batch` Arrow streaming, `adbc_ingest` bulk write, `fetch_df`/`fetch_polars` DataFrame convenience) plus connection-level metadata (`adbc_get_*`) and prepared statements (`adbc_prepare`/`adbc_execute_schema`) now ship as pure offload wrappers over the unchanged sync core, routed through the existing v1.4.0 `offload`/`cancellable_offload` chokepoint. Async/sync parity now covers every ADBC method the sync raw-cursor path exposes (partitioned result sets excepted, deferred as niche Flight-SQL-only). The deferred P2 async edge-case hardening suite landed as well (test-only). No new runtime deps, no new extras, no sync-core change.
 
-**Current milestone:** v1.5.0 Async Cursor Completion — offload the four v1.4.0-deferred ADBC cursor methods (`fetch_record_batch` Arrow streaming, `adbc_ingest` bulk write, `fetch_df`/`fetch_polars` DataFrame convenience) and land the deferred P2 async edge-case hardening suite. Pure offload wrappers over methods that already exist on the wrapped sync ADBC cursor — no dependency changes, no sync-core changes. pandas/polars stay user-supplied runtime deps (ADBC raises if absent), consistent with how the library treats drivers.
+**Previously shipped:** v1.4.0 Async API (2026-07-01) — the optional `[async]` extra: `create_async_pool` / `managed_async_pool` / `close_async_pool` plus awaitable `AsyncPool` / `AsyncConnection` / `AsyncCursor` for all 13 backends, offloading the sync core to worker threads via anyio (asyncio + trio) with zero added async dependency on the sync path.
+
+**Current milestone:** Planning the next milestone — v1.5.0 completed async/sync parity for the cursor surface; the async API is feature-complete against the sync raw-cursor path.
 
 ## Core Value
 
@@ -40,15 +42,14 @@ One config in, one pool out — `create_pool(SnowflakeConfig(...))` returns a re
 - ✓ Semi-integration tests for all 12 backends — v1.2.0
 - ✓ `QuackConfig` backend for `adbc-driver-quack` (URI + decomposed host/port + token + tls), plus guide, configuration table, index listing, mkdocs nav — v1.3.0 (Phase 21, 2026-05-19)
 - ✓ Optional async API (`[async]` extra): `create_async_pool` / `managed_async_pool` / `close_async_pool` + `AsyncPool` / `AsyncConnection` / `AsyncCursor` for all 13 backends via anyio thread-offload (asyncio + trio), dedicated per-pool `CapacityLimiter`, cooperative cancellation that never poisons the pool, PEP 562 zero-cost sync path, dual-backend test matrix, honest concurrency docs — v1.4.0 (Phases 22–28, 2026-07-01)
+- ✓ Async cursor completion — Arrow streaming (`fetch_record_batch` → `AsyncRecordBatchReader`, reader lifetime bound to checkout), bulk write (`adbc_ingest`, `on_abort=invalidate`), DataFrame convenience (`fetch_df`/`fetch_polars`, user-supplied pandas/polars), connection metadata (`adbc_get_*`), and prepared statements (`adbc_prepare`/`adbc_execute_schema`), all pure offload wrappers over the unchanged sync core; plus the deferred P2 async edge-case hardening suite (test-only). Async/sync parity complete for the raw-cursor surface — v1.5.0 (Phases 29–35, 2026-07-05)
 
 ### Active
 
-**v1.5.0 Async Cursor Completion** — complete the async cursor surface with the four v1.4.0-deferred methods (pure offload wrappers over the already-wrapped sync ADBC cursor) plus the deferred P2 edge-case hardening:
+No active milestone — v1.5.0 completed async/sync parity for the cursor surface. Candidates for the next milestone (choose at `/gsd-new-milestone`):
 
-- [ ] Arrow streaming — `await cursor.fetch_record_batch()` + `async for batch in ...` (RecordBatchReader lifetime vs. reset-event checkin is the headline design)
-- [ ] Async bulk write — `await cursor.adbc_ingest(table_name, data, mode=...)`
-- [x] DataFrame convenience — `await cursor.fetch_df()` / `await cursor.fetch_polars()` (pandas/polars user-supplied at runtime; no new poolhouse extras) — validated in Phase 31 (2026-07-02)
-- [ ] P2 async edge-case suite — EDGE-08, 13/14, 20, 22/23, 24, 31/32 (designs in `.planning/research/ASYNC-EDGE-CASES.md`)
+- [ ] Async partitioned result sets (`adbc_execute_partitions` / `adbc_read_partition`) — the one deferred async surface; niche Flight-SQL/BigQuery-oriented, revisit only if a consumer needs it
+- [ ] Re-record the Snowflake streaming cassette once `pytest-adbc-replay` supports `fetch_record_batch` (currently the reader legs are DuckDB-only / manual)
 
 **Carried (externally blocked):**
 - [ ] Verify Teradata field names against real Columnar ADBC Teradata driver
@@ -83,7 +84,7 @@ Two concrete consumers:
 
 Integration tests use pytest-adbc-replay cassettes (VCR-style record/replay) for Snowflake and Databricks — CI runs without credentials.
 
-433 tests passing, 2 skipped (v1.4.0 added the async layer plus a dual-backend asyncio/trio matrix over DuckDB + Snowflake cassette). The `[async]` extra adds only anyio; the shipped sync wheel gains no async dependency.
+As of v1.5.0: ~5,360 LOC Python in `src/` and 489 test functions across the sync + async suites (async tests run under both asyncio and trio over DuckDB in-proc + a Snowflake cassette; cancellation/concurrency legs looped ×20, 0 hangs, on macOS and Linux CI). The `[async]` extra adds only anyio; the shipped sync wheel gains no async dependency. Package version is 1.5.0 (`pyproject.toml`).
 
 ## Constraints
 
@@ -118,6 +119,9 @@ Integration tests use pytest-adbc-replay cassettes (VCR-style record/replay) for
 | Cancellation invalidates, never returns busy | A cancelled in-flight C call can poison the connection | ✓ Good — `checkedout()==0` after cancel, asyncio/trio parity (v1.4.0) |
 | `[async]` extra + PEP 562 lazy import | Sync users pay nothing; anyio stays optional | ✓ Good — sync suite green with anyio absent (v1.4.0) |
 | TypeVarTuple/Unpack at offload boundary (not ParamSpec) | ParamSpec can't type keyword-only params after `*args` | ✓ Good — basedpyright strict, 0 errors (v1.4.0) |
+| Reader lifetime bound to the checked-out connection | `fetch_record_batch` returns a live reader; binding it to checkout + closing on the reset-event checkin makes read-after-checkin a clean driver error, not a use-after-free | ✓ Good — no bespoke error type; DuckDB-pinned ordering (v1.5.0, Phase 29) |
+| No bespoke async error types, no `find_spec` pre-checks | Async methods mirror the sync method's native errors (closed-stream `ArrowInvalid`, `ModuleNotFoundError`, `NotSupportedError`) — the offload chokepoint passes them through unchanged | ✓ Good — smaller surface, sync/async behavioral parity (v1.5.0) |
+| `on_abort` omitted for prepare / metadata offloads | A prepare / `execute_schema` / metadata read writes no state, so a cancelled call returns a clean connection with no `invalidate` (cancellable but non-poisoning); only stateful writes (`adbc_ingest`) invalidate | ✓ Good — proven by cancel tests (`adbc_cancel`==1, `invalidate`==0); fixed CR-34-01 (v1.5.0, Phases 34/35) |
 
 ## Evolution
 
@@ -137,4 +141,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-07-02 — Phase 31 (DataFrame Convenience) complete: `await cursor.fetch_df()` / `fetch_polars()` shipped as byte-for-byte `fetch_arrow_table` offload clones; pandas/polars remain user-supplied (native `ModuleNotFoundError` propagates unchanged), dev-group-only, `__init__` surface untouched. Three of the four deferred cursor methods now landed (arrow streaming P29, bulk write P30, DataFrame convenience P31). Next: Phase 32 — P2 async edge-case hardening.*
+*Last updated: 2026-07-05 after v1.5.0 milestone — Async Cursor Completion shipped (Phases 29–35): Arrow streaming, bulk write, DataFrame convenience, connection metadata, and prepared statements all landed as pure offload wrappers over the unchanged sync core, plus the deferred P2 async edge-case suite. Async/sync parity complete for the raw-cursor surface (partitioned result sets excepted). Package bumped to 1.5.0. Next: `/gsd-new-milestone`.*
