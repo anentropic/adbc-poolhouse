@@ -268,7 +268,7 @@ dev = [
     { name = "polars", specifier = ">=1.0" },
     { name = "pyarrow", specifier = ">=23.0.1" },
     { name = "pytest", specifier = ">=8.0.0" },
-    { name = "pytest-adbc-replay", specifier = ">=1.0.0a3" },
+    { name = "pytest-adbc-replay", specifier = ">=1.1.0" },
     { name = "pytest-cov", specifier = ">=6.0.0" },
     { name = "pytest-repeat" },
     { name = "pytest-timeout" },

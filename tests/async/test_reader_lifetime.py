@@ -127,30 +127,34 @@ class TestEdge33ReadAfterCheckin:
                 await reader.__anext__()
 
 
-# A1 (see test_reader_cassette_smoke.py): the checked-in Snowflake cassette CANNOT
-# replay a streaming `fetch_record_batch`. `pytest-adbc-replay` >= 1.1 now exposes a
-# `fetch_record_batch` method, but the `snowflake_arrow_round_trip` cassette still
-# stores a single materialized Arrow result, not a streaming reader interaction --- so
-# NEITHER Snowflake reader leg below can run offline against the current cassette.
-# Both are scoped to a MANUAL-ONLY re-record follow-up (29-VALIDATION §Manual-Only
-# Verifications). They carry `@pytest.mark.snowflake` (CI runs `-m "not snowflake"`,
-# so they never run in the offline gate) AND a module-level skip so a stray local
-# run does not fail on the missing streaming interaction. DuckDB carries the
-# mandatory EDGE-33 coverage and is NOT gated on this result. Remove the skip and
-# re-enable these legs once the cassette is re-recorded against the live driver with
-# a streaming reader interaction (needs Snowflake credentials).
-_A1_SNOWFLAKE_SKIP = pytest.mark.skip(
-    reason="A1: Snowflake cassette lacks a streaming fetch_record_batch recording "
-    "(pytest-adbc-replay >= 1.1 supports the method, but the cassette must be "
-    "re-recorded against the live driver); manual-only re-record follow-up. "
-    "See test_reader_cassette_smoke.py + 29-01-SUMMARY.md."
+# A1 (see test_reader_cassette_smoke.py) is now resolved for the drain leg.
+# `pytest-adbc-replay` >= 1.1 exposes `fetch_record_batch` and streams it from the
+# recorded result in the checked-in `snowflake_arrow_round_trip` cassette, so
+# `test_drain_then_checkin_rows_snowflake` below runs OFFLINE in CI --- no live
+# Snowflake, no re-record needed.
+#
+# `test_read_after_checkin_raises_arrow_invalid_snowflake` stays live-driver-only. Its
+# assertion is that reading AFTER the connection checks in raises the driver's native
+# closed-stream `ArrowInvalid`. That is a property of the live C-level stream being
+# invalidated on checkin; a cassette replay serves recorded batches from a file and is
+# not bound to the pool's connection lifecycle, so it cannot reproduce the closed-stream
+# error (replay yields instead of raising). Re-recording would NOT change this --- it is
+# a structural limit of replay, not a missing recording. DuckDB's
+# `test_read_after_checkin_raises_arrow_invalid_duckdb` carries the mandatory offline
+# EDGE-33 read-after-checkin coverage against a real driver; this Snowflake leg runs
+# only against live credentials (`--adbc-record`) and is skipped offline.
+_LIVE_DRIVER_ONLY_SKIP = pytest.mark.skip(
+    reason="Read-after-checkin ArrowInvalid is a live-stream-close property that "
+    "cassette replay cannot model (the replay reader is not bound to the pool "
+    "connection lifecycle); runs only against live Snowflake credentials. DuckDB's "
+    "duckdb leg carries the offline EDGE-33 read-after-checkin coverage."
 )
 
 
-@_A1_SNOWFLAKE_SKIP
 class TestEdge33Snowflake:
-    """EDGE-33 Snowflake-cassette leg --- A1: cassette lacks streaming replay (skipped)."""
+    """EDGE-33 Snowflake leg: streaming drain replays offline; read-after-checkin is live-only."""
 
+    @_LIVE_DRIVER_ONLY_SKIP
     @pytest.mark.anyio
     @pytest.mark.snowflake
     @pytest.mark.adbc_cassette("snowflake_arrow_round_trip")
@@ -158,14 +162,15 @@ class TestEdge33Snowflake:
         self, snowflake_async_pool: AsyncPool
     ) -> None:
         """
-        Snowflake read-after-checkin raises native `ArrowInvalid` (manual-only).
+        Snowflake read-after-checkin raises native `ArrowInvalid` (live-driver-only).
 
-        Would prove the read-after-checkin `ArrowInvalid` path on the Snowflake
-        driver, but A1 resolved that the cassette cannot serve `fetch_record_batch`
-        offline (the replay cursor has no such method), so this leg is a MANUAL-ONLY
-        re-record follow-up and is skipped in the automated gate. DuckDB's
+        The read-after-checkin `ArrowInvalid` is a property of the live driver's stream
+        being invalidated when the connection checks in. A cassette replay serves
+        recorded batches and is not bound to the connection lifecycle, so it cannot
+        reproduce the closed-stream error --- this leg therefore runs only against live
+        Snowflake credentials and is skipped offline. DuckDB's
         `test_read_after_checkin_raises_arrow_invalid_duckdb` carries the mandatory
-        EDGE-33 coverage.
+        offline EDGE-33 coverage.
         """
         async with await snowflake_async_pool.connect() as conn:
             cur = conn.cursor()
@@ -180,13 +185,13 @@ class TestEdge33Snowflake:
     @pytest.mark.adbc_cassette("snowflake_arrow_round_trip")
     async def test_drain_then_checkin_rows_snowflake(self, snowflake_async_pool: AsyncPool) -> None:
         """
-        Snowflake drain-then-checkin yields correct rows (manual-only).
+        Snowflake drain-then-checkin yields correct rows (offline cassette replay).
 
-        Needs the cassette to replay a streaming `fetch_record_batch`, which A1
-        resolved it CANNOT (the replay cursor lacks the method). Scoped to a
-        MANUAL-ONLY re-record follow-up and skipped in the automated gate; DuckDB's
-        `test_drain_then_checkin_rows_duckdb` carries the mandatory row-drain
-        coverage.
+        `pytest-adbc-replay` >= 1.1 streams `fetch_record_batch` from the checked-in
+        `snowflake_arrow_round_trip` cassette, so this leg runs offline in CI: draining
+        the reader before checkin yields the recorded row. DuckDB's
+        `test_drain_then_checkin_rows_duckdb` carries the same guarantee against the
+        in-process driver.
         """
         rows = 0
         async with await snowflake_async_pool.connect() as conn:
