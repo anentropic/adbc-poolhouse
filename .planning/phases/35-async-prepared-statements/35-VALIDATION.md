@@ -18,7 +18,7 @@ validated: 2026-07-05
 
 | Property | Value |
 |----------|-------|
-| **Framework** | pytest 7.x (asyncio + trio via anyio) |
+| **Framework** | pytest 8.x (asyncio + trio via anyio) |
 | **Config file** | `pyproject.toml` / `tests/conftest.py` |
 | **Quick run command** | `.venv/bin/pytest tests/async/ -k "prep" -q` |
 | **Full suite command** | `.venv/bin/pytest -q` |

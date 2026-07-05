@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-07-05
+
+### Features
+
+- Complete the async cursor surface. The four cursor methods deferred in 1.4.0 are now available on `AsyncCursor`, each a thread-offloaded wrapper over the underlying sync ADBC cursor:
+  - `fetch_record_batch()` returns an `AsyncRecordBatchReader` for lazy Arrow streaming (`async for batch in reader:`), with each batch pull offloaded individually. The reader's lifetime is bound to its checked-out connection; reading after checkin surfaces the driver's native closed-stream error.
+  - `adbc_ingest(table_name, data, mode=...)` bulk-writes Arrow data and returns the affected row count. `mode` is a typed `Literal`; note that `mode="replace"` **drops** the existing table.
+  - `fetch_df()` and `fetch_polars()` return a `pandas.DataFrame` / `polars.DataFrame`. pandas and polars stay user-supplied — a missing dependency raises the native `ModuleNotFoundError` unchanged.
+- Add the six `adbc_get_*` connection metadata methods (`adbc_get_info`, `adbc_get_objects`, `adbc_get_table_schema`, `adbc_get_table_types`, `adbc_get_statistics`, `adbc_get_statistic_names`) on `AsyncConnection` as offload wrappers; the streaming ones surface their native `RecordBatchReader`.
+- Add `adbc_prepare()` and `adbc_execute_schema()` on `AsyncCursor`; `adbc_execute_schema()` returns the result Arrow schema without executing the query.
+- Cancelling or timing out any of these calls fires `adbc_cancel` once and, for the stateful `adbc_ingest`, invalidates the connection so the pool is never left poisoned. Reads and schema resolutions are cancellable but non-poisoning.
+
+This completes async/sync parity for the ADBC methods the sync raw-cursor path exposes (partitioned result sets remain deferred). The async API stays behind the `[async]` extra and is still experimental. The sync path is unchanged.
+
 ## [1.4.0] - 2026-07-01
 
 ### Features
