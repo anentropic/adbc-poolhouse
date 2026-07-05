@@ -1,6 +1,6 @@
 [project]
 name = "adbc-poolhouse"
-version = "1.4.0"
+version = "1.5.0"
 description = "Connection pooling for ADBC drivers from typed warehouse configs"
 readme = "README.md"
 authors = [
@@ -51,10 +51,13 @@ dev = [
     "ipython>=9.10.0",
     "pdbpp>=0.12.0.post1",
     "pyarrow>=23.0.1",
+    "pandas>=2.0",
+    "pandas-stubs>=2.0",
+    "polars>=1.0",
     "pytest>=8.0.0",
     "pytest-cov>=6.0.0",
     "ruff>=0.15.1",
-    "pytest-adbc-replay>=1.0.0a3",
+    "pytest-adbc-replay>=1.1.0",
     "anyio>=4.13",
     "trio>=0.31",
     "aiotools>=2.2",

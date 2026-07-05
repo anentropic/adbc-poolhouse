@@ -3,7 +3,9 @@ The async cursor wrapper: offloaded DBAPI surface, materialized Arrow, sync prop
 
 [`AsyncCursor`][adbc_poolhouse._async._cursor.AsyncCursor] wraps a single sync
 ADBC dbapi cursor and offloads every blocking call --- `execute`, `executemany`,
-`fetchone`, `fetchmany`, `fetchall`, `fetch_arrow_table`, `close` --- through the
+`fetchone`, `fetchmany`, `fetchall`, `fetch_arrow_table`, `fetch_df`,
+`fetch_polars`, `adbc_ingest`, `close`
+--- through the
 owning pool's limiter. Each offloaded call brackets the work with the parent
 [`AsyncConnection`][adbc_poolhouse._async._connection.AsyncConnection]'s
 `_in_use` guard, so concurrent use of one cursor (or two cursors on one
@@ -30,19 +32,25 @@ Worker exceptions are never re-wrapped (ACUR-06/EDGE-17): the single
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Protocol
+import functools
+from typing import TYPE_CHECKING, Protocol, cast
 
 import anyio
 
 from adbc_poolhouse._async._cancel import cancellable_offload
 from adbc_poolhouse._async._offload import offload
+from adbc_poolhouse._async._reader import AsyncRecordBatchReader
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
     from types import TracebackType
+    from typing import Literal
 
+    import pandas
+    import polars
     import pyarrow
     from anyio import CapacityLimiter
+    from typing_extensions import CapsuleType
 
     from adbc_poolhouse._async._connection import AsyncConnection
 
@@ -70,6 +78,23 @@ class _SyncCursor(Protocol):
     def fetchmany(self, size: int = ..., /) -> Sequence[object]: ...
     def fetchall(self) -> Sequence[object]: ...
     def fetch_arrow_table(self) -> pyarrow.Table: ...
+    def fetch_record_batch(self) -> pyarrow.RecordBatchReader: ...
+    def fetch_df(self) -> object: ...
+    def fetch_polars(self) -> object: ...
+    def adbc_ingest(
+        self,
+        table_name: str,
+        data: pyarrow.RecordBatch | pyarrow.Table | pyarrow.RecordBatchReader | CapsuleType,
+        mode: Literal["append", "create", "replace", "create_append"] = ...,
+        *,
+        catalog_name: str | None = ...,
+        db_schema_name: str | None = ...,
+        temporary: bool = ...,
+    ) -> int: ...
+    def adbc_prepare(self, operation: bytes | str, /) -> object: ...
+    def adbc_execute_schema(
+        self, operation: bytes | str, parameters: object = ..., /
+    ) -> object: ...
     def adbc_cancel(self) -> None: ...
     def close(self) -> None: ...
 
@@ -351,6 +376,386 @@ class AsyncCursor:
                 limiter=self._limiter,
                 on_abort=self._owner.invalidate,  # poison recovery on a real abort (D-25-03)
             )
+
+    async def fetch_df(self) -> pandas.DataFrame:
+        """
+        Materialize the full result set as a `pandas.DataFrame` on a worker thread.
+
+        Offloads the driver's native `fetch_df` through the pool limiter and returns
+        its result unchanged: a fully-materialized `pandas.DataFrame` that owns its
+        own buffers. The frame is safe to read after the connection is checked in ---
+        it is never bound to the (soon-closed) cursor's C stream (EDGE-21 / Pitfall 7).
+
+        `pandas` is not a poolhouse dependency --- you install it yourself. poolhouse
+        never imports it: the driver imports `pandas` inside the worker, so a missing
+        install surfaces the native `ModuleNotFoundError` unchanged, with no
+        pre-check and no wrapping.
+
+        If the surrounding scope is cancelled or times out while the result is
+        being materialized, the in-flight C call is aborted with
+        `cursor.adbc_cancel`, the now-poisoned connection is invalidated
+        (shielded), and the cancellation is re-raised (CANCEL-01/02).
+
+        Returns:
+            The materialized `pandas.DataFrame` for the current result set.
+
+        Raises:
+            ConnectionBusyError: If another offloaded call on the owning connection
+                is already in flight.
+            ModuleNotFoundError: If `pandas` is not installed. Raised by the driver
+                in the worker and propagated unchanged.
+
+        Example:
+            ```python
+            async with await pool.connect() as conn:
+                cursor = conn.cursor()
+                await cursor.execute("SELECT * FROM events")
+                df = await cursor.fetch_df()  # a pandas.DataFrame
+            ```
+        """
+        with self._owner._offloading():  # noqa: SLF001
+            # `_SyncCursor.fetch_df` is typed `-> object` to keep the Protocol
+            # driver-agnostic and free of a pandas stub dependency (D-31-06); cast
+            # back to the public return type. No runtime effect --- the driver
+            # materializes and returns the pandas.DataFrame itself.
+            return cast(
+                "pandas.DataFrame",
+                await cancellable_offload(
+                    self._adbc_cancel,
+                    self._cursor.fetch_df,
+                    limiter=self._limiter,
+                    on_abort=self._owner.invalidate,  # poison recovery on a real abort (D-25-03)
+                ),
+            )
+
+    async def fetch_polars(self) -> polars.DataFrame:
+        """
+        Materialize the full result set as a `polars.DataFrame` on a worker thread.
+
+        Offloads the driver's native `fetch_polars` through the pool limiter and
+        returns its result unchanged: a fully-materialized `polars.DataFrame` that
+        owns its own buffers. The frame is safe to read after the connection is
+        checked in --- it is never bound to the (soon-closed) cursor's C stream
+        (EDGE-21 / Pitfall 7).
+
+        `polars` is not a poolhouse dependency --- you install it yourself. poolhouse
+        never imports it: the driver imports `polars` inside the worker, so a missing
+        install surfaces the native `ModuleNotFoundError` unchanged, with no
+        pre-check and no wrapping.
+
+        If the surrounding scope is cancelled or times out while the result is
+        being materialized, the in-flight C call is aborted with
+        `cursor.adbc_cancel`, the now-poisoned connection is invalidated
+        (shielded), and the cancellation is re-raised (CANCEL-01/02).
+
+        Returns:
+            The materialized `polars.DataFrame` for the current result set.
+
+        Raises:
+            ConnectionBusyError: If another offloaded call on the owning connection
+                is already in flight.
+            ModuleNotFoundError: If `polars` is not installed. Raised by the driver
+                in the worker and propagated unchanged.
+
+        Example:
+            ```python
+            async with await pool.connect() as conn:
+                cursor = conn.cursor()
+                await cursor.execute("SELECT * FROM events")
+                df = await cursor.fetch_polars()  # a polars.DataFrame
+            ```
+        """
+        with self._owner._offloading():  # noqa: SLF001
+            # `_SyncCursor.fetch_polars` is typed `-> object` to keep the Protocol
+            # driver-agnostic (D-31-06); cast back to the public return type. No
+            # runtime effect --- the driver materializes and returns the
+            # polars.DataFrame itself.
+            return cast(
+                "polars.DataFrame",
+                await cancellable_offload(
+                    self._adbc_cancel,
+                    self._cursor.fetch_polars,
+                    limiter=self._limiter,
+                    on_abort=self._owner.invalidate,  # poison recovery on a real abort (D-25-03)
+                ),
+            )
+
+    async def adbc_ingest(
+        self,
+        table_name: str,
+        data: pyarrow.RecordBatch | pyarrow.Table | pyarrow.RecordBatchReader | CapsuleType,
+        *,
+        mode: Literal["create", "append", "replace", "create_append"] = "create",
+        catalog_name: str | None = None,
+        db_schema_name: str | None = None,
+        temporary: bool = False,
+    ) -> int:
+        """
+        Bulk-load an Arrow dataset into a table on a worker thread.
+
+        Offloads the dbapi `adbc_ingest` through the pool limiter while holding the
+        parent connection's `_in_use` guard, so a concurrent call on the same
+        connection is rejected with `ConnectionBusyError` (EDGE-15). This is a
+        single whole-operation offload --- the connection checks back in the moment
+        the ingest returns, unlike `fetch_record_batch`, which holds the connection
+        for a reader's whole lifetime.
+
+        `data` is handed to the driver untouched: poolhouse performs no conversion
+        and no validation. The driver owns the Arrow binding and the table
+        identifier, so a malformed dataset or a bad identifier surfaces the driver's
+        native error unchanged.
+
+        If the surrounding scope is cancelled or times out while the ingest is in
+        flight, the in-flight C call is aborted with `cursor.adbc_cancel`, the
+        now-poisoned connection is invalidated (shielded), and the cancellation is
+        re-raised --- the connection never returns to the pool busy (CANCEL-01/02).
+        Recovery restores the *connection*, not the *table*: an aborted bulk load
+        can leave rows already written, and poolhouse does not roll that back. Treat
+        a cancelled ingest as leaving the table in an undefined state.
+
+        Args:
+            table_name: The target table. Passed straight to the driver as a SQL
+                identifier; poolhouse does not quote or sanitize it.
+            data: The Arrow dataset to load --- a `pyarrow.Table`, `RecordBatch`,
+                `RecordBatchReader`, or an Arrow C-stream capsule. Forwarded to the
+                driver with zero conversion.
+            mode: How to write the data. `"create"` (the default) makes a new table
+                and fails if it exists; `"append"` adds rows to an existing table;
+                `"create_append"` creates the table if needed, then appends;
+                `"replace"` **drops** the existing table and recreates it --- the old
+                rows are lost, so it is not a row-level upsert. Forwarded to the
+                driver verbatim.
+            catalog_name: EXPERIMENTAL. Target catalog for the table. No stability
+                guarantee; surfaced as-is from the driver.
+            db_schema_name: EXPERIMENTAL. Target schema for the table. No stability
+                guarantee; surfaced as-is from the driver.
+            temporary: EXPERIMENTAL. Create the table as temporary. No stability
+                guarantee; surfaced as-is from the driver.
+
+        Returns:
+            The number of rows written, or `-1` when the driver cannot report a
+            count. Poolhouse returns the driver's value unchanged.
+
+        Raises:
+            ConnectionBusyError: If another offloaded call on the owning connection
+                is already in flight.
+
+        Example:
+            ```python
+            import pyarrow as pa
+
+            people = pa.table({"id": [1, 2, 3], "name": ["a", "b", "c"]})
+            async with await pool.connect() as conn:
+                cursor = conn.cursor()
+                await cursor.adbc_ingest("people", people, mode="create")  # returns 3
+                await cursor.adbc_ingest("people", people, mode="append")  # returns 3 (6 total)
+            ```
+        """
+        with self._owner._offloading():  # noqa: SLF001
+            return await cancellable_offload(
+                self._adbc_cancel,
+                functools.partial(
+                    self._cursor.adbc_ingest,
+                    table_name,
+                    data,
+                    mode=mode,
+                    catalog_name=catalog_name,
+                    db_schema_name=db_schema_name,
+                    temporary=temporary,
+                ),
+                limiter=self._limiter,
+                on_abort=self._owner.invalidate,  # poison recovery on a real abort (D-25-03)
+            )
+
+    async def adbc_prepare(self, operation: bytes | str) -> pyarrow.Schema | None:
+        """
+        Prepare a statement without executing it, on a worker thread.
+
+        Offloads the dbapi `adbc_prepare` through the pool limiter while holding the
+        parent connection's `_in_use` guard, so a concurrent call on the same
+        connection is rejected with `ConnectionBusyError` (EDGE-15). The query is
+        prepared but NOT executed --- no rows are read and no data is written.
+
+        Returns the schema of the query's BIND PARAMETERS, or `None` when the driver
+        cannot determine it. Poolhouse forwards the driver's value unchanged; treat a
+        `None` result as "the backend does not report a parameter schema", not an
+        error.
+
+        If the surrounding scope is cancelled or times out while the prepare is in
+        flight, the in-flight C call is aborted with `cursor.adbc_cancel` and the
+        cancellation is re-raised. Because a prepare writes no table data, the
+        connection is NOT invalidated --- it is cancellable but non-poisoning, returning
+        clean to the pool (D-35-04). This is the deliberate difference from `execute`,
+        which invalidates on abort. The non-poisoning guarantee assumes the driver
+        leaves no lingering session state after a cancelled prepare (true for DuckDB); a
+        backend whose cancel aborts the surrounding transaction may need the connection
+        rolled back before reuse.
+
+        Args:
+            operation: The SQL text to prepare. Passed to the driver verbatim;
+                poolhouse constructs no SQL and adds no sanitization.
+
+        Returns:
+            The `pyarrow.Schema` describing the query's bind parameters, or `None`
+            when the driver cannot determine a parameter schema.
+
+        Raises:
+            ConnectionBusyError: If another offloaded call on the owning connection
+                is already in flight.
+
+        Example:
+            ```python
+            async with await pool.connect() as conn:
+                cursor = conn.cursor()
+                schema = await cursor.adbc_prepare("SELECT * FROM t WHERE id = ?")
+                # `schema` describes the `?` bind parameters (or is None).
+            ```
+        """
+        with self._owner._offloading():  # noqa: SLF001
+            # `_SyncCursor.adbc_prepare` is typed `-> object` to keep the Protocol
+            # driver-agnostic (D-35-05); cast back to the public return type. No
+            # runtime effect --- the driver returns the pyarrow.Schema (or None).
+            return cast(
+                "pyarrow.Schema | None",
+                await cancellable_offload(
+                    self._adbc_cancel,
+                    self._cursor.adbc_prepare,
+                    operation,
+                    limiter=self._limiter,
+                    # on_abort OMITTED (D-35-04): cancellable but non-poisoning ---
+                    # a prepare writes no state, so an aborted call leaves the
+                    # connection clean; do NOT invalidate (unlike execute).
+                ),
+            )
+
+    async def adbc_execute_schema(
+        self, operation: bytes | str, parameters: object = None
+    ) -> pyarrow.Schema:
+        """
+        Get a query's result-set schema without executing it, on a worker thread.
+
+        Offloads the dbapi `adbc_execute_schema` through the pool limiter while
+        holding the parent connection's `_in_use` guard, so a concurrent call on the
+        same connection is rejected with `ConnectionBusyError` (EDGE-15). The query is
+        planned but NOT run --- no rows are fetched and no side effects occur; only the
+        result-set schema is returned.
+
+        If the surrounding scope is cancelled or times out while the call is in
+        flight, the in-flight C call is aborted with `cursor.adbc_cancel` and the
+        cancellation is re-raised. Because the query never executes, the connection is
+        NOT invalidated --- it is cancellable but non-poisoning, returning clean to the
+        pool (D-35-04). As with `adbc_prepare`, this assumes the driver leaves no
+        lingering session state after a cancelled call (true for DuckDB); a backend
+        whose cancel aborts the surrounding transaction may need a rollback before reuse.
+
+        An unsupported backend surfaces the driver's native error unchanged: poolhouse
+        does not catch, wrap, or `find_spec`-pre-check it (D-35-06). DuckDB, for
+        example, does not implement result-schema introspection and raises
+        `NotSupportedError` straight through the single offload chokepoint (EDGE-17).
+
+        Args:
+            operation: The SQL text whose result schema to resolve. Passed to the
+                driver verbatim; poolhouse constructs no SQL and adds no sanitization.
+            parameters: Optional bound parameters, forwarded to the dbapi cursor.
+
+        Returns:
+            The `pyarrow.Schema` describing the query's result set, resolved without
+            executing the query.
+
+        Raises:
+            ConnectionBusyError: If another offloaded call on the owning connection
+                is already in flight.
+            NotSupportedError: If the driver does not implement result-schema
+                introspection (e.g. DuckDB). Raised by the driver in the worker and
+                propagated unchanged through the offload chokepoint (EDGE-17).
+
+        Example:
+            ```python
+            async with await pool.connect() as conn:
+                cursor = conn.cursor()
+                schema = await cursor.adbc_execute_schema("SELECT id, name FROM t")
+                # `schema` is the result-set schema; the query never ran.
+            ```
+        """
+        with self._owner._offloading():  # noqa: SLF001
+            # `_SyncCursor.adbc_execute_schema` is typed `-> object` to keep the
+            # Protocol driver-agnostic (D-35-05); cast back to the public return type.
+            # No runtime effect --- the driver returns the pyarrow.Schema itself.
+            return cast(
+                "pyarrow.Schema",
+                await cancellable_offload(
+                    self._adbc_cancel,
+                    self._cursor.adbc_execute_schema,
+                    operation,
+                    parameters,
+                    limiter=self._limiter,
+                    # on_abort OMITTED (D-35-04): cancellable but non-poisoning ---
+                    # the query never executes, so an aborted call leaves the
+                    # connection clean; do NOT invalidate (unlike execute).
+                ),
+            )
+
+    async def fetch_record_batch(self) -> AsyncRecordBatchReader:
+        """
+        Stream the result set as an `AsyncRecordBatchReader` off a worker thread.
+
+        Offloads the dbapi `fetch_record_batch` through the pool limiter to create
+        the sync `pyarrow.RecordBatchReader`, then wraps it in an
+        `AsyncRecordBatchReader` whose every batch pull is itself offloaded (D-29-03).
+        Unlike
+        `fetch_arrow_table`, the result is a live stream bound to this connection's C
+        Arrow stream, so the reader locks the connection for its WHOLE lifetime: a
+        foreign op raises `ConnectionBusyError` until the reader is closed (STREAM-06),
+        and a read after the reader is closed / the connection is checked in surfaces
+        the driver's native `pyarrow.lib.ArrowInvalid` (never a segfault, T-29-01).
+
+        The `_reader_open` lifetime lock is set AFTER the `_offloading()` span exits
+        (which already cleared the per-call `_in_use`) and ONLY on the success path,
+        so a cancelled or failed creation leaves the connection usable rather than
+        permanently busy (Pitfall 5).
+
+        If the surrounding scope is cancelled or times out while the reader is being
+        created, the in-flight C call is aborted with `cursor.adbc_cancel`, the
+        now-poisoned connection is invalidated (shielded), and the cancellation is
+        re-raised --- the connection never returns to the pool busy (CANCEL-01/02).
+
+        Returns:
+            An `AsyncRecordBatchReader` streaming the current result set, threaded
+            with this cursor's `adbc_cancel` so a cancelled pull aborts through the
+            cursor (the reader has no cancel of its own, Pitfall 4).
+
+        Raises:
+            ConnectionBusyError: If another offloaded call on the owning connection
+                is already in flight.
+
+        Example:
+            ```python
+            await cursor.execute("SELECT * FROM events")
+            async with await cursor.fetch_record_batch() as reader:
+                async for batch in reader:
+                    process(batch)  # a pyarrow.RecordBatch, each pull offloaded
+            ```
+        """
+        with self._owner._offloading():  # noqa: SLF001  foreign-tier guard: _in_use OR _reader_open
+            sync_reader = await cancellable_offload(
+                self._adbc_cancel,
+                self._cursor.fetch_record_batch,
+                limiter=self._limiter,
+                on_abort=self._owner.invalidate,  # poison recovery on a real abort (D-25-03)
+            )
+        # Lock the connection for the reader's WHOLE lifetime (D-29-08/09). Set AFTER
+        # the _offloading() span exits (it already cleared _in_use) and ONLY on the
+        # success path, so a cancelled/failed creation leaves _reader_open False and
+        # the connection usable (Pitfall 5).
+        self._owner._reader_open = True  # noqa: SLF001
+        # Pass this cursor's own `_adbc_cancel` as the 4th arg: a cancelled pull must
+        # abort through the cursor, since the reader has no cancel of its own (Pitfall 4).
+        return AsyncRecordBatchReader(
+            sync_reader,
+            self._limiter,
+            self._owner,
+            self._adbc_cancel,
+        )
 
     async def close(self) -> None:
         """

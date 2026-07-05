@@ -1,220 +1,220 @@
-# Stack Research: adbc-poolhouse v1.4.0 Async API
+# Technology Stack
 
-**Research Date:** 2026-06-25
-**Research Type:** Subsequent Milestone — Optional async API layer over the existing sync ADBC pool
-**Milestone:** v1.4.0 — Async API
-**Confidence:** HIGH
+**Project:** adbc-poolhouse v1.5.0 — Async Cursor Completion
+**Researched:** 2026-07-01
+**Research Type:** Subsequent Milestone — four deferred async cursor methods (`fetch_record_batch`, `adbc_ingest`, `fetch_df`, `fetch_polars`) + P2 async edge-case suite
+**Overall confidence:** HIGH — every claim below is grounded in introspection of the packages installed in this repo's `.venv`, cross-checked against latest PyPI releases.
 
----
+## Headline Conclusion
 
-## Scope Note
+**v1.5.0 requires ZERO new runtime dependencies and ZERO new extras.** All four new methods are pure offload wrappers over methods that **already exist natively** on the wrapped `adbc_driver_manager.dbapi.Cursor` — identical in shape to the already-shipped `fetch_arrow_table` (ACUR-04). Their only Arrow-side need is `pyarrow`, which is already a core runtime dependency (`pyarrow>=23.0.1`, installed `24.0.0`). pandas and polars stay **user-supplied runtime deps** — ADBC itself raises a clear `ModuleNotFoundError` if they are absent, exactly how poolhouse already treats missing ADBC drivers. The only optional change is a **dev-group-only** addition of pandas/polars so the test suite can actually exercise `fetch_df`/`fetch_polars`.
 
-This file covers ONLY the additions/changes the new async layer needs. The existing validated
-stack (Pydantic BaseSettings; SQLAlchemy `sqlalchemy.pool` / `sqlalchemy.event`; ADBC Driver
-Manager + per-backend drivers; mkdocs-material + mkdocstrings; uv; ruff; basedpyright strict; prek)
-is settled and unchanged and is **not re-researched here**. Prior-milestone driver/CLI stack
-research lives in git history.
+This mirrors and extends the v1.4.0 posture ("the async layer adds exactly one runtime dependency, `anyio`, behind `[async]`") — v1.5.0 adds none.
 
-The async layer adds exactly **one runtime dependency** (`anyio`) behind an `[async]` extra, plus
-test wiring that reuses the existing pytest stack. No greenlet, no `sqlalchemy[asyncio]`, no native
-async ADBC driver.
+## Ground-Truth Method Signatures (from installed `adbc-driver-manager==1.11.0`)
 
----
+Introspected via `.venv/bin/python -c "import inspect, adbc_driver_manager.dbapi as d; ..."`. These are the exact signatures the async wrappers offload to.
 
-## Confidence Key
-
-- HIGH — confirmed from multiple current sources (PyPI JSON API + official docs)
-- MEDIUM — confirmed from one authoritative source
-- LOW — single web-search source, unverified
-
----
-
-## Recommended Stack
-
-### Core Technologies (new for v1.4.0)
-
-| Technology | Version | Purpose | Why Recommended |
-|------------|---------|---------|-----------------|
-| `anyio` | `>=4.0.0` (current stable **4.14.1**) | Async runtime-abstraction layer. Provides `anyio.to_thread.run_sync()` to offload blocking sync ADBC calls to a worker thread; `CapacityLimiter` to bound concurrent thread checkouts; cancellation scopes (`CancelScope` / `fail_after` / `move_on_after`) to wire `adbc_cancel` to cooperative cancellation; `anyio.Path` if async filesystem access is ever needed. | ADBC releases the GIL in its C calls, so thread-offload yields *real* concurrency with no native async driver. anyio is the only widely-used library that is **backend-neutral** (asyncio *and* trio) — required for the project's trio+asyncio neutrality posture. `to_thread.run_sync` already integrates a shared `CapacityLimiter` and propagates cancellation, so the cooperative-cancellation plumbing comes for free. Single small pure-Python dep. |
-
-That is the **entire** new runtime dependency surface.
-
-### Supporting Libraries
-
-| Library | Version | Purpose | When to Use |
-|---------|---------|---------|-------------|
-| `typing-extensions` | (transitive `>=4.5`) | Back-compat typing primitives. | **Do NOT add as a direct dep.** anyio already pulls it transitively on Python `< 3.13`. On our 3.11 floor `ParamSpec`, `Self`, `Coroutine`, `Awaitable` are all in stdlib `typing` / `collections.abc`. Add a direct dep only if our own code imports a genuinely 3.12+-only symbol (none identified). |
-| `exceptiongroup` | — | PEP 654 `ExceptionGroup` / `except*` backport. | **Do NOT add.** anyio task groups raise native `ExceptionGroup` on 3.11+. anyio only declares the backport for `python_version < "3.11"`; our floor is 3.11, so it is never installed and `except*` is native. |
-| `trio` | `>=0.32.0` (current **0.33.0**) | Trio event loop. | **Test-only, optional.** Pull via `anyio[trio]` in the dev group only if the suite is parametrized across asyncio + trio. Never a runtime dependency. |
-
-### Development Tools (new test wiring)
-
-| Tool | Purpose | Notes |
-|------|---------|-------|
-| anyio's **built-in pytest plugin** | Runs `@pytest.mark.anyio` (or auto-mode) coroutine tests; supplies the `anyio_backend` fixture. | **Bundled with anyio — no extra install.** Do **not** add `pytest-asyncio` (asyncio-only; conflicts with anyio's plugin in auto mode). Enable via marker mode (recommended) or `anyio_mode = "auto"` in `[tool.pytest.ini_options]`. |
-| `anyio_backend` fixture | Parametrizes async tests across backends. | Defaults to asyncio only. To also cover trio, override in `conftest.py` (snippet below). Recommend default = asyncio for the cassette-replay suite, with an opt-in trio param over a thin smoke subset to prove backend-neutrality. |
-| existing `pytest` (**9.1.1**, pinned `>=8.0.0`) + `pytest-adbc-replay` (`>=1.0.0a3`) | Cassette record/replay, reused unchanged. | The replay machinery patches the **sync** ADBC dbapi modules (`adbc_auto_patch`). Because the async wrapper calls the *same* sync methods via `to_thread.run_sync`, existing cassettes replay correctly when the async wrapper is driven from an `@pytest.mark.anyio` test — no new cassette format. |
-
----
-
-## Installation
-
-```bash
-# Add the async runtime dep as an optional extra (uv edits pyproject + lockfile)
-uv add --optional async "anyio>=4.0.0"
-
-# Add trio to the dev group ONLY if parametrizing tests across backends
-uv add --group dev "anyio[trio]>=4.0.0"   # or: uv add --group dev "trio>=0.32.0"
-```
-
-### pyproject.toml wiring
-
-Add to `[project.optional-dependencies]` alongside the per-backend extras:
-
-```toml
-[project.optional-dependencies]
-async = ["anyio>=4.0.0"]
-# ... existing duckdb / snowflake / postgresql / quack / flightsql / bigquery / sqlite ...
-all = [
-    # ... existing backend extras ...
-    "adbc-poolhouse[async]",   # recommended: include async in `all`
-]
-```
-
-The existing `dev` group already depends on `adbc-poolhouse[all]`, so once `async` is listed in
-`all`, anyio is automatically available to the test suite. Add `anyio[trio]` to `dev` separately
-**only** if running the trio-parametrized smoke subset:
-
-```toml
-[dependency-groups]
-dev = [
-    "adbc-poolhouse[all]",     # brings anyio once `async` is in `all`
-    "anyio[trio]>=4.0.0",      # add ONLY for trio-parametrized tests
-    # ... existing dev deps unchanged ...
-]
-```
-
-### Test plugin config
-
-Marker mode (recommended — explicit, no clash risk). Mark async tests with `@pytest.mark.anyio`;
-no `anyio_mode` line needed.
-
-Optional `conftest.py` to parametrize across backends (opt-in trio coverage):
+### `fetch_record_batch`
 
 ```python
-import pytest
-
-@pytest.fixture(
-    params=[
-        pytest.param("asyncio", id="asyncio"),
-        pytest.param("trio", id="trio"),   # requires anyio[trio] in dev group
-    ]
-)
-def anyio_backend(request: pytest.FixtureRequest) -> str:
-    return request.param
+def fetch_record_batch(self) -> "pyarrow.RecordBatchReader": ...
 ```
 
-Omit the fixture entirely to run asyncio-only (anyio's default).
+- No parameters. Returns a **streaming** `pyarrow.RecordBatchReader` bound to the underlying result/statement.
+- Source calls `_requires_pyarrow()` and raises `ProgrammingError("Cannot fetch_record_batch() before execute()", INVALID_STATE)` if called before `execute()`.
+- **Design headline (already flagged in requirements):** unlike `fetch_arrow_table` (which materializes a self-owning `pyarrow.Table`), this returns a **reader tied to the cursor/connection lifetime**. Reading batches after the connection is checked in (reset event closes the cursor) will dangle (RESEARCH Pitfall 7 / EDGE-21). The `RecordBatchReader`-lifetime-vs-reset-event-checkin question is a **design** concern for the roadmap, **not** a stack/dependency concern — no new library solves it.
 
----
+### `adbc_ingest`
 
-## Integration Points
+```python
+def adbc_ingest(
+    self,
+    table_name: str,
+    data: pyarrow.RecordBatch | pyarrow.Table | pyarrow.RecordBatchReader | CapsuleType,
+    mode: Literal["append", "create", "replace", "create_append"] = "create",
+    *,
+    catalog_name: str | None = None,
+    db_schema_name: str | None = None,
+    temporary: bool = False,
+) -> int: ...
+```
 
-- **Offload primitive:** every async wrapper method (`connect`, `execute`, `executemany`,
-  `fetch*`, `fetch_arrow_table`, pool create/close) calls the corresponding sync ADBC/QueuePool
-  method inside `anyio.to_thread.run_sync(...)`. The sync code path is untouched.
-- **Checkout bounding:** use an anyio `CapacityLimiter` (passed to `to_thread.run_sync(..., limiter=...)`)
-  rather than tuning the worker thread pool directly, so the limit is honoured identically under
-  asyncio and trio. This is the trio-safe analogue of the "anyio-native checkout limiter" option in
-  PROJECT.md's open design decision.
-- **Cancellation:** wrap offloaded calls in an `anyio.CancelScope` (or `fail_after`/`move_on_after`)
-  and, on cancellation, call the connection's `adbc_cancel()` so the in-flight C call is interrupted
-  cooperatively. `to_thread.run_sync(cancellable=...)` controls whether the awaiting task detaches.
-- **Genericity:** the async layer wraps the existing `WarehouseConfig`-driven sync pool, so one async
-  implementation covers all 13 backends with no per-backend code.
+- `data` accepts any Arrow PyCapsule-Protocol object (`__arrow_c_array__` / `__arrow_c_stream__`), so callers are **not** forced to hold a `pyarrow` object — anything Arrow-compatible works. `CapsuleType` is the raw PyCapsule case.
+- `catalog_name`, `db_schema_name`, `temporary` are marked **EXPERIMENTAL** in the ADBC docstring — surface them as-is; do not add stability guarantees.
+- Returns `int` (rows inserted, or `-1` if the driver cannot report).
+- Note: this method **writes** — it holds the connection for the duration of a bulk load. It is a natural fit for the existing `cancellable_offload` + `on_abort=self._owner.invalidate` pattern (a cancelled mid-ingest C call poisons the connection).
 
----
+### `fetch_df`
 
-## Alternatives Considered
+```python
+def fetch_df(self) -> "pandas.DataFrame": ...
+```
 
-| Recommended | Alternative | When to Use Alternative |
-|-------------|-------------|-------------------------|
-| `anyio.to_thread.run_sync` | `asyncio.to_thread` / `loop.run_in_executor` | Only if the project drops trio-neutrality and commits to asyncio-only. These lack a built-in `CapacityLimiter` and cancellation integration and lock out trio users. Not recommended. |
-| anyio built-in pytest plugin | `pytest-asyncio` | Only for an asyncio-exclusive codebase that never touches anyio. Conflicts with anyio's plugin and cannot drive trio. Avoid. |
-| Sync driver + thread-offload | Native async ADBC driver | No native async ADBC/dbapi driver exists. Revisit only if one ships upstream — but feasibility is explicitly thread-offload. |
-| Plain sync `QueuePool` + anyio-offloaded checkout | `sqlalchemy.AsyncAdaptedQueuePool` via `create_async_engine` | Never for this project — see "What NOT to Add". |
+- No parameters. Internally delegates to `self._results.fetch_df()` → `reader.read_pandas()` (a **pyarrow** method that imports pandas lazily).
+- Raises `ProgrammingError("Cannot fetch_df() before execute()", INVALID_STATE)` before `execute()`.
 
----
+### `fetch_polars`
 
-## What NOT to Add — Decision Table
+```python
+def fetch_polars(self) -> "polars.DataFrame": ...
+```
 
-| Candidate | Verdict | Rationale |
-|-----------|---------|-----------|
-| `sqlalchemy[asyncio]` / `AsyncAdaptedQueuePool` / `create_async_engine` | **DO NOT ADD** | `AsyncAdaptedQueuePool` is asyncio-bound and assumes a **natively-async DBAPI** (asyncpg/aiomysql/aiosqlite-style). ADBC has **no** async DBAPI, so it cannot satisfy the pool's await points. SQLAlchemy docs state plain `QueuePool` is "not compatible with asyncio and `create_async_engine()`". It does **not** replace the thread-offload, and adopting it drags in greenlet and pins us to asyncio, breaking trio-neutrality. It remains a *reference*, not a foundation. |
-| `greenlet` (direct/runtime dep) | **DO NOT ADD** | Only relevant as SQLAlchemy's sync↔async shim, which we are not using. asyncio-oriented, adds hidden scheduling, unnecessary for thread-offload. (May still arrive transitively via base SQLAlchemy on some platforms; we never `import greenlet` and never declare it.) |
-| `pytest-asyncio` | **DO NOT ADD** | asyncio-only; conflicts with anyio's bundled pytest plugin in auto mode. Use anyio's plugin (`@pytest.mark.anyio` + `anyio_backend`). |
-| `exceptiongroup` backport | **DO NOT ADD** | Native `ExceptionGroup` / `except*` exist on Python ≥3.11 (our floor). Backport only installs on `<3.11`. |
-| Direct `typing-extensions` dep | **DO NOT ADD** | Redundant on Python ≥3.11 (`ParamSpec`, `Self`, `Coroutine`, `Awaitable` are stdlib); arrives transitively via anyio anyway. |
-| Native async ADBC driver | **DOES NOT EXIST** | Async is achieved by offloading the sync driver to threads. |
-| Upper version caps (e.g. `anyio<5`) | **DO NOT ADD** | Project policy is open lower bounds only; caps cause downstream dep-resolution conflicts for the two known consumers (dbt-open-sl, Semantic ORM). Use `anyio>=4.0.0`. |
+- No parameters. Internally does `import polars; polars.from_arrow(self.fetch_arrow())`.
+- Raises `ProgrammingError` before `execute()`.
 
----
+## How ADBC Signals Missing pandas / polars (verified)
 
-## Version Compatibility
+This is the evidence backing "pandas/polars must NOT become poolhouse deps." Confirmed by running the pyarrow/ADBC code paths with pandas and polars **uninstalled** in this `.venv`:
 
-| Package A | Compatible With | Notes |
-|-----------|-----------------|-------|
-| `anyio 4.14.1` | Python `>=3.10` | Project floor 3.11 → fully covered. On 3.11/3.12 anyio pulls `typing_extensions>=4.5` transitively; on ≥3.13 it does not. |
-| `anyio 4.x` | `exceptiongroup` only on `python_version < "3.11"` | 3.11 floor → backport never installed; native `ExceptionGroup` used. |
-| `anyio[trio]` 4.14.1 | `trio>=0.32.0` (current 0.33.0) | Test-only extra; never a runtime dep. |
-| `anyio` | `sqlalchemy 2.x` `QueuePool` | Orthogonal — anyio offloads sync `QueuePool` calls to threads. No version constraint between them. |
-| anyio pytest plugin | `pytest 8/9.x` (project `>=8.0.0`, current 9.1.1) | Bundled with anyio; works with current pytest. Must NOT coexist with `pytest-asyncio` auto mode. |
-| `basedpyright 1.38+` strict | anyio typing on 3.11 | anyio ships `py.typed` and is fully typed; wrappers typed with stdlib `ParamSpec` / `Self` / `Coroutine[Any, Any, T]` — no extra typing dep for strict mode. |
+| Method | Missing-dep trigger | Error surfaced | poolhouse action |
+|--------|--------------------|-----------------|------------------|
+| `fetch_df` | `reader.read_pandas()` (pyarrow) does `import pandas` lazily | `ModuleNotFoundError: No module named 'pandas'` (verified live) | **Do not catch, do not wrap.** Let it propagate through the offload chokepoint unchanged (ACUR-06 / EDGE-17), exactly like an `AdbcError`. |
+| `fetch_polars` | ADBC's `fetch_polars` does `import polars` at call time | `ModuleNotFoundError: No module named 'polars'` | Same — propagate unchanged. |
+| all four (before `execute`) | `self._results is None` | `adbc_driver_manager.dbapi.ProgrammingError` (subclass of `DatabaseError` → `Error` → `Exception`) | Propagate unchanged. |
+| `fetch_record_batch` (no pyarrow) | `_requires_pyarrow()` | `ProgrammingError("This API requires PyArrow to be installed")` — unreachable for poolhouse since pyarrow is a hard core dep | N/A |
 
----
+**Consequence for the roadmap:** poolhouse does not need a `try/except ImportError` or a bespoke "pandas not installed" error. The single offload chokepoint already re-raises worker exceptions with exact type and traceback. The clean, actionable `ModuleNotFoundError` reaches the caller verbatim — this is the *documented, intended* behaviour and is consistent with how poolhouse surfaces missing ADBC drivers. **Just document it** (guide note: "`fetch_df`/`fetch_polars` require you to install pandas/polars yourself").
 
-## Lower-Bound Choice
+## Recommended Stack (v1.5.0 delta)
 
-**`anyio>=4.0.0`** (current stable 4.14.1). Rationale:
+### Core Runtime — NO CHANGES
 
-- anyio 4.0 is the release that adopted native PEP 654 `ExceptionGroup` and the modern
-  `to_thread.run_sync` / `CapacityLimiter` / cancellation-scope API used here.
-- An open `>=4.0.0` lower bound matches the project's "open lower bounds, no upper caps" policy and
-  maximises consumer compatibility while guaranteeing the APIs we rely on.
-- No reason to pin higher (e.g. `>=4.14`); nothing we use was added after 4.0.
+| Technology | Current bound | Installed | Purpose in v1.5.0 | Why unchanged |
+|------------|---------------|-----------|-------------------|----------------|
+| `adbc-driver-manager` | `>=1.8.0` | `1.11.0` (= latest) | Provides all four methods natively on `dbapi.Cursor` | Methods present since well before 1.8.0; no bump needed |
+| `pyarrow` | `>=23.0.1` (core dep) | `24.0.0` (= latest) | `RecordBatchReader` return type; `Table`/`RecordBatch`/PyCapsule inputs for `adbc_ingest`; underpins `read_pandas` and `from_arrow` | Already core; the streaming reader type is already available |
+| `anyio` | `>=4.13` (`[async]` extra) | `4.14.1` (= latest) | Unchanged offload/limiter/cancel plumbing; new methods reuse `offload` / `cancellable_offload` verbatim | No new anyio surface used |
 
----
+### Extras — NO CHANGES
 
-## Open Questions / Gaps
+`[async] = anyio>=4.13` stays exactly as shipped. **Do NOT add** a `[pandas]`, `[polars]`, or `[dataframe]` extra — the maintainer has ruled these out; pandas/polars are user-supplied, ADBC-signalled optional deps.
 
-- **Checkout-wait strategy** (PROJECT.md open design decision): plain sync `QueuePool` with an
-  anyio-offloaded checkout-and-execute vs. an anyio-native `CapacityLimiter` in front of the pool.
-  Stack-wise both need only `anyio` — no extra dependency either way. This is an architecture
-  decision, resolved in ARCHITECTURE research, not a stack addition.
-- **`cancellable=` semantics for `to_thread.run_sync`**: whether to detach the awaiting task on
-  cancellation (the thread keeps running until `adbc_cancel` lands) vs. block. Behavioural detail for
-  the cancellation design; no dependency impact.
+### Dev group — ONE optional addition (test-only)
 
----
+| Library | Suggested dev bound | Latest | Why (dev-only) | Distinction |
+|---------|--------------------|--------|-----------------|-------------|
+| `pandas` | `pandas>=2.0` (or unpinned in `[dependency-groups].dev`) | `3.0.3` | So the suite can assert `fetch_df` returns a real `pandas.DataFrame` (not just that it offloads) | **DEV-GROUP ONLY — NOT a runtime dep, NOT an extra.** Exercises the method; never shipped. |
+| `polars` | `polars>=1.0` (or unpinned) | `1.42.1` | So the suite can assert `fetch_polars` returns a real `polars.DataFrame` | Same — dev-group only. |
+
+This is the crux distinction the downstream consumer asked for:
+
+> **Runtime/extra dep** = poolhouse forces it on every consumer who installs the extra. ❌ Not doing this for pandas/polars.
+> **Dev-group test dep** = only present in *this repo's* test env to actually call `fetch_df`/`fetch_polars` and check the return type. ✅ Acceptable and recommended.
+
+**Alternative (equally valid):** add pandas/polars behind a **dev-only** marker/param and `pytest.importorskip("pandas")` / `importorskip("polars")` in the relevant tests, so contributors without them installed still get a green (skipped) suite. Recommend `importorskip` guards regardless, since the missing-dep propagation test (asserting `ModuleNotFoundError`) must run in an env where they are *absent* — a `no-df` test env or a subprocess/monkeypatched-import test.
+
+### P2 edge-case suite — NO new dev deps
+
+Audited EDGE-08, 13/14, 20, 22/23, 24, 31/32 in `.planning/research/ASYNC-EDGE-CASES.md`:
+
+| Edge case | What it needs | Already available? |
+|-----------|---------------|---------------------|
+| EDGE-08 (trio checkpoint delivery) | trio backend param | ✓ `trio>=0.31` in dev |
+| EDGE-13/14 (contextvars in/out of worker) | stdlib `contextvars.ContextVar` | ✓ stdlib |
+| EDGE-20 (cleanup error chaining) | stdlib exception `__context__` | ✓ stdlib |
+| EDGE-22 (`__del__` → `ResourceWarning`) | `pytest.warns(ResourceWarning)` + `gc.collect()` | ✓ stdlib + pytest |
+| EDGE-23 (no "coroutine never awaited") | `warnings`/`pytest.warns` on `RuntimeWarning` | ✓ stdlib + pytest |
+| EDGE-24 (loop-shutdown, trio nursery canary) | trio nursery | ✓ `trio` in dev |
+| EDGE-31/32 (timeout precision, `move_on_after`) | anyio `move_on_after`/`fail_after`; deterministic timing | ✓ anyio; `aiotools`/`pytest-timeout`/`pytest-repeat` already present |
+
+**Conclusion:** the existing dev group (`anyio`, `trio`, `aiotools`, `pytest-repeat`, `pytest-timeout`, `pytest-adbc-replay`) fully covers the P2 suite. No additions required for edge cases.
+
+## Typing / Stub Integration
+
+### `_SyncCursor` Protocol extension (`src/adbc_poolhouse/_async/_cursor.py`)
+
+The structural Protocol at lines 50–74 must gain four members. Verified strict-clean against `.venv/bin/basedpyright` (strict mode, the repo's config) in-repo:
+
+```python
+class _SyncCursor(Protocol):
+    ...  # existing members
+    def fetch_record_batch(self) -> pyarrow.RecordBatchReader: ...
+    def adbc_ingest(
+        self,
+        table_name: str,
+        data: pyarrow.RecordBatch | pyarrow.Table | pyarrow.RecordBatchReader | CapsuleType,
+        mode: Literal["append", "create", "replace", "create_append"] = ...,
+        *,
+        catalog_name: str | None = ...,
+        db_schema_name: str | None = ...,
+        temporary: bool = ...,
+    ) -> int: ...
+    def fetch_df(self) -> object: ...      # pandas.DataFrame at runtime; see note below
+    def fetch_polars(self) -> object: ...  # polars.DataFrame at runtime; see note below
+```
+
+Probe result: extended Protocol with the full `adbc_ingest` union (including `CapsuleType`) produced **0 real diagnostics** under strict basedpyright (only a throwaway `reportUnusedClass` from the probe scaffold itself).
+
+### The pyarrow-stub reality (important, verified)
+
+pyarrow `24.0.0` **does ship `py.typed`** and an `__init__.pyi`, **but that stub is an official placeholder**:
+
+```python
+"""Type stubs for PyArrow. This is a placeholder stub file.
+Complete type annotations will be added in subsequent PRs."""
+def __getattr__(name: str) -> Any: ...   # TODO(GH-48970): remove before release
+```
+
+**Implication:** every `pyarrow.X` member (`RecordBatchReader`, `Table`, `RecordBatch`, …) currently resolves to `Any` under basedpyright. This is why the existing `fetch_arrow_table(self) -> pyarrow.Table` annotation is already strict-clean (verified: `_cursor.py` → 0 errors), and why `-> pyarrow.RecordBatchReader` and the `adbc_ingest` `data` union will be equally clean — they degrade to `Any`, which strict mode accepts silently. **No stub package (`pyarrow-stubs`) is needed**, and adding one would risk introducing *stricter* checks than the placeholder currently enforces (avoid). Keep the annotations as real `pyarrow.*` names (self-documenting, forward-compatible with pyarrow's future real stubs) under `if TYPE_CHECKING`.
+
+### `CapsuleType` typing
+
+- ADBC's own stub imports `CapsuleType` from `typing_extensions` under `TYPE_CHECKING`.
+- In this repo (Python floor 3.11): `types.CapsuleType` exists only on 3.13+; `typing_extensions.CapsuleType` is available (typing-extensions is a transitive dep via anyio/pydantic). **Recommendation:** import `CapsuleType` from `typing_extensions` under `TYPE_CHECKING` (matches ADBC's own choice, works on the 3.11 floor). Do **not** add `typing-extensions` as a direct runtime dep — it is TYPE_CHECKING-only here and already transitively present.
+
+### `fetch_df` / `fetch_polars` return-type annotation choice
+
+The wrappers can annotate returns as:
+- **`-> object`** on the Protocol (poolhouse never depends on pandas/polars types) — simplest, strict-clean, no conditional import of pandas/polars stubs. **Recommended for the Protocol.**
+- On the **public** `AsyncCursor.fetch_df`/`fetch_polars` methods, annotate `-> "pandas.DataFrame"` / `-> "polars.DataFrame"` under `if TYPE_CHECKING: import pandas, polars` (string/deferred annotations, never imported at runtime). This gives consumers accurate return types in their IDE **without** making pandas/polars a runtime import. basedpyright treats an unresolved `pandas`/`polars` import as `reportMissingImports` **only if** the modules aren't installed in the type-checking env — since they are in the **dev group**, the repo's own type-check run resolves them. Consumers who lack them still get correct behaviour (the string annotation is never evaluated). **Recommendation:** use the TYPE_CHECKING string-annotation approach on the public methods for good DX; keep the internal `_SyncCursor` Protocol members at `-> object` (driver-agnostic, no stub coupling).
+
+## Alternatives Considered (and rejected)
+
+| Category | Chosen | Alternative | Why not |
+|----------|--------|-------------|---------|
+| pandas/polars availability | User-supplied; ADBC raises `ModuleNotFoundError` | `[pandas]`/`[polars]` poolhouse extras | Maintainer ruling; consistent with driver treatment; ADBC already signals cleanly |
+| Missing-dep handling | Propagate ADBC's `ModuleNotFoundError` unchanged | Catch + re-raise `PoolhouseError` | Offload chokepoint intentionally never re-wraps (ACUR-06/EDGE-17); the native error is already clear and actionable |
+| pyarrow typing | Real `pyarrow.*` names under TYPE_CHECKING (resolve to `Any`) | Add `pyarrow-stubs` dev dep | Placeholder official stub already makes members `Any`; third-party stubs could add spurious strict errors; official stubs land in a future pyarrow |
+| `CapsuleType` source | `typing_extensions` (TYPE_CHECKING) | `types.CapsuleType` | `types.CapsuleType` is 3.13+ only; floor is 3.11 |
+| pandas/polars in tests | dev-group + `importorskip` guards | test with monkeypatched fakes only | Real libs give a real return-type assertion; `importorskip` keeps the suite green for contributors without them |
+
+## Installation (dev env delta)
+
+No consumer-facing install changes. For the **development** environment only:
+
+```bash
+# Add to [dependency-groups].dev in pyproject.toml (test-only, never shipped):
+#   "pandas>=2.0",
+#   "polars>=1.0",
+uv sync
+```
+
+No change to `[project.dependencies]`, no change to `[project.optional-dependencies]`.
+
+## Version Confirmation (2026-07-01)
+
+Installed-in-`.venv` vs latest-on-PyPI (WebFetch of `pypi.org/pypi/<pkg>/json`):
+
+| Package | Installed (`.venv`) | Latest PyPI | Notes |
+|---------|--------------------|-------------|-------|
+| `adbc-driver-manager` | 1.11.0 | 1.11.0 | Provides all four methods; up to date |
+| `pyarrow` | 24.0.0 | 24.0.0 | `RecordBatchReader` present; ships placeholder `py.typed` stub |
+| `anyio` | 4.14.1 | 4.14.1 | Unchanged from v1.4.0 |
+| `trio` | 0.33.0 | 0.33.0 (installed) | dev-only, edge suite |
+| `aiotools` | 2.2.3 | (installed) | dev-only, timing/scheduling edge tests |
+| `basedpyright` | 1.39.5 | (installed) | strict-mode gate |
+| `pandas` | **not installed** | 3.0.3 | proposed dev-group add |
+| `polars` | **not installed** | 1.42.1 | proposed dev-group add |
+
+Context7 MCP was unavailable in this session; versions were confirmed directly against PyPI JSON and by introspecting the installed packages (higher-fidelity than Context7 for this "exact installed signature" question).
 
 ## Sources
 
-- PyPI JSON API (`pypi.org/pypi/<pkg>/json`) — verified current versions and anyio 4.14.1 dependency
-  markers: anyio 4.14.1 (`requires-python >=3.10`; `exceptiongroup; python_version<"3.11"`,
-  `typing_extensions>=4.5; python_version<"3.13"`, `trio>=0.32.0; extra=="trio"`), exceptiongroup
-  1.3.1, typing-extensions 4.15.0, pytest 9.1.1, greenlet 3.5.2, trio 0.33.0. **HIGH**
-- [AnyIO Testing docs](https://anyio.readthedocs.io/en/stable/testing.html) — built-in pytest plugin,
-  `@pytest.mark.anyio`, `anyio_mode = "auto"`, `anyio_backend` parametrization, explicit conflict
-  warning vs pytest-asyncio. **HIGH**
-- [AnyIO Tasks docs](https://anyio.readthedocs.io/en/stable/tasks.html) +
-  [Migration 3→4](https://anyio.readthedocs.io/en/stable/migration.html) — task groups raise native
-  PEP 654 `ExceptionGroup`; backport only needed `<3.11`. **HIGH**
-- [SQLAlchemy 2.0 asyncio docs](https://docs.sqlalchemy.org/en/20/orm/extensions/asyncio.html) +
-  [Connection Pooling docs](https://docs.sqlalchemy.org/en/20/core/pooling.html) —
-  `AsyncAdaptedQueuePool` requires a natively-async DBAPI and uses greenlet; plain `QueuePool` is
-  "not compatible with asyncio"; confirms thread-offload remains required and
-  greenlet/sqlalchemy[asyncio] should be avoided. **HIGH**
-
----
-*Research by Claude Code — 2026-06-25*
-*Sources: PyPI JSON API, anyio.readthedocs.io, docs.sqlalchemy.org*
+- Installed-package introspection via `.venv/bin/python -c "import inspect, adbc_driver_manager.dbapi as d; ..."` — signatures + source of all four methods (HIGH confidence, ground truth).
+- Live missing-dep behaviour: ran `reader.read_pandas()` / `import polars` with pandas & polars absent in `.venv` → `ModuleNotFoundError` (HIGH, verified).
+- `.venv/bin/basedpyright` strict-mode probes on `_cursor.py` and an extended-Protocol scaffold (HIGH, verified: 0 real diagnostics).
+- pyarrow `__init__.pyi` placeholder-stub contents read from the installed wheel (HIGH, verified).
+- PyPI JSON for adbc-driver-manager (1.11.0), pyarrow (24.0.0), anyio (4.14.1), pandas (3.0.3), polars (1.42.1) (HIGH).
+- `.planning/milestones/v1.4.0-research/STACK.md` — the `[async]`/anyio "one runtime dep" posture this milestone continues (project doc).
+- `.planning/research/ASYNC-EDGE-CASES.md` — P2 edge-case definitions (EDGE-08/13/14/20/22/23/24/31/32) confirming stdlib-only test needs (project doc).

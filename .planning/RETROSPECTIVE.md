@@ -167,6 +167,47 @@
 
 ---
 
+## Milestone: v1.5.0 — Async Cursor Completion
+
+**Shipped:** 2026-07-05
+**Phases:** 7 (29-35) | **Plans:** 19
+
+### What Was Built
+- Arrow streaming — `fetch_record_batch()` → `AsyncRecordBatchReader` with per-batch offloaded `async for`, reader lifetime bound to the checked-out connection, read-after-checkin surfacing the driver's native closed-stream error
+- Async bulk write (`adbc_ingest`, `on_abort=invalidate`), DataFrame convenience (`fetch_df`/`fetch_polars`, user-supplied pandas/polars), connection metadata (`adbc_get_*`), and prepared statements (`adbc_prepare`/`adbc_execute_schema`) — all pure offload wrappers over the unchanged sync core
+- The deferred P2 async edge-case hardening suite (contextvars, trio checkpoint, deadline precision, loop-shutdown) — test-only, dual-backend, looped ×20 on macOS + Linux CI
+- Full async documentation (streaming/ingest/DataFrame/metadata/prepared-statement how-tos + API reference) under a `mkdocs build --strict` gate
+
+### What Worked
+- The Phase 29 reader-lifetime design (the milestone's one real novelty) front-loaded, then its `__aexit__`/`__del__`/per-batch-cancel patterns copied mechanically by every later method — the four researchers' ordering held up
+- RED-first scaffolding per phase (a blocking-stub method + failing tests pinning the contract before the symbol exists) made each GREEN implementation a near-mechanical clone of `execute`/`fetch_arrow_table`
+- The single `cancellable_offload` chokepoint absorbed all six new method groups with zero widening — the "mirror the sync method, invent nothing" principle kept the surface tiny
+- The `on_abort`-omitted vs `on_abort=invalidate` distinction (stateless reads non-poisoning, stateful writes poisoning) proved out cleanly under the two-axis cancel tests, and a code review (CR-34-01) caught the one place a metadata reader would have wrongly invalidated
+- Nyquist VALIDATION.md reconciliation done per-phase this milestone (32/34/35) rather than left as a close-time backlog — directly addressing the v1.4.0 lesson
+
+### What Was Inefficient
+- The v1.5.0 release step (version bump + tag) was deliberately held out of docs scope, so pyproject sat at 1.4.0 through the whole milestone and had to be reconciled at close (bump + `uv.lock` regen) before the tag could match the wheel
+- The milestone-close artifact audit flagged 8 completed quick tasks as "open" purely because their SUMMARY frontmatter lacks a `status:` field — a recurring false positive that needs a `/gsd-cleanup` frontmatter backfill
+- The auto-extracted MILESTONES.md accomplishments pulled in deviation-log fragments ("1. [Rule 3 - Blocking]…") and needed a manual rewrite
+
+### Patterns Established
+- RED blocking-stub + failing-test scaffold as Wave 0 for every new offloaded method, with a green-wave pyright-pragma cleanup once the symbol lands
+- Two-axis cancel test (`adbc_cancel`==1 AND `invalidate`==0) as the proof for cancellable-but-non-poisoning offloads
+- Per-phase Nyquist validation reconciliation instead of a close-time sweep
+- "Retire the whole caveat when the last deferred bullet ships" as the docs pattern for shrinking a not-available-yet block
+
+### Key Lessons
+1. Decide the release mechanics (version bump + tag placement) up front — deferring the bump left pyproject and the intended tag inconsistent, and the release CI enforces wheel==tag
+2. A structural pattern proven once (Phase 29 reader lifetime) turns the rest of a parity milestone into mechanical clones — front-load the genuine risk
+3. Keep tracking-artifact hygiene current (SUMMARY `status:` frontmatter, VALIDATION compliance) — the audit's false "open" items trace directly to missing frontmatter, not real gaps
+
+### Cost Observations
+- Model mix: opus for the Phase 29 reader-lifetime design and cancellation review; sonnet for the mechanical RED/GREEN clones and docs
+- 133 commits over 4 days (v1.4.0 → v1.5.0)
+- Notable: Phases 30/31/34/35 were near-mechanical offload clones once Phase 29 established the pattern; the real effort was streaming lifetime + the P2 edge suite
+
+---
+
 ## Cross-Milestone Trends
 
 ### Process Evolution
@@ -177,6 +218,7 @@
 | v1.2.0 | 6 | 17 | Architectural pivot mid-milestone; gap closure from audit |
 | v1.3.0 | 2 | 6 | Single-backend addition on the v1.2.0 Protocol pattern + gap-closure phase (21.1) |
 | v1.4.0 | 7 | 29 | Feasibility-spike gate + deterministic async harness before code; Linux CI as async gate |
+| v1.5.0 | 7 | 19 | RED blocking-stub scaffold per method; per-phase Nyquist reconciliation; parity via mechanical offload clones |
 
 ### Cumulative Quality
 
@@ -186,9 +228,11 @@
 | v1.2.0 | 241 | 12 | 1/13 satisfied, 12/13 superseded |
 | v1.3.0 | ~265 | 13 | 29/29 |
 | v1.4.0 | 433 | 13 (async for all) | 63/63 |
+| v1.5.0 | 489 | 13 (async parity complete) | 38/38 |
 
 ### Top Lessons (Verified Across Milestones)
 
 1. Audit before archiving — catches gaps that phase-level verification misses (confirmed v1.0.0 + v1.2.0)
-2. Establish patterns early, then replicate mechanically — translator consolidation scaled to all 12 backends (confirmed v1.0.0 + v1.2.0)
+2. Establish patterns early, then replicate mechanically — translator consolidation scaled to all 12 backends, and async offload clones scaled to all six new cursor methods (confirmed v1.0.0 + v1.2.0 + v1.5.0)
 3. Build the simplest solution that works — registry was unnecessary complexity, self-describing configs are better (v1.2.0)
+4. Keep tracking-artifact hygiene current as you go — ROADMAP checkboxes (v1.4.0), VALIDATION status and SUMMARY frontmatter (v1.5.0); reconciling at close is avoidable friction

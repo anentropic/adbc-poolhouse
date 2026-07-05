@@ -2,14 +2,28 @@
 
 ## Milestones
 
+- ✅ **v1.5.0 Async Cursor Completion** — Phases 29–35 (shipped 2026-07-05)
 - ✅ **v1.4.0 Async API** — Phases 22–28 (shipped 2026-07-01)
 - ✅ **v1.3.0 Quack Backend** — Phases 21–21.1 (shipped 2026-05-21)
 - ✅ **v1.2.0 Plugin/Extensibility API** — Phases 16-20 (shipped 2026-03-15)
 - ✅ **v1.0.0 MVP + Backend Expansion** — Phases 1-15 (shipped 2026-03-07)
 
-_Next milestone: TBD — run `/gsd-new-milestone`._
-
 ## Phases
+
+<details>
+<summary>✅ v1.5.0 Async Cursor Completion (Phases 29-35) — SHIPPED 2026-07-05</summary>
+
+- [x] **Phase 29: Arrow Streaming** — `await cursor.fetch_record_batch()` → `AsyncRecordBatchReader` with per-batch offloaded `async for`, reader-lifetime bound to checkout, read-after-checkin surfaces the driver's native closed-stream error (4/4 plans) — completed 2026-07-01
+- [x] **Phase 30: Async Bulk Write** — `await cursor.adbc_ingest(table, data, mode=...)`, single whole-op offload, typed `Literal` mode, `on_abort=invalidate` on cancel (2/2 plans) — completed 2026-07-01
+- [x] **Phase 31: DataFrame Convenience** — `await cursor.fetch_df()` / `await cursor.fetch_polars()`, single-offload wrappers returning self-owning frames; pandas/polars user-supplied (2/2 plans) — completed 2026-07-02
+- [x] **Phase 32: P2 Edge Hardening** — remaining deferred P2 edge cases (contextvars, trio-checkpoint, timeout precision, loop-shutdown) extended across the new streaming/ingest/DataFrame paths; all six EDGE requirements green x20 on macOS + Linux CI, test-only (zero production change) (3/3 plans) — completed 2026-07-02
+- [x] **Phase 33: Documentation** — streaming guide, ingest mode table + replace warning, DataFrame user-supplied note, API reference for the new symbols, `mkdocs build --strict` gate, humanizer pass (2/2 plans) — completed 2026-07-04
+- [x] **Phase 34: Async Metadata** — the six `adbc_get_*` connection metadata methods as async offload wrappers over the sync `dbapi.Connection`; streaming trio wrapped in `AsyncRecordBatchReader` (code review fixed CR-34-01: metadata readers are non-poisoning on cancel) (3/3 plans) — completed 2026-07-04
+- [x] **Phase 35: Async Prepared Statements** — `adbc_prepare` + `adbc_execute_schema` as async offload wrappers over the sync `dbapi.Cursor` (second parity gap named in the docs caveat) (3/3 plans) — completed 2026-07-04
+
+Full detail: `milestones/v1.5.0-ROADMAP.md` · Audit: `milestones/v1.5.0-MILESTONE-AUDIT.md`
+
+</details>
 
 <details>
 <summary>✅ v1.4.0 Async API (Phases 22-28) — SHIPPED 2026-07-01</summary>
@@ -69,17 +83,20 @@ Full detail: `milestones/v1.4.0-ROADMAP.md` · Audit: `milestones/v1.4.0-MILESTO
 
 ## Progress
 
+**Execution Order:**
+Phases execute in numeric order: 29 → 30 → 31 → 32 → 33 → 34 → 35
+
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
-| 22. Feasibility Spike | v1.4.0 | 2/2 | Complete | 2026-06-27 |
-| 23. Test Harness Foundation | v1.4.0 | 4/4 | Complete | 2026-06-27 |
-| 24. Core Async Wrapper | v1.4.0 | 5/5 | Complete | 2026-06-27 |
-| 25. Cancellation | v1.4.0 | 5/5 | Complete | 2026-06-28 |
-| 26. Packaging & Extra Scoping | v1.4.0 | 4/4 | Complete | 2026-06-28 |
-| 27. Dual-Backend Test Matrix | v1.4.0 | 5/5 | Complete | 2026-06-28 |
-| 28. Documentation | v1.4.0 | 4/4 | Complete | 2026-06-29 |
+| 29. Arrow Streaming | v1.5.0 | 4/4 | Complete    | 2026-07-01 |
+| 30. Async Bulk Write | v1.5.0 | 2/2 | Complete    | 2026-07-01 |
+| 31. DataFrame Convenience | v1.5.0 | 2/2 | Complete    | 2026-07-02 |
+| 32. P2 Edge Hardening | v1.5.0 | 3/3 | Complete    | 2026-07-02 |
+| 33. Documentation | v1.5.0 | 2/2 | Complete    | 2026-07-04 |
+| 34. Async Metadata | v1.5.0 | 3/3 | Complete    | 2026-07-04 |
+| 35. Async Prepared Statements | v1.5.0 | 3/3 | Complete    | 2026-07-04 |
+| 22-28. Async API | v1.4.0 | 29/29 | Complete | 2026-07-01 |
 | 21.1. ADBC dispatch URI-positional fix | v1.3.0 | 3/3 | Complete | 2026-05-20 |
 | 21. Quack Backend | v1.3.0 | 3/3 | Complete | 2026-05-19 |
 | 16-20. Plugin/Extensibility API | v1.2.0 | 17/17 | Complete | 2026-03-15 |
 | 1-15. MVP + Backend Expansion | v1.0.0 | 51/51 | Complete | 2026-03-07 |
-</content>
