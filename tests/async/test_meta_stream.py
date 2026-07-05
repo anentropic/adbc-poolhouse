@@ -1,5 +1,5 @@
 """
-Async metadata streaming reader (META-02) --- Wave-0 RED scaffolding.
+Async metadata streaming reader (META-02) --- regression coverage.
 
 Locked decision #1 streams the Arrow-returning metadata surfaces rather than
 materializing them: `adbc_get_objects` hands back a live
@@ -18,11 +18,11 @@ real DuckDB driver:
   [`ConnectionBusyError`][adbc_poolhouse.ConnectionBusyError] rather than
   interleaving into the still-open C stream.
 
-Wave-0 status: `adbc_get_objects` does not exist on `AsyncConnection` yet, so every
-test here FAILS (RED) with `AttributeError` --- the acceptance signal Plan 34-02
-turns GREEN. Both backends (asyncio x trio) via `anyio_backend`; DuckDB is the real
-driver leg. The drain body keeps no shared mutable state across iterations so it
-stays loop-safe under the `ADBC_ASYNC_REPEAT=20` wave-merge gate.
+Status: `adbc_get_objects` streaming is implemented on `AsyncConnection`
+(Plan 34-02); this file is passing regression coverage of the drain and
+busy-guard contracts above. Both backends (asyncio x trio) via `anyio_backend`;
+DuckDB is the real driver leg. The drain body keeps no shared mutable state across
+iterations so it stays loop-safe under the `ADBC_ASYNC_REPEAT=20` wave-merge gate.
 """
 
 from __future__ import annotations

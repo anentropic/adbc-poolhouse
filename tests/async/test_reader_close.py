@@ -1,5 +1,5 @@
 """
-Reader close discipline (STREAM-03 + EDGE-20) --- Wave-0 RED scaffolding.
+Reader close discipline (STREAM-03 + EDGE-20) --- regression coverage.
 
 - **STREAM-03:** `schema` is a synchronous passthrough property (no offload, no
   `await`); the blocking members are replaced by async twins; and
@@ -10,9 +10,10 @@ Reader close discipline (STREAM-03 + EDGE-20) --- Wave-0 RED scaffolding.
   cleared (released) regardless --- a failed cleanup never strands the connection
   busy.
 
-Wave-0 status: `AsyncRecordBatchReader` / `fetch_record_batch` do not exist yet,
-so these FAIL (RED). Both backends via `anyio_backend`; the EDGE-20 raise-on-close
-leg drives the stub reader so `close` can be made to raise deterministically.
+Status: `AsyncRecordBatchReader` / `fetch_record_batch` are implemented; this file
+is passing regression coverage of the contract above. Both backends via
+`anyio_backend`; the EDGE-20 raise-on-close leg drives the stub reader so `close`
+can be made to raise deterministically.
 """
 
 from __future__ import annotations
@@ -91,8 +92,6 @@ class TestEdge20ShieldedCleanupChains:
         `__context__` links back to the body error (Python's implicit chaining), and
         the connection's `_reader_open` lock is cleared regardless (EDGE-20 / D-29-16)
         --- a foreign op afterwards must NOT raise `ConnectionBusyError`.
-
-        Wave-0 note: `AsyncRecordBatchReader` does not exist yet, so this FAILS (RED).
         """
         del anyio_backend_name
         async_conn, _stub_conn = make_stub_async_connection()

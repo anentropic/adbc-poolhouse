@@ -1,5 +1,5 @@
 """
-Async bulk-write mode forwarding (INGEST-02) --- Wave-0 RED scaffolding.
+Async bulk-write mode forwarding (INGEST-02) --- regression coverage.
 
 Phase 30 forwards `mode` verbatim to the driver as a typed
 `Literal["create", "append", "replace", "create_append"]` --- poolhouse does no
@@ -14,9 +14,9 @@ recreates it (not a row-level upsert).
 - **replace:** drops-then-recreates --- the post-replace count is the NEW table's
   row count, never the cumulative total (the load-bearing INGEST-02 assertion).
 
-Wave-0 status: `AsyncCursor.adbc_ingest` does NOT exist yet, so every test here
-FAILS (RED) --- the acceptance signal. Both backends via `anyio_backend`; DuckDB
-is the real driver leg.
+Status: `AsyncCursor.adbc_ingest` is implemented (Plan 30-02); this file is passing
+regression coverage of the `Literal` mode forwarding above. Both backends via
+`anyio_backend`; DuckDB is the real driver leg.
 """
 
 from __future__ import annotations

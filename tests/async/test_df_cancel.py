@@ -1,5 +1,5 @@
 """
-Async DataFrame cancel/invalidate parity (T-31-01) --- Wave-0 RED scaffolding.
+Async DataFrame cancel/invalidate parity (T-31-01) --- regression coverage.
 
 Cancelling or timing out an in-flight `fetch_df` / `fetch_polars` must fire the
 cursor's `adbc_cancel` exactly once (`on_abort=owner.invalidate`, D-31-09),
@@ -19,9 +19,10 @@ Harness discipline (copied verbatim from `test_ingest_cancel.py`): `await_inside
 hang; `concurrency_marks` (x-loop repeat + timeout) so a ~33% deadlock cannot hide
 behind one lucky pass (MEMORY loop-flaky-concurrency lesson). Both backends.
 
-Wave-0 status: `AsyncCursor.fetch_df` / `fetch_polars` do NOT exist yet, so these
-FAIL (RED) --- the acceptance signal. Closes threat T-31-01 (poisoned connection
-returned to pool / pool starvation) once GREEN.
+Status: `AsyncCursor.fetch_df` / `fetch_polars` are implemented (Plan 31-02); this file is
+passing regression coverage that cancel/timeout fires `adbc_cancel` once, invalidates the
+connection, and drains the pool (threat T-31-01, poisoned connection returned to pool,
+closed).
 """
 
 from __future__ import annotations

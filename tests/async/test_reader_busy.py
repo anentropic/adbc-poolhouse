@@ -1,5 +1,5 @@
 """
-Reader two-tier connection guard (STREAM-06) --- Wave-0 RED scaffolding.
+Reader two-tier connection guard (STREAM-06) --- regression coverage.
 
 A live reader locks its parent connection for the reader's WHOLE lifetime
 (`_reader_open == True`, D-29-08/09). While the reader is live:
@@ -16,9 +16,9 @@ A live reader locks its parent connection for the reader's WHOLE lifetime
 `async with reader:` is the canonical usage.
 
 Dual-backend via `anyio_backend`; `concurrency_marks` (loop + timeout) guard the
-hang-prone gating. Wave-0 status: production `fetch_record_batch` /
-`AsyncRecordBatchReader` / the `_reader_open` guard do not exist yet, so these FAIL
-(RED).
+hang-prone gating. Status: `fetch_record_batch` / `AsyncRecordBatchReader` / the
+`_reader_open` guard are implemented; this file is passing regression coverage of
+the contract above.
 """
 
 from __future__ import annotations

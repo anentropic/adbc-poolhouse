@@ -1,5 +1,5 @@
 """
-Async DataFrame self-owning-frame lifetime (DF-04) --- Wave-0 RED scaffolding.
+Async DataFrame self-owning-frame lifetime (DF-04) --- regression coverage.
 
 `fetch_df` / `fetch_polars` are whole-operation offloads: the connection checks
 back in the instant the offload returns (no `_reader_open` lifetime lock, D-31-03).
@@ -13,9 +13,9 @@ no use-after-free / segfault.
 Each flavour is `pytest.importorskip`-guarded (PKG-02). Both backends via
 `anyio_backend`; DuckDB is the real driver leg.
 
-Wave-0 status: `AsyncCursor.fetch_df` / `fetch_polars` do NOT exist yet, so these
-FAIL (RED) --- the acceptance signal. Closes threat T-31-02 (use-after-free reading
-a frame after checkin) once GREEN.
+Status: `AsyncCursor.fetch_df` / `fetch_polars` are implemented (Plan 31-02); this file is
+passing regression coverage that a self-owning frame stays readable after the connection
+checks in (threat T-31-02, use-after-free, closed).
 """
 
 from __future__ import annotations

@@ -1,5 +1,5 @@
 """
-Async DataFrame convenience round-trip (DF-01/DF-02) --- Wave-0 RED scaffolding.
+Async DataFrame convenience round-trip (DF-01/DF-02) --- regression coverage.
 
 Phase 31 adds `await cursor.fetch_df()` returning a `pandas.DataFrame` and
 `await cursor.fetch_polars()` returning a `polars.DataFrame`, each a single
@@ -17,10 +17,10 @@ cleanly where pandas/polars are absent (PKG-02, D-31-08). The two cases carry
 `fetch_df` / `fetch_polars` in their names so the VALIDATION test map can select
 them with `-k`.
 
-Wave-0 status: `AsyncCursor.fetch_df` / `fetch_polars` do NOT exist yet, so every
-test here FAILS (RED). That is the acceptance signal --- Plan 31-02 turns them
-GREEN by cloning the `fetch_arrow_table` shape. Both backends (asyncio x trio) via
-the `anyio_backend` fixture; DuckDB is the real driver leg.
+Status: `AsyncCursor.fetch_df` / `fetch_polars` are implemented (Plan 31-02 cloned the
+`fetch_arrow_table` shape); this file is passing regression coverage of the round-trip
+contracts above. Both backends (asyncio x trio) via the `anyio_backend` fixture; DuckDB is
+the real driver leg.
 """
 
 from __future__ import annotations

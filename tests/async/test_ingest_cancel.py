@@ -1,5 +1,5 @@
 """
-Async bulk-write cancel/invalidate parity (INGEST-04, T-30-01) --- Wave-0 RED scaffolding.
+Async bulk-write cancel/invalidate parity (INGEST-04, T-30-01) --- regression coverage.
 
 Cancelling or timing out an in-flight `adbc_ingest` must fire the cursor's
 `adbc_cancel` exactly once (`on_abort=owner.invalidate`), invalidate the
@@ -19,9 +19,9 @@ autojumps under the trio `MockClock`) fails fast on a hang; `concurrency_marks`
 (x-loop repeat + timeout) so a ~33% deadlock cannot hide behind one lucky pass
 (MEMORY loop-flaky-concurrency lesson). Both backends.
 
-Wave-0 status: `AsyncCursor.adbc_ingest` does not exist yet, so these FAIL (RED).
-Closes threat T-30-01 (poisoned-connection-returned-to-pool / pool-starvation)
-once GREEN.
+Status: `AsyncCursor.adbc_ingest` is implemented (Plan 30-02); this file is passing
+regression coverage of the cancel/invalidate parity above. Closed threat T-30-01
+(poisoned-connection-returned-to-pool / pool-starvation).
 """
 
 from __future__ import annotations

@@ -1,5 +1,5 @@
 """
-Async DataFrame missing-dependency propagation (DF-03) --- Wave-0 RED scaffolding.
+Async DataFrame missing-dependency propagation (DF-03) --- regression coverage.
 
 pandas/polars stay user-supplied runtime deps: poolhouse never imports them and
 adds NO `find_spec` pre-check and NO wrapping (D-31-05). A missing dependency raises
@@ -16,9 +16,10 @@ raise). The assertion is the exact native surface --- `ei.value.name ==
 spurious `find_spec` / `try-except` wrapping in the production method would FAIL
 here. The two flavours carry `pandas` / `polars` in their names for `-k` selection.
 
-Wave-0 status: `AsyncCursor.fetch_df` / `fetch_polars` do NOT exist yet, so these
-FAIL (RED) --- the acceptance signal. Both backends via `anyio_backend`. Closes the
-worker-thread -> caller exception-path boundary once GREEN.
+Status: `AsyncCursor.fetch_df` / `fetch_polars` are implemented (Plan 31-02); this file is
+passing regression coverage that a missing pandas/polars raises the native
+`ModuleNotFoundError` unchanged across the `to_thread` boundary. Both backends via
+`anyio_backend`.
 """
 
 from __future__ import annotations

@@ -1,5 +1,5 @@
 """
-Reader finalizer discipline (EDGE-22 / EDGE-23) --- Wave-0 RED scaffolding.
+Reader finalizer discipline (EDGE-22 / EDGE-23) --- regression coverage.
 
 An `AsyncRecordBatchReader` cannot `await` inside `__del__`, so its finalizer is
 warn-only (D-29-15):
@@ -13,8 +13,9 @@ warn-only (D-29-15):
 
 Actual buffer release rides the pool reset event on checkin (D-29-12); `__del__`
 only warns. EDGE-22 is asserted on asyncio (finalizer timing is loop-agnostic);
-EDGE-23 runs both backends. Wave-0 status: `AsyncRecordBatchReader` /
-`fetch_record_batch` do not exist yet, so these FAIL (RED).
+EDGE-23 runs both backends. Status: `AsyncRecordBatchReader` /
+`fetch_record_batch` are implemented; this file is passing regression coverage of
+the contract above.
 """
 
 from __future__ import annotations

@@ -1,5 +1,5 @@
 """
-Reader cancel-safety (STREAM-05) --- Wave-0 RED scaffolding.
+Reader cancel-safety (STREAM-05) --- regression coverage.
 
 Cancelling or timing out a batch pull must fire the OWNING cursor's `adbc_cancel`
 exactly once (the reader has none of its own, Pitfall 4), invalidate the poisoned
@@ -17,8 +17,8 @@ blocked pull, `real_clock_watchdog` (a wall-clock side thread --- NOT
 hang, and `concurrency_marks` (x-loop + timeout) so a ~33% deadlock cannot hide
 behind one lucky pass (MEMORY loop-flaky-concurrency lesson). Both backends.
 
-Wave-0 status: `AsyncCursor.fetch_record_batch` / `AsyncRecordBatchReader` do not
-exist yet, so these FAIL (RED).
+Status: `AsyncCursor.fetch_record_batch` / `AsyncRecordBatchReader` are
+implemented; this file is passing regression coverage of the contract above.
 """
 
 from __future__ import annotations

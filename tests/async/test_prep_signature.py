@@ -1,5 +1,5 @@
 """
-Async prepared-statement signature contract (PREP-01) --- Wave-0 RED scaffolding.
+Async prepared-statement signature contract (PREP-01) --- regression coverage.
 
 Phase 35 adds two awaitable methods to `AsyncCursor`:
 
@@ -15,9 +15,8 @@ basedpyright-strict over `_cursor.py`
 (`.venv/bin/basedpyright src/adbc_poolhouse/_async/_cursor.py`), which runs in Plan
 35-02; this file is the runtime companion a plain `pytest` run exercises.
 
-Wave-0 status: neither `AsyncCursor.adbc_prepare` nor `adbc_execute_schema` exists
-yet, so the assertions below FAIL (RED) --- the acceptance signal. Plan 35-02 turns
-them GREEN.
+Status: both `AsyncCursor.adbc_prepare` and `adbc_execute_schema` are implemented
+(Plan 35-02); this file is passing regression coverage asserting both methods exist.
 """
 
 from __future__ import annotations

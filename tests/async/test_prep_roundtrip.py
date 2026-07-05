@@ -1,5 +1,5 @@
 """
-Async `adbc_prepare` DuckDB round-trip (PREP-01, D-35-02) --- Wave-0 RED scaffolding.
+Async `adbc_prepare` DuckDB round-trip (PREP-01, D-35-02) --- regression coverage.
 
 Phase 35 adds `await cursor.adbc_prepare(operation)`, a single whole-operation
 offload that prepares a query WITHOUT executing it and returns the driver's
@@ -13,10 +13,9 @@ Because there is no reader lifetime lock (D-35-01), the connection checks back i
 the instant the offload returns, so `pool.checkedout()` is `0` once the scope
 exits.
 
-Wave-0 status: `AsyncCursor.adbc_prepare` does NOT exist yet, so the call raises
-`AttributeError` and this test FAILS (RED) --- the acceptance signal Plan 35-02
-turns GREEN. Both backends (asyncio x trio) via `anyio_backend`; DuckDB is the
-real driver leg.
+Status: `AsyncCursor.adbc_prepare` is implemented (Plan 35-02); this file is passing
+regression coverage of the round-trip above. Both backends (asyncio x trio) via
+`anyio_backend`; DuckDB is the real driver leg.
 """
 
 from __future__ import annotations

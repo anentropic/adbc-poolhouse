@@ -1,5 +1,5 @@
 """
-Streaming happy-path reader coverage (STREAM-01/02) --- Wave-0 RED scaffolding.
+Streaming happy-path reader coverage (STREAM-01/02) --- regression coverage.
 
 Phase 29 wraps the sync `pyarrow.RecordBatchReader` in an
 `AsyncRecordBatchReader` reached via `await cursor.fetch_record_batch()`. These
@@ -12,11 +12,10 @@ tests pin the two happy-path contracts:
   limiter (proven on the real DuckDB driver by a thread-id check, and on the stub
   by counting the pulls that ran on a non-loop thread).
 
-Wave-0 status: the production `fetch_record_batch` / `AsyncRecordBatchReader`
-symbols do NOT exist yet, so every test here FAILS (RED). That is correct --- the
-tests encode the observable contract that plans 02/03 will turn GREEN. Both
-backends (asyncio x trio) via the `anyio_backend` fixture; DuckDB is the real
-driver leg.
+Status: the `fetch_record_batch` / `AsyncRecordBatchReader` symbols are
+implemented (plans 02/03 turned these GREEN); this file is passing regression
+coverage of the observable contract above. Both backends (asyncio x trio) via the
+`anyio_backend` fixture; DuckDB is the real driver leg.
 """
 
 from __future__ import annotations
@@ -125,9 +124,6 @@ class TestStream02IteratesBatchesOffLoop:
         thread ids (the offload dispatched every pull to a worker). This is the
         deterministic STREAM-02 off-loop proof --- the real-driver leg above cannot
         observe the worker thread id directly.
-
-        Wave-0 note: `AsyncCursor.fetch_record_batch` does not exist yet, so this
-        FAILS now (RED); it pins the contract the GREEN wave must satisfy.
         """
         del anyio_backend_name
         loop_thread_id = threading.get_ident()

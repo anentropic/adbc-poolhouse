@@ -1,5 +1,5 @@
 """
-Async DataFrame busy-guard parity (T-31-03) --- Wave-0 RED scaffolding.
+Async DataFrame busy-guard parity (T-31-03) --- regression coverage.
 
 An ADBC connection permits serialized but not concurrent C-access. `fetch_df` /
 `fetch_polars` bracket their offload with `self._owner._offloading()` (the `_in_use`
@@ -17,9 +17,9 @@ connection). The gated worker is released in a `finally`; a `real_clock_watchdog
 `concurrency_marks` (x-loop repeat + timeout) so a ~33% deadlock cannot hide behind
 one lucky pass (MEMORY loop-flaky-concurrency lesson). Both backends.
 
-Wave-0 status: `AsyncCursor.fetch_df` / `fetch_polars` do NOT exist yet, so these
-FAIL (RED) --- the acceptance signal. Closes threat T-31-03 (concurrent C-access on
-one connection) once GREEN.
+Status: `AsyncCursor.fetch_df` / `fetch_polars` are implemented (Plan 31-02); this file is
+passing regression coverage of the busy-guard parity that rejects a concurrent op with
+`ConnectionBusyError` (threat T-31-03, concurrent C-access, closed).
 """
 
 from __future__ import annotations

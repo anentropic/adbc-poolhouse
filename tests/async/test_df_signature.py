@@ -1,5 +1,5 @@
 """
-Async DataFrame signature + import-surface contract (DF-01/DF-02, PKG-02) --- Wave-0 RED.
+Async DataFrame signature + import-surface contract (DF-01/DF-02, PKG-02) --- regression coverage.
 
 Two runtime-companion contracts for Phase 31:
 
@@ -20,9 +20,8 @@ proves the structural Protocol carries `fetch_df` / `fetch_polars` as `-> object
 (D-31-06) and that `BlockingStubCursor` satisfies it. That static gate runs in Plan
 31-02; this file is the runtime companion a plain `pytest` run exercises.
 
-Wave-0 status: `AsyncCursor.fetch_df` / `fetch_polars` do NOT exist yet, so the
-introspection below fails (RED) --- the acceptance signal. The `import_surface` case
-may already PASS (it only imports the package); that is acceptable.
+Status: `AsyncCursor.fetch_df` / `fetch_polars` are implemented (Plan 31-02); this file is
+passing regression coverage of the signature and import-surface contracts above.
 """
 
 from __future__ import annotations

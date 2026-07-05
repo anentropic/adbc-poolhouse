@@ -1,5 +1,5 @@
 """
-Async bulk-write signature contract (INGEST-01) --- Wave-0 RED scaffolding.
+Async bulk-write signature contract (INGEST-01) --- regression coverage.
 
 Phase 30's public `AsyncCursor.adbc_ingest` surfaces `mode`, `catalog_name`,
 `db_schema_name`, and `temporary` as KEYWORD-ONLY (after `*`, D-30-03), while
@@ -13,8 +13,8 @@ The authoritative Protocol-coverage gate is basedpyright-strict over `_cursor.py
 `BlockingStubCursor` satisfies it. That static gate runs in Plan 30-02; this file
 is the runtime companion that a plain `pytest` run exercises.
 
-Wave-0 status: `AsyncCursor.adbc_ingest` does NOT exist yet, so the introspection
-below raises `AttributeError` and the test FAILS (RED) --- the acceptance signal.
+Status: `AsyncCursor.adbc_ingest` is implemented (Plan 30-02); this file is passing
+regression coverage of the keyword-only/positional signature contract above.
 """
 
 from __future__ import annotations

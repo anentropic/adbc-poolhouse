@@ -1,5 +1,5 @@
 """
-Async `adbc_execute_schema` value + no-execute proof (PREP-02, D-35-06) --- Wave-0 RED.
+Async `adbc_execute_schema` value + no-execute proof (PREP-02, D-35-06) --- regression coverage.
 
 Phase 35's `await cursor.adbc_execute_schema(operation, parameters=None)` returns
 the RESULT-set schema WITHOUT executing the query. The load-bearing PREP-02 proof
@@ -22,9 +22,9 @@ provably inside the blocked call before releasing it; `real_clock_watchdog` (a
 wall-clock side thread --- NOT `anyio.fail_after`, which autojumps under the trio
 `MockClock`) fails fast on a hang. Both backends.
 
-Wave-0 status: `AsyncCursor.adbc_execute_schema` does not exist yet, so the drive
-raises `AttributeError` and this test FAILS (RED) --- the acceptance signal Plan
-35-02 turns GREEN.
+Status: `AsyncCursor.adbc_execute_schema` is implemented (Plan 35-02); this file is
+passing regression coverage proving the awaited schema passes through unchanged and
+the query is never executed.
 """
 
 from __future__ import annotations

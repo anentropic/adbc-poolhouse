@@ -1,5 +1,5 @@
 """
-Async metadata native-error surfacing (META-03) --- Wave-0 RED scaffolding.
+Async metadata native-error surfacing (META-03) --- regression coverage.
 
 Locked decision #6 (the milestone's governing principle: no bespoke async error
 type) says an async metadata method mirrors the sync driver's native error. The
@@ -11,11 +11,10 @@ surfaces that native error UNCHANGED --- no `PoolhouseError` wrapping, no
 swallowing --- and that the connection still checks back in cleanly after the
 failed call (`pool.checkedout() == 0`, T-34-02).
 
-Wave-0 status: neither `adbc_get_statistics` nor `adbc_get_statistic_names` exists
-on `AsyncConnection` yet, so `pytest.raises(NotSupportedError)` does NOT match the
-`AttributeError` the missing method raises, and every test here FAILS (RED). That
-is the acceptance signal --- Plan 34-02 turns them GREEN. Both backends (asyncio x
-trio) via `anyio_backend`; DuckDB is the real driver leg.
+Status: `adbc_get_statistics` and `adbc_get_statistic_names` are implemented on
+`AsyncConnection` (Plan 34-02); this file is passing regression coverage of the
+native `NotSupportedError` passthrough and clean-checkin contract above. Both
+backends (asyncio x trio) via `anyio_backend`; DuckDB is the real driver leg.
 """
 
 from __future__ import annotations

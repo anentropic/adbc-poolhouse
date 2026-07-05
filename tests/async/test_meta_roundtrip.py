@@ -1,5 +1,5 @@
 """
-Async metadata value round-trip (META-01/02) --- Wave-0 RED scaffolding.
+Async metadata value round-trip (META-01/02) --- regression coverage.
 
 Phase 34 adds the value-returning metadata methods to
 [`AsyncConnection`][adbc_poolhouse._async._connection.AsyncConnection]: each hands
@@ -17,10 +17,10 @@ The connection checks back in the instant each value method returns (no reader
 lifetime lock), so `pool.checkedout()` returns to 0 once the scope exits ---
 proving the `_offloading()` guard releases the connection cleanly (T-34-02).
 
-Wave-0 status: none of the metadata methods exist on `AsyncConnection` yet, so
-every test here FAILS (RED) with `AttributeError`. That is the acceptance signal
---- the tests encode the observable contract Plan 34-02 turns GREEN. Both backends
-(asyncio x trio) via the `anyio_backend` fixture; DuckDB is the real driver leg.
+Status: the value metadata methods are implemented on `AsyncConnection`
+(Plan 34-02); this file is passing regression coverage of the return-type and
+clean-checkin contract above. Both backends (asyncio x trio) via the
+`anyio_backend` fixture; DuckDB is the real driver leg.
 """
 
 from __future__ import annotations

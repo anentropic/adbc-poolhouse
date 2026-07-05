@@ -1,5 +1,5 @@
 """
-Async prepared-statement cancel: cancellable BUT non-poisoning (D-35-04) --- Wave-0 RED.
+Async prepared-statement cancel: cancellable BUT non-poisoning (D-35-04) --- regression coverage.
 
 Cancelling or timing out an in-flight `adbc_prepare` must fire the cursor's
 `adbc_cancel` exactly once (the call IS cancellable --- the sync method routes
@@ -24,8 +24,9 @@ rare deadlock cannot hide behind one lucky pass (loop-flaky-concurrency lesson).
 backends. The timeout twin uses `virtual_clock` + `anyio.fail_after` ONLY as the
 cancellation TRIGGER (the watchdog stays real-clock).
 
-Wave-0 status: `AsyncCursor.adbc_prepare` does not exist yet, so these FAIL (RED).
-Closes threat T-35-02 (connection-left-busy-after-cancel) once GREEN.
+Status: `AsyncCursor.adbc_prepare` is implemented (Plan 35-02); this file is passing
+regression coverage of the cancellable-but-non-poisoning contract above. Closes
+threat T-35-02 (connection-left-busy-after-cancel).
 """
 
 from __future__ import annotations

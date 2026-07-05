@@ -1,5 +1,5 @@
 """
-Async connection metadata signature contract (META-01) --- Wave-0 RED scaffolding.
+Async connection metadata signature contract (META-01) --- regression coverage.
 
 Phase 34 adds six `adbc_get_*` metadata methods to
 [`AsyncConnection`][adbc_poolhouse._async._connection.AsyncConnection], each an
@@ -18,9 +18,9 @@ src/adbc_poolhouse/_async/_connection.py`), which proves the `_SyncConnection`
 structural Protocol carries the six methods. That static gate runs in Plan 34-02;
 this file is the runtime companion a plain `pytest` run exercises.
 
-Wave-0 status: none of the six `adbc_get_*` methods exist on `AsyncConnection`
-yet, so the introspection below raises `AttributeError` and every test FAILS
-(RED) --- the acceptance signal.
+Status: all six `adbc_get_*` methods are implemented on `AsyncConnection`
+(Plan 34-02); this file is passing regression coverage of the keyword-only
+signature contract above.
 """
 
 from __future__ import annotations

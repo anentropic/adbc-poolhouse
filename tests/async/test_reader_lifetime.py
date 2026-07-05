@@ -1,5 +1,5 @@
 """
-Reader lifetime + read-after-checkin safety (STREAM-04 / EDGE-33) --- Wave-0 RED.
+Reader lifetime + read-after-checkin safety (STREAM-04 / EDGE-33) --- regression coverage.
 
 A streaming `RecordBatchReader` is bound to its checked-out connection's C Arrow
 stream. This suite pins the two halves of that lifetime contract:
@@ -17,7 +17,7 @@ stream. This suite pins the two halves of that lifetime contract:
 Both backends via `anyio_backend`; both drivers where a live C-stream is needed
 (DuckDB always; Snowflake via the cassette fixture, which `importorskip`s cleanly
 when the driver/cassette is absent). The Snowflake leg scope is resolved by the
-Wave-0 cassette smoke (`test_reader_cassette_smoke.py`, assumption A1): if the
+cassette smoke (`test_reader_cassette_smoke.py`, assumption A1): if the
 cassette cannot replay a streaming `fetch_record_batch`, the Snowflake row-drain
 leg is skipped and only the `ArrowInvalid` read-after-checkin path (which needs no
 live streaming rows) is asserted. The `_LIFETIME_LOOPS` + `concurrency_marks`

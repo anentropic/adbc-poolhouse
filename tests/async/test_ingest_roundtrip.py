@@ -1,5 +1,5 @@
 """
-Async bulk-write round-trip + data pass-through (INGEST-01/03) --- Wave-0 RED scaffolding.
+Async bulk-write round-trip + data pass-through (INGEST-01/03) --- regression coverage.
 
 Phase 30 adds `await cursor.adbc_ingest(table_name, data, *, mode=...)`, a single
 whole-operation offload that hands an Arrow payload to the driver untouched and
@@ -13,10 +13,10 @@ contracts against the real DuckDB driver:
 - **INGEST-03:** `data` is pass-through with ZERO conversion --- both a
   `pyarrow.Table` and a `pyarrow.RecordBatch` ingest and round-trip unchanged.
 
-Wave-0 status: `AsyncCursor.adbc_ingest` does NOT exist yet, so every test here
-FAILS (RED). That is the acceptance signal --- the tests encode the observable
-contract Plan 30-02 turns GREEN. Both backends (asyncio x trio) via the
-`anyio_backend` fixture; DuckDB is the real driver leg.
+Status: `AsyncCursor.adbc_ingest` is implemented (Plan 30-02); this file is passing
+regression coverage of the round-trip and pass-through contracts above against the
+real DuckDB driver. Both backends (asyncio x trio) via the `anyio_backend` fixture;
+DuckDB is the real driver leg.
 """
 
 from __future__ import annotations
