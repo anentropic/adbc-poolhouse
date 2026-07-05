@@ -16,10 +16,14 @@ result, not a streaming reader. Consequently BOTH Snowflake reader legs in
 manual-only re-record follow-ups per `29-VALIDATION.md` §Manual-Only Verifications.
 DuckDB carries the mandatory EDGE-33 coverage and is NOT gated on this result.
 
-This smoke asserts the A1 fact directly against the installed replay plugin, so a
-future plugin version that DOES gain `fetch_record_batch` replay support will make
-this test fail loudly --- the signal to re-enable the offline Snowflake reader
-legs. It never opens a live connection and never hangs.
+**Update (pytest-adbc-replay >= 1.1):** the plugin now exposes `fetch_record_batch`,
+so the plugin half of A1 has changed. The cassette half has not --- the checked-in
+`snowflake_arrow_round_trip` cassette still records a materialized result, not a
+streaming interaction, so the Snowflake reader legs cannot run offline until the
+cassette is re-recorded against the live driver (needs Snowflake credentials). This
+smoke keeps a two-way signal without blocking CI: on the older plugin it re-asserts
+A1, and on >= 1.1 it skips with the remaining re-record follow-up. It never opens a
+live connection and never hangs.
 """
 
 from __future__ import annotations
@@ -32,26 +36,43 @@ import pytest
 class TestA1CassetteStreamingSupport:
     """A1 probe: whether the replay plugin supports streaming `fetch_record_batch`."""
 
-    def test_replay_cursor_lacks_fetch_record_batch(self) -> None:
+    def test_cassette_streaming_replay_support(self) -> None:
         """
-        The `pytest-adbc-replay` replay cursor exposes no `fetch_record_batch`.
+        Track whether the replay plugin can serve a streaming `fetch_record_batch`.
 
-        This is the mechanism behind A1: the cassette stores a single materialized
-        Arrow result and the replay cursor serves it via `fetch_arrow_table`, with no
-        streaming-reader method. If a future plugin version adds
-        `fetch_record_batch`, this assertion fails --- re-enable the offline Snowflake
-        reader legs in `test_reader_lifetime.py` and re-record the cassette with a
-        streaming interaction.
+        A1 (recorded at Phase 29) was that `pytest-adbc-replay` exposed no
+        `fetch_record_batch`, so the cassette --- a single materialized Arrow result
+        served via `fetch_arrow_table` --- could not replay a streaming reader, and
+        both Snowflake reader legs in `test_reader_lifetime.py` were skipped.
+
+        `pytest-adbc-replay` >= 1.1 adds a `fetch_record_batch` method, so the plugin
+        half of A1 has changed. The *cassette* half has not: the checked-in
+        `snowflake_arrow_round_trip` cassette records a materialized result, not a
+        streaming interaction, so the Snowflake reader legs still cannot run offline
+        until the cassette is re-recorded against the live driver (needs Snowflake
+        credentials). That re-record + re-enable is tracked as a follow-up (ROADMAP
+        Backlog / PROJECT.md Active candidates); it is not a hard failure here.
+
+        This smoke keeps a signal in both directions without blocking CI: on the older
+        plugin it re-asserts A1 (no streaming method); on >= 1.1 it skips with the
+        remaining re-record follow-up.
         """
         if importlib.util.find_spec("pytest_adbc_replay") is None:
             pytest.skip("pytest-adbc-replay not installed")
         from pytest_adbc_replay import _cursor as replay_cursor
 
         replay_cursor_cls = replay_cursor.ReplayCursor
-        assert not hasattr(replay_cursor_cls, "fetch_record_batch"), (
-            "Replay cursor gained fetch_record_batch: re-enable the offline Snowflake "
-            "reader legs and re-record the streaming cassette (A1 changed)."
-        )
-        # The materialized-table method IS present --- proving the cassette serves a
-        # table, not a streaming reader.
+        # The materialized-table method is always present --- the cassette serves a
+        # table, which is the standing constraint regardless of plugin version.
         assert hasattr(replay_cursor_cls, "fetch_arrow_table")
+
+        if hasattr(replay_cursor_cls, "fetch_record_batch"):
+            pytest.skip(
+                "pytest-adbc-replay >= 1.1 exposes fetch_record_batch, but the "
+                "snowflake_arrow_round_trip cassette records a materialized result, "
+                "not a streaming interaction. Re-record the cassette against the live "
+                "driver (needs Snowflake credentials) and re-enable the Snowflake "
+                "reader legs in test_reader_lifetime.py. Follow-up tracked in ROADMAP "
+                "Backlog."
+            )
+        # Older plugin: A1 holds unchanged --- no streaming replay, legs stay skipped.

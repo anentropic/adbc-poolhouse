@@ -127,22 +127,22 @@ class TestEdge33ReadAfterCheckin:
                 await reader.__anext__()
 
 
-# A1 RESOLVED (see test_reader_cassette_smoke.py): the checked-in Snowflake
-# cassette CANNOT replay a streaming `fetch_record_batch`. The `pytest-adbc-replay`
-# replay cursor implements only `fetch_arrow_table` (a materialized `pyarrow.Table`)
-# plus row-based fetch methods --- it has NO `fetch_record_batch`, and the cassette
-# stores a single materialized Arrow result, not a streaming reader interaction. So
-# NEITHER Snowflake reader leg below can run offline against the cassette; both are
-# scoped to a MANUAL-ONLY re-record follow-up (29-VALIDATION §Manual-Only
+# A1 (see test_reader_cassette_smoke.py): the checked-in Snowflake cassette CANNOT
+# replay a streaming `fetch_record_batch`. `pytest-adbc-replay` >= 1.1 now exposes a
+# `fetch_record_batch` method, but the `snowflake_arrow_round_trip` cassette still
+# stores a single materialized Arrow result, not a streaming reader interaction --- so
+# NEITHER Snowflake reader leg below can run offline against the current cassette.
+# Both are scoped to a MANUAL-ONLY re-record follow-up (29-VALIDATION §Manual-Only
 # Verifications). They carry `@pytest.mark.snowflake` (CI runs `-m "not snowflake"`,
 # so they never run in the offline gate) AND a module-level skip so a stray local
 # run does not fail on the missing streaming interaction. DuckDB carries the
 # mandatory EDGE-33 coverage and is NOT gated on this result. Remove the skip and
-# re-record the cassette with a streaming reader once the replay plugin supports it
-# (the smoke test fails loudly when it does).
+# re-enable these legs once the cassette is re-recorded against the live driver with
+# a streaming reader interaction (needs Snowflake credentials).
 _A1_SNOWFLAKE_SKIP = pytest.mark.skip(
-    reason="A1: Snowflake cassette cannot replay streaming fetch_record_batch "
-    "(replay cursor has no fetch_record_batch); manual-only re-record follow-up. "
+    reason="A1: Snowflake cassette lacks a streaming fetch_record_batch recording "
+    "(pytest-adbc-replay >= 1.1 supports the method, but the cassette must be "
+    "re-recorded against the live driver); manual-only re-record follow-up. "
     "See test_reader_cassette_smoke.py + 29-01-SUMMARY.md."
 )
 
