@@ -36,6 +36,7 @@ import trio.testing
 
 from adbc_poolhouse import (
     DuckDBConfig,
+    FlightSQLConfig,
     SnowflakeConfig,
     close_async_pool,
     create_async_pool,
@@ -44,7 +45,7 @@ from adbc_poolhouse._async._connection import AsyncConnection
 from tests._async_harness.stubs import BlockingStubConnection
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncIterator, Callable
+    from collections.abc import AsyncIterator, Callable, Iterator
 
     from adbc_poolhouse._async._pool import AsyncPool
 
@@ -100,6 +101,55 @@ async def duckdb_async_pool() -> AsyncIterator[AsyncPool]:
     """
     tmpdir = tempfile.mkdtemp()
     pool = create_async_pool(DuckDBConfig(database=str(Path(tmpdir) / "async_edge.db")))
+    try:
+        yield pool
+    finally:
+        await pool.close()
+
+
+@pytest.fixture(scope="session")
+def flightsql_partition_uri() -> Iterator[str]:
+    """
+    A running in-process Flight SQL server that returns partitioned result sets.
+
+    Flight SQL is the only ADBC driver that implements `adbc_execute_partitions` /
+    `adbc_read_partition`, and no free local backend supports it, so partitioned
+    execution gets *live* coverage from
+    [`PartitionFlightServer`][tests._flightsql_harness.partition_server.PartitionFlightServer]
+    --- a tiny hand-rolled Flight SQL server (see that module for the protocol it
+    implements). Session-scoped: one gRPC server serves every partition test. The
+    server is plain sync (its own gRPC thread), so it is backend-independent and
+    the async pool built on top runs under both asyncio and trio.
+
+    Skipped when `adbc_driver_flightsql` (and thus `pyarrow.flight`) is absent, so
+    the suite stays green in a minimal environment.
+
+    Yields:
+        The `grpc://127.0.0.1:<port>` URI of the running server.
+    """
+    pytest.importorskip("adbc_driver_flightsql")
+
+    from tests._flightsql_harness.partition_server import serve_partitions
+
+    with serve_partitions() as uri:
+        yield uri
+
+
+@pytest.fixture
+async def flightsql_async_pool(flightsql_partition_uri: str) -> AsyncIterator[AsyncPool]:
+    """
+    A real-driver Flight SQL `AsyncPool` pointed at the in-process partition server.
+
+    Drives poolhouse's actual async offload path (through `FlightSQLConfig` and the
+    `adbc_driver_flightsql` driver) against
+    [`flightsql_partition_uri`][tests.async.conftest.flightsql_partition_uri], so
+    the async partition wrappers get genuine live coverage rather than stub-only.
+    The pool is closed on teardown.
+
+    Yields:
+        A ready `AsyncPool` wrapping a real Flight SQL driver over the local server.
+    """
+    pool = create_async_pool(FlightSQLConfig(uri=flightsql_partition_uri))
     try:
         yield pool
     finally:

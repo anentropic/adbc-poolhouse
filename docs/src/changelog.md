@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.5.1] - 2026-07-07
+
+### Features
+
+- Add `adbc_execute_partitions()` and `adbc_read_partition()` to `AsyncCursor`, closing the last gap in async/sync parity for the ADBC methods the sync raw-cursor path exposes. Both are thread-offloaded wrappers over the sync cursor:
+  - `adbc_execute_partitions(operation, parameters=None)` executes a query and returns `(partitions, schema)` — a list of opaque partition descriptors plus the result-set schema (or `None`).
+  - `adbc_read_partition(partition)` reads one descriptor into the cursor's result set; drain it afterwards with the existing async `fetch_*` methods.
+- Both are cancellable and, like `execute`, invalidate the connection on abort (partitioned execution runs the query, so it is poisoning — unlike the non-poisoning `adbc_prepare` / `adbc_execute_schema`). Partitioned execution is a distributed/Flight-SQL extension; backends that do not implement it (DuckDB, etc.) surface the driver's native `NotSupportedError` unchanged through the offload chokepoint.
+
+The async API stays behind the `[async]` extra and is still experimental. The sync path is unchanged.
+
 ## [1.5.0] - 2026-07-05
 
 ### Features

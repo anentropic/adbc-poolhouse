@@ -95,6 +95,10 @@ class _SyncCursor(Protocol):
     def adbc_execute_schema(
         self, operation: bytes | str, parameters: object = ..., /
     ) -> object: ...
+    def adbc_execute_partitions(
+        self, operation: bytes | str, parameters: object = ..., /
+    ) -> object: ...
+    def adbc_read_partition(self, partition: bytes, /) -> None: ...
     def adbc_cancel(self) -> None: ...
     def close(self) -> None: ...
 
@@ -693,6 +697,126 @@ class AsyncCursor:
                     # the query never executes, so an aborted call leaves the
                     # connection clean; do NOT invalidate (unlike execute).
                 ),
+            )
+
+    async def adbc_execute_partitions(
+        self, operation: bytes | str, parameters: object = None
+    ) -> tuple[list[bytes], pyarrow.Schema | None]:
+        """
+        Execute a query and return its distributed-result partitions, on a worker thread.
+
+        Offloads the dbapi `adbc_execute_partitions` through the pool limiter while
+        holding the parent connection's `_in_use` guard, so a concurrent call on the
+        same connection is rejected with `ConnectionBusyError` (EDGE-15). Unlike
+        `adbc_prepare` / `adbc_execute_schema`, this DOES execute the query --- it
+        returns a list of opaque partition descriptors plus the result-set schema,
+        each descriptor readable with `adbc_read_partition`.
+
+        Partitioned execution is an ADBC extension for distributed result sets
+        (Flight SQL and similar). A backend that does not implement it surfaces the
+        driver's native error unchanged --- poolhouse does not catch, wrap, or
+        pre-check it (D-35-06). DuckDB, for example, raises `NotSupportedError`
+        straight through the single offload chokepoint (EDGE-17).
+
+        If the surrounding scope is cancelled or times out while the call is in
+        flight, the in-flight C call is aborted with `cursor.adbc_cancel`, the
+        now-poisoned connection is invalidated (shielded), and the cancellation is
+        re-raised --- the connection never returns to the pool busy (CANCEL-01/02).
+        Because the query executes, this is poisoning on abort, exactly like
+        `execute` (the deliberate difference from the non-poisoning `adbc_prepare` /
+        `adbc_execute_schema`).
+
+        Args:
+            operation: The SQL text to execute. Passed to the driver verbatim;
+                poolhouse constructs no SQL and adds no sanitization.
+            parameters: Optional bound parameters, forwarded to the dbapi cursor.
+
+        Returns:
+            A `(partitions, schema)` tuple: `partitions` is a list of opaque `bytes`
+            descriptors, each readable with `adbc_read_partition`; `schema` is the
+            result-set `pyarrow.Schema`, or `None` when the driver defers it (e.g.
+            under incremental execution).
+
+        Raises:
+            ConnectionBusyError: If another offloaded call on the owning connection
+                is already in flight.
+            NotSupportedError: If the driver does not implement partitioned execution
+                (e.g. DuckDB). Raised by the driver in the worker and propagated
+                unchanged through the offload chokepoint (EDGE-17).
+
+        Example:
+            ```python
+            async with await pool.connect() as conn:
+                cursor = conn.cursor()
+                partitions, schema = await cursor.adbc_execute_partitions("SELECT * FROM t")
+                for descriptor in partitions:
+                    await cursor.adbc_read_partition(descriptor)
+                    table = await cursor.fetch_arrow_table()
+            ```
+        """
+        with self._owner._offloading():  # noqa: SLF001
+            # `_SyncCursor.adbc_execute_partitions` is typed `-> object` to keep the
+            # Protocol driver-agnostic (D-35-05); cast back to the public return type.
+            # No runtime effect --- the driver returns the `(partitions, schema)` tuple.
+            return cast(
+                "tuple[list[bytes], pyarrow.Schema | None]",
+                await cancellable_offload(
+                    self._adbc_cancel,
+                    self._cursor.adbc_execute_partitions,
+                    operation,
+                    parameters,
+                    limiter=self._limiter,
+                    on_abort=self._owner.invalidate,  # executes the query → poisoning like execute
+                ),
+            )
+
+    async def adbc_read_partition(self, partition: bytes) -> None:
+        """
+        Read one distributed-result partition into the cursor, on a worker thread.
+
+        Offloads the dbapi `adbc_read_partition` through the pool limiter while
+        holding the parent connection's `_in_use` guard, so a concurrent call on the
+        same connection is rejected with `ConnectionBusyError` (EDGE-15). The
+        `partition` descriptor comes from a prior `adbc_execute_partitions`. Like
+        `execute`, this sets up the cursor's result set and returns nothing --- drain
+        it afterwards with the usual async accessors (`fetch_arrow_table`,
+        `fetch_record_batch`, `fetchall`, ...).
+
+        As with `adbc_execute_partitions`, a backend that does not implement partition
+        reads surfaces the driver's native error unchanged --- poolhouse does not
+        catch, wrap, or pre-check it (D-35-06). DuckDB, for example, raises
+        `NotSupportedError` straight through the single offload chokepoint (EDGE-17).
+
+        If the surrounding scope is cancelled or times out while the read is in
+        flight, the in-flight C call is aborted with `cursor.adbc_cancel`, the
+        now-poisoned connection is invalidated (shielded), and the cancellation is
+        re-raised --- the connection never returns to the pool busy (CANCEL-01/02).
+
+        Args:
+            partition: An opaque partition descriptor returned by
+                `adbc_execute_partitions`. Passed to the driver verbatim.
+
+        Raises:
+            ConnectionBusyError: If another offloaded call on the owning connection
+                is already in flight.
+            NotSupportedError: If the driver does not implement partition reads
+                (e.g. DuckDB). Raised by the driver in the worker and propagated
+                unchanged through the offload chokepoint (EDGE-17).
+
+        Example:
+            ```python
+            partitions, _ = await cursor.adbc_execute_partitions("SELECT * FROM t")
+            await cursor.adbc_read_partition(partitions[0])
+            table = await cursor.fetch_arrow_table()  # the partition's rows
+            ```
+        """
+        with self._owner._offloading():  # noqa: SLF001
+            await cancellable_offload(
+                self._adbc_cancel,
+                self._cursor.adbc_read_partition,
+                partition,
+                limiter=self._limiter,
+                on_abort=self._owner.invalidate,  # opens a result set → poisoning like execute
             )
 
     async def fetch_record_batch(self) -> AsyncRecordBatchReader:
