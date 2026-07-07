@@ -700,7 +700,7 @@ class AsyncCursor:
             )
 
     async def adbc_execute_partitions(
-        self, operation: str, parameters: object = None
+        self, operation: bytes | str, parameters: object = None
     ) -> tuple[list[bytes], pyarrow.Schema | None]:
         """
         Execute a query and return its distributed-result partitions, on a worker thread.
@@ -782,6 +782,11 @@ class AsyncCursor:
         it afterwards with the usual async accessors (`fetch_arrow_table`,
         `fetch_record_batch`, `fetchall`, ...).
 
+        As with `adbc_execute_partitions`, a backend that does not implement partition
+        reads surfaces the driver's native error unchanged --- poolhouse does not
+        catch, wrap, or pre-check it (D-35-06). DuckDB, for example, raises
+        `NotSupportedError` straight through the single offload chokepoint (EDGE-17).
+
         If the surrounding scope is cancelled or times out while the read is in
         flight, the in-flight C call is aborted with `cursor.adbc_cancel`, the
         now-poisoned connection is invalidated (shielded), and the cancellation is
@@ -794,6 +799,9 @@ class AsyncCursor:
         Raises:
             ConnectionBusyError: If another offloaded call on the owning connection
                 is already in flight.
+            NotSupportedError: If the driver does not implement partition reads
+                (e.g. DuckDB). Raised by the driver in the worker and propagated
+                unchanged through the offload chokepoint (EDGE-17).
 
         Example:
             ```python
