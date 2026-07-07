@@ -84,11 +84,16 @@ markers = [
     "databricks: requires live Databricks credentials (recording only; cassettes checked in for CI replay)",
 ]
 
-[tool.basedpyright]
+[tool.pyright]
 pythonVersion = "3.11"
 typeCheckingMode = "strict"
 include = ["src", "tests"]
 reportPrivateUsage = false
+# venvPath/venv let any Pyright-family checker (basedpyright in CI, and an
+# editor/agent-launched vanilla pyright that does not otherwise know the
+# interpreter) resolve imports against the project .venv.
+venvPath = "."
+venv = ".venv"
 
 [tool.ruff]
 target-version = "py311"
