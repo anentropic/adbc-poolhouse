@@ -7,7 +7,7 @@ the connector's Statement Execution ("kernel") path rather than Thrift.
 Most workloads should use [`DatabricksConfig`][adbc_poolhouse.DatabricksConfig], which
 runs on the ADBC driver and is the default choice for SQL warehouses. Reach for
 `DatabricksPythonConfig` only when you need the non-Thrift path, in particular
-**Lakehouse//RT**, which rejects the Thrift protocol that the ADBC and ODBC
+**Lakehouse//RT**, which [rejects the Thrift protocol](https://docs.databricks.com/aws/en/compute/sql-warehouse/real-time#connectivity) that the ADBC and ODBC
 drivers use. If you are not targeting Lakehouse//RT, prefer
 [`DatabricksConfig`][adbc_poolhouse.DatabricksConfig].
 

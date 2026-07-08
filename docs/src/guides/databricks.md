@@ -100,7 +100,7 @@ For URI mode, set `DATABRICKS_URI` instead of the three individual variables.
 ## Lakehouse//RT and the Python connector
 
 This ADBC backend uses the Thrift protocol, which Databricks **Lakehouse//RT**
-does not accept. RT requires the Statement Execution ("kernel") path, and
+[does not accept](https://docs.databricks.com/aws/en/compute/sql-warehouse/real-time#connectivity). RT requires the Statement Execution ("kernel") path, and
 Databricks lists ADBC as unsupported for it. To reach a Lakehouse//RT warehouse,
 use [`DatabricksPythonConfig`][adbc_poolhouse.DatabricksPythonConfig] instead, which
 runs on the `databricks-sql-connector` package. See the
