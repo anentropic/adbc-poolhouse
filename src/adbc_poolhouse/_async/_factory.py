@@ -114,11 +114,15 @@ def create_async_pool(
         dbapi_module: Dotted module name for a Python package implementing the ADBC
             dbapi interface (e.g. `"adbc_driver_snowflake.dbapi"`). Requires
             `db_kwargs`. Mutually exclusive with `config` and `driver_path`.
-        pool_size: Number of connections to keep in the pool. Default: 5.
-        max_overflow: Extra connections allowed above `pool_size`. Default: 3.
-        timeout: Seconds to wait for a connection before raising. Default: 30.
-        recycle: Seconds before a connection is recycled. Default: 3600.
-        pre_ping: Whether to ping connections before checkout. Default: False.
+        pool_size: Number of connections to keep in the pool. Resolved per the
+            precedence above; the raw-driver fallback is 5.
+        max_overflow: Extra connections allowed above `pool_size`. Raw-driver
+            fallback: 3.
+        timeout: Seconds to wait for a connection before raising. Raw-driver
+            fallback: 30.
+        recycle: Seconds before a connection is recycled. Raw-driver fallback: 3600.
+        pre_ping: Whether to ping connections before checkout. Raw-driver
+            fallback: False.
 
     Returns:
         A configured `AsyncPool` ready for use.
@@ -273,11 +277,15 @@ async def managed_async_pool(
         dbapi_module: Dotted module name for a Python package implementing the ADBC
             dbapi interface (e.g. `"adbc_driver_snowflake.dbapi"`). Requires
             `db_kwargs`. Mutually exclusive with `config` and `driver_path`.
-        pool_size: Number of connections to keep in the pool. Default: 5.
-        max_overflow: Extra connections allowed above `pool_size`. Default: 3.
-        timeout: Seconds to wait for a connection before raising. Default: 30.
-        recycle: Seconds before a connection is recycled. Default: 3600.
-        pre_ping: Whether to ping connections before checkout. Default: False.
+        pool_size: Number of connections to keep in the pool. Resolved per the
+            precedence above; the raw-driver fallback is 5.
+        max_overflow: Extra connections allowed above `pool_size`. Raw-driver
+            fallback: 3.
+        timeout: Seconds to wait for a connection before raising. Raw-driver
+            fallback: 30.
+        recycle: Seconds before a connection is recycled. Raw-driver fallback: 3600.
+        pre_ping: Whether to ping connections before checkout. Raw-driver
+            fallback: False.
 
     Yields:
         A configured `AsyncPool`, closed automatically when the block exits.
