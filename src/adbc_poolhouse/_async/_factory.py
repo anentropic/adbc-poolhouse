@@ -83,11 +83,17 @@ def create_async_pool(
     Create an `AsyncPool` backed by an ADBC driver.
 
     The signature mirrors [`create_pool`][adbc_poolhouse.create_pool] exactly,
-    with the same three call patterns and keyword defaults. The pool is built
-    synchronously by the shared sync core (`_create_pool_impl`), then wrapped in an
-    `AsyncPool` that owns a dedicated `anyio.CapacityLimiter(pool_size +
-    max_overflow)`. There is no per-backend code, so any of the supported
-    warehouse configs works.
+    with the same three call patterns. The pool is built synchronously by the
+    shared sync core (`_create_pool_impl`), then wrapped in an `AsyncPool` that
+    owns a dedicated `anyio.CapacityLimiter(pool_size + max_overflow)`. There is no
+    per-backend code, so any of the supported warehouse configs works.
+
+    Pool-tuning arguments (`pool_size`, `max_overflow`, `timeout`, `recycle`,
+    `pre_ping`) resolve with the same precedence as the sync entry points: an
+    explicit keyword here wins, otherwise the config's own field is used (loaded
+    from keywords or environment variables), and the raw driver paths fall back to
+    the built-in defaults. The `AsyncPool` limiter is sized from the resolved
+    values, so it always matches the underlying `QueuePool`.
 
     Three call patterns are supported:
 
@@ -242,6 +248,11 @@ async def managed_async_pool(
     created when the `async with` block is entered and closed (via
     `close_async_pool`, whose teardown is shielded from cancellation) when the
     block exits, whether normally or by exception.
+
+    Pool-tuning arguments resolve with the same precedence as the sync entry
+    points: an explicit keyword wins, otherwise the config's own field is used
+    (loaded from keywords or environment variables), and the raw driver paths fall
+    back to the built-in defaults.
 
     Three call patterns are supported:
 

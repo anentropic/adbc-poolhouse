@@ -114,6 +114,25 @@ class TestConfigPoolTuning:
         with managed_pool(cfg) as pool:
             assert pool.size() == 6
 
+    def test_config_pre_ping_forwarded(self, tmp_path: Path) -> None:
+        """A config's pre_ping reaches the pool (it is a real config field)."""
+        cfg = DuckDBConfig(database=str(tmp_path / "t.db"), pre_ping=True)
+        pool = create_pool(cfg)
+        try:
+            assert pool._pre_ping is True
+        finally:
+            self._close(pool)
+
+    def test_config_timeout_and_recycle_forwarded(self, tmp_path: Path) -> None:
+        """Timeout and recycle also flow from the config to the pool."""
+        cfg = DuckDBConfig(database=str(tmp_path / "t.db"), timeout=45, recycle=1200)
+        pool = create_pool(cfg)
+        try:
+            assert pool._timeout == 45
+            assert pool._recycle == 1200
+        finally:
+            self._close(pool)
+
 
 class TestArrowAllocatorCleanup:
     """POOL-04, TEST-07: Arrow allocator cleanup via reset event."""

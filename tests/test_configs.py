@@ -33,6 +33,7 @@ class TestBaseWarehouseConfig:
         assert BaseWarehouseConfig.model_fields["max_overflow"].default == 3
         assert BaseWarehouseConfig.model_fields["timeout"].default == 30
         assert BaseWarehouseConfig.model_fields["recycle"].default == 3600
+        assert BaseWarehouseConfig.model_fields["pre_ping"].default is False
 
 
 class TestDuckDBConfig:

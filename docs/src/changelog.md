@@ -6,6 +6,10 @@ All notable changes to this project will be documented in this file.
 
 ## [1.6.1] - 2026-07-08
 
+### Added
+
+- `pre_ping` is now a field on `BaseWarehouseConfig` (default `False`), so it can be set on any config or loaded from the `{PREFIX}_PRE_PING` environment variable — previously it was only a `create_pool` keyword. This completes the set of config-tunable pool fields.
+
 ### Fixed
 
 - `create_pool`, `managed_pool`, and their async counterparts now honor a config's pool-tuning fields (`pool_size`, `max_overflow`, `timeout`, `recycle`, `pre_ping`). Previously these were read off the config but never forwarded, so `create_pool(SnowflakeConfig(pool_size=10))` and the documented `SNOWFLAKE_POOL_SIZE` environment override both silently produced a default-sized pool. Precedence is now: an explicit `create_pool` keyword overrides the config field, which overrides the built-in default used by the raw driver paths.

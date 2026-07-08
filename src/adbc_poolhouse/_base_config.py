@@ -39,6 +39,11 @@ class WarehouseConfig(Protocol):
     recycle: int
     """Seconds before a connection is closed and replaced."""
 
+    # NOTE: pre_ping is intentionally NOT part of the protocol contract. It is a
+    # field on BaseWarehouseConfig (default False), but a Protocol-only custom
+    # config need not declare it — create_pool resolves it via getattr with a
+    # False fallback, so the minimal contract stays at the four fields above.
+
     def _adbc_entrypoint(self) -> str | None:
         """
         Return the ADBC driver init symbol, or ``None`` for the default.
@@ -115,6 +120,12 @@ class BaseWarehouseConfig(BaseSettings, ABC):
 
     recycle: int = 3600
     """Seconds before a connection is closed and replaced. Default: 3600."""
+
+    pre_ping: bool = False
+    """Whether to ping connections before checkout. Default: False.
+
+    Does not function on a standalone `QueuePool` without a SQLAlchemy dialect;
+    use `recycle` for connection health."""
 
     def _adbc_entrypoint(self) -> str | None:
         """
