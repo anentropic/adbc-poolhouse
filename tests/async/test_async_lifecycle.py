@@ -25,6 +25,7 @@ import pyarrow
 import pytest
 
 from adbc_poolhouse import (
+    DatabricksPythonConfig,
     DuckDBConfig,
     SnowflakeConfig,
     close_async_pool,
@@ -154,6 +155,43 @@ class TestSnowflakeCassetteLeg:
         # validator and the cassette intercepts before any real connection.
         os.environ.setdefault("SNOWFLAKE_ACCOUNT", "replay-account")
         pool = create_async_pool(SnowflakeConfig())  # type: ignore[call-arg]
+        try:
+            async with await pool.connect() as conn:
+                cur = conn.cursor()
+                await cur.execute("SELECT 1 AS n, 'hello' AS s")
+                table: Any = await cur.fetch_arrow_table()
+            assert table is not None
+            assert table.num_rows == 1
+        finally:
+            await close_async_pool(pool)
+
+
+class TestDatabricksPythonCassetteLeg:
+    """The async layer driven through the non-ADBC Databricks Python connector backend."""
+
+    @pytest.mark.anyio
+    @pytest.mark.databricks_python
+    @pytest.mark.adbc_cassette("databricks_python_arrow_round_trip")
+    async def test_async_databricks_python_arrow_round_trip(self, anyio_backend_name: str) -> None:
+        """
+        Drive `create_async_pool(DatabricksPythonConfig)` through the connector cassette.
+
+        Proves the async offload machinery is backend-generic all the way down to a
+        NON-ADBC driver: the connector connection is wrapped by the ADBC cursor shim,
+        recorded below it, and replayed from
+        `tests/cassettes/databricks_python_arrow_round_trip/` with no live credentials.
+        """
+        del anyio_backend_name
+        pytest.importorskip(
+            "databricks.sql",
+            reason="databricks-sql-connector not installed; cassette leg skipped",
+        )
+        if not (_CASSETTE_ROOT / "databricks_python_arrow_round_trip").exists():
+            pytest.skip("databricks_python_arrow_round_trip cassette absent")
+        os.environ.setdefault("DATABRICKS_PYTHON_HOST", "replay-host")
+        os.environ.setdefault("DATABRICKS_PYTHON_HTTP_PATH", "/sql/1.0/warehouses/replay")
+        os.environ.setdefault("DATABRICKS_PYTHON_TOKEN", "replay-token")  # noqa: S105
+        pool = create_async_pool(DatabricksPythonConfig())  # type: ignore[call-arg]
         try:
             async with await pool.connect() as conn:
                 cur = conn.cursor()

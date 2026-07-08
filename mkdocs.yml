@@ -104,6 +104,7 @@ nav:
       - PostgreSQL: guides/postgresql.md
       - FlightSQL: guides/flightsql.md
       - Databricks: guides/databricks.md
+      - Databricks (Python connector): guides/databricks-python.md
       - Redshift: guides/redshift.md
       - Trino: guides/trino.md
       - MSSQL: guides/mssql.md

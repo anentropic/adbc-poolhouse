@@ -10,6 +10,7 @@ from adbc_poolhouse import (
     BigQueryConfig,
     ClickHouseConfig,
     DatabricksConfig,
+    DatabricksPythonConfig,
     DuckDBConfig,
     FlightSQLConfig,
     MSSQLConfig,
@@ -763,3 +764,103 @@ class TestQuackConfig:
         from adbc_poolhouse._base_config import WarehouseConfig as _WC
 
         assert isinstance(QuackConfig(host="h"), _WC)
+
+
+class TestDatabricksPythonConfig:
+    """DatabricksPythonConfig: connector kwargs, auth modes, validation."""
+
+    def test_missing_host_or_http_path_raises(self) -> None:
+        """No host/http_path raises ValidationError."""
+        with pytest.raises(ValidationError):
+            DatabricksPythonConfig(token=SecretStr("t"))  # pragma: allowlist secret
+
+    def test_missing_auth_raises(self) -> None:
+        """host/http_path set but no auth method raises ValidationError."""
+        with pytest.raises(ValidationError):
+            DatabricksPythonConfig(host="h", http_path="/p")
+
+    def test_pat_connect_kwargs(self) -> None:
+        """PAT maps token -> access_token; use_kernel defaults True."""
+        c = DatabricksPythonConfig(
+            host="h", http_path="/p", token=SecretStr("dapi-secret")  # pragma: allowlist secret
+        )
+        kw = c.to_connect_kwargs()
+        assert kw["server_hostname"] == "h"
+        assert kw["http_path"] == "/p"
+        assert kw["access_token"] == "dapi-secret"  # pragma: allowlist secret
+        assert kw["use_kernel"] is True
+        assert isinstance(c, WarehouseConfig)
+
+    def test_u2m_connect_kwargs(self) -> None:
+        """OAuthU2M maps to connector auth_type='databricks-oauth'; no secret."""
+        c = DatabricksPythonConfig(host="h", http_path="/p", auth_type="OAuthU2M")
+        kw = c.to_connect_kwargs()
+        assert kw["auth_type"] == "databricks-oauth"
+        assert "access_token" not in kw
+        assert "credentials_provider" not in kw
+
+    def test_m2m_builds_credentials_provider(self) -> None:
+        """OAuthM2M yields a callable credentials_provider, not invoked at build time."""
+        c = DatabricksPythonConfig(
+            host="h.example.net",
+            http_path="/p",
+            auth_type="OAuthM2M",
+            client_id="cid",
+            client_secret=SecretStr("csecret"),  # pragma: allowlist secret
+        )
+        kw = c.to_connect_kwargs()
+        assert callable(kw["credentials_provider"])
+        assert "access_token" not in kw
+
+    def test_m2m_requires_client_id_and_secret(self) -> None:
+        """OAuthM2M without client_id/secret raises ValidationError."""
+        with pytest.raises(ValidationError):
+            DatabricksPythonConfig(
+                host="h", http_path="/p", auth_type="OAuthM2M", client_id="cid"
+            )
+
+    def test_explicit_credentials_provider_passthrough(self) -> None:
+        """An explicit credentials_provider satisfies auth and is passed verbatim."""
+        provider = lambda: None  # noqa: E731
+        c = DatabricksPythonConfig(host="h", http_path="/p", credentials_provider=provider)
+        kw = c.to_connect_kwargs()
+        assert kw["credentials_provider"] is provider
+
+    def test_catalog_and_schema_forwarded(self) -> None:
+        """Catalog and schema are forwarded as connector kwargs when set."""
+        c = DatabricksPythonConfig(
+            host="h",
+            http_path="/p",
+            token=SecretStr("t"),  # pragma: allowlist secret
+            catalog="cat",
+            schema="sch",
+        )
+        kw = c.to_connect_kwargs()
+        assert kw["catalog"] == "cat"
+        assert kw["schema"] == "sch"
+
+    def test_token_is_secret_and_not_leaked(self) -> None:
+        """Token stays a SecretStr; plaintext appears only via to_connect_kwargs."""
+        c = DatabricksPythonConfig(
+            host="h", http_path="/p", token=SecretStr("dapi-plain")  # pragma: allowlist secret
+        )
+        assert isinstance(c.token, SecretStr)
+        assert "dapi-plain" not in repr(c)
+        assert c.to_connect_kwargs()["access_token"] == "dapi-plain"  # pragma: allowlist secret
+
+    def test_env_prefix_isolated_from_databricks(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """DATABRICKS_PYTHON_* env vars populate this config independently."""
+        monkeypatch.setenv("DATABRICKS_PYTHON_HOST", "envhost")
+        monkeypatch.setenv("DATABRICKS_PYTHON_HTTP_PATH", "/env/path")
+        monkeypatch.setenv("DATABRICKS_PYTHON_TOKEN", "env-token")  # pragma: allowlist secret
+        c = DatabricksPythonConfig()  # type: ignore[call-arg]
+        assert c.host == "envhost"
+        assert c.http_path == "/env/path"
+
+    def test_to_adbc_kwargs_not_supported(self) -> None:
+        """to_adbc_kwargs is inapplicable for the native connector backend."""
+        c = DatabricksPythonConfig(
+            host="h", http_path="/p", token=SecretStr("t")  # pragma: allowlist secret
+        )
+        with pytest.raises(NotImplementedError):
+            c.to_adbc_kwargs()

@@ -4,9 +4,12 @@ from __future__ import annotations
 
 import importlib.util
 from abc import ABC, abstractmethod
-from typing import Any, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
 from pydantic_settings import BaseSettings
+
+if TYPE_CHECKING:
+    from adbc_poolhouse._backend import ConnectionBackend
 
 
 @runtime_checkable
@@ -155,6 +158,18 @@ class BaseWarehouseConfig(BaseSettings, ABC):
         serialization.
         """
         ...
+
+    def _make_backend(self) -> ConnectionBackend | None:
+        """
+        Return a non-ADBC `ConnectionBackend`, or ``None`` for the ADBC path.
+
+        The base implementation returns ``None``, so every ADBC-backed config
+        routes through ``adbc_driver_manager`` unchanged. A config backed by a
+        native (non-ADBC) driver overrides this to return a
+        `ConnectionBackend`; the pool factory then builds the pool from that
+        backend instead of the ADBC source+clone path.
+        """
+        return None
 
     @staticmethod
     def _resolve_driver_path(

@@ -97,7 +97,17 @@ pool = create_pool(config)
 
 For URI mode, set `DATABRICKS_URI` instead of the three individual variables.
 
+## Lakehouse//RT and the Python connector
+
+This ADBC backend uses the Thrift protocol, which Databricks **Lakehouse//RT**
+does not accept. RT requires the Statement Execution ("kernel") path, and
+Databricks lists ADBC as unsupported for it. To reach a Lakehouse//RT warehouse,
+use [`DatabricksPythonConfig`][adbc_poolhouse.DatabricksPythonConfig] instead, which
+runs on the `databricks-sql-connector` package. See the
+[Databricks Python connector guide](databricks-python.md).
+
 ## See also
 
+- [Databricks Python connector guide](databricks-python.md) — the non-Thrift backend for Lakehouse//RT
 - [Configuration reference](configuration.md) — env_prefix, pool tuning
 - [Pool lifecycle](pool-lifecycle.md) — close_pool, pytest fixtures
