@@ -150,6 +150,15 @@ class _DatabricksPythonCursor:
         batch size follows ``arraysize``, so chunk boundaries need not match the
         server's own batching.
 
+        Note:
+            The first batch is fetched eagerly here to obtain the schema, which
+            ``pyarrow.RecordBatchReader.from_batches`` requires up front — the
+            connector exposes no schema-without-fetch path. So the first
+            round-trip happens inside this call rather than on the first
+            ``read_next_batch``; a cancel only takes effect from the second batch
+            on. On the async path the whole call is offloaded, so this is not
+            blocking.
+
         Returns:
             A reader whose ``schema`` / ``read_next_batch`` / ``close`` satisfy
             the streaming contract the async layer wraps.

@@ -33,6 +33,7 @@ class TestBaseWarehouseConfig:
         assert BaseWarehouseConfig.model_fields["max_overflow"].default == 3
         assert BaseWarehouseConfig.model_fields["timeout"].default == 30
         assert BaseWarehouseConfig.model_fields["recycle"].default == 3600
+        assert BaseWarehouseConfig.model_fields["pre_ping"].default is False
 
 
 class TestDuckDBConfig:
@@ -56,6 +57,16 @@ class TestDuckDBConfig:
     def test_file_database_pool_size_gt1_is_valid(self) -> None:
         d = DuckDBConfig(database="/tmp/test.duckdb", pool_size=5)
         assert d.pool_size == 5
+
+    def test_file_database_defaults_pool_size_5(self) -> None:
+        """A file-backed database defaults pool_size to 5, not the in-memory 1."""
+        d = DuckDBConfig(database="/tmp/test.duckdb")
+        assert d.pool_size == 5
+
+    def test_env_file_database_defaults_pool_size_5(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """A file database from the environment (no pool_size set) defaults to 5."""
+        monkeypatch.setenv("DUCKDB_DATABASE", "/tmp/test.duckdb")
+        assert DuckDBConfig().pool_size == 5
 
     def test_env_prefix_pool_size(self, monkeypatch: pytest.MonkeyPatch) -> None:
         # Use a file database since pool_size > 1 with :memory: raises ValidationError
@@ -342,6 +353,11 @@ class TestSQLiteConfig:
 
     def test_file_database_pool_size_gt1_is_valid(self) -> None:
         s = SQLiteConfig(database="/tmp/x.db", pool_size=5)
+        assert s.pool_size == 5
+
+    def test_file_database_defaults_pool_size_5(self) -> None:
+        """A file-backed database defaults pool_size to 5, not the in-memory 1."""
+        s = SQLiteConfig(database="/tmp/x.db")
         assert s.pool_size == 5
 
     def test_env_prefix_database(self, monkeypatch: pytest.MonkeyPatch) -> None:

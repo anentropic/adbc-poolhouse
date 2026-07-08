@@ -19,7 +19,7 @@ import contextlib
 from typing import TYPE_CHECKING, overload
 
 from adbc_poolhouse._async._pool import AsyncPool
-from adbc_poolhouse._pool_factory import _create_pool_impl
+from adbc_poolhouse._pool_factory import _create_pool_impl, _resolve_tuning
 
 if TYPE_CHECKING:
     import collections.abc
@@ -73,21 +73,27 @@ def create_async_pool(
     db_kwargs: dict[str, str] | None = None,
     entrypoint: str | None = None,
     dbapi_module: str | None = None,
-    pool_size: int = 5,
-    max_overflow: int = 3,
-    timeout: int = 30,
-    recycle: int = 3600,
-    pre_ping: bool = False,
+    pool_size: int | None = None,
+    max_overflow: int | None = None,
+    timeout: int | None = None,
+    recycle: int | None = None,
+    pre_ping: bool | None = None,
 ) -> AsyncPool:
     """
     Create an `AsyncPool` backed by an ADBC driver.
 
     The signature mirrors [`create_pool`][adbc_poolhouse.create_pool] exactly,
-    with the same three call patterns and keyword defaults. The pool is built
-    synchronously by the shared sync core (`_create_pool_impl`), then wrapped in an
-    `AsyncPool` that owns a dedicated `anyio.CapacityLimiter(pool_size +
-    max_overflow)`. There is no per-backend code, so any of the supported
-    warehouse configs works.
+    with the same three call patterns. The pool is built synchronously by the
+    shared sync core (`_create_pool_impl`), then wrapped in an `AsyncPool` that
+    owns a dedicated `anyio.CapacityLimiter(pool_size + max_overflow)`. There is no
+    per-backend code, so any of the supported warehouse configs works.
+
+    Pool-tuning arguments (`pool_size`, `max_overflow`, `timeout`, `recycle`,
+    `pre_ping`) resolve with the same precedence as the sync entry points: an
+    explicit keyword here wins, otherwise the config's own field is used (loaded
+    from keywords or environment variables), and the raw driver paths fall back to
+    the built-in defaults. The `AsyncPool` limiter is sized from the resolved
+    values, so it always matches the underlying `QueuePool`.
 
     Three call patterns are supported:
 
@@ -108,11 +114,15 @@ def create_async_pool(
         dbapi_module: Dotted module name for a Python package implementing the ADBC
             dbapi interface (e.g. `"adbc_driver_snowflake.dbapi"`). Requires
             `db_kwargs`. Mutually exclusive with `config` and `driver_path`.
-        pool_size: Number of connections to keep in the pool. Default: 5.
-        max_overflow: Extra connections allowed above `pool_size`. Default: 3.
-        timeout: Seconds to wait for a connection before raising. Default: 30.
-        recycle: Seconds before a connection is recycled. Default: 3600.
-        pre_ping: Whether to ping connections before checkout. Default: False.
+        pool_size: Number of connections to keep in the pool. Resolved per the
+            precedence above; the raw-driver fallback is 5.
+        max_overflow: Extra connections allowed above `pool_size`. Raw-driver
+            fallback: 3.
+        timeout: Seconds to wait for a connection before raising. Raw-driver
+            fallback: 30.
+        recycle: Seconds before a connection is recycled. Raw-driver fallback: 3600.
+        pre_ping: Whether to ping connections before checkout. Raw-driver
+            fallback: False.
 
     Returns:
         A configured `AsyncPool` ready for use.
@@ -141,19 +151,22 @@ def create_async_pool(
         anyio.run(main)
         ```
     """
+    r_pool_size, r_max_overflow, r_timeout, r_recycle, r_pre_ping = _resolve_tuning(
+        config, pool_size, max_overflow, timeout, recycle, pre_ping
+    )
     sync_pool = _create_pool_impl(
         config,
         driver_path,
         db_kwargs,
         entrypoint,
         dbapi_module,
-        pool_size,
-        max_overflow,
-        timeout,
-        recycle,
-        pre_ping,
+        r_pool_size,
+        r_max_overflow,
+        r_timeout,
+        r_recycle,
+        r_pre_ping,
     )
-    return AsyncPool(sync_pool, pool_size=pool_size, max_overflow=max_overflow)
+    return AsyncPool(sync_pool, pool_size=r_pool_size, max_overflow=r_max_overflow)
 
 
 async def close_async_pool(pool: AsyncPool) -> None:
@@ -226,11 +239,11 @@ async def managed_async_pool(
     db_kwargs: dict[str, str] | None = None,
     entrypoint: str | None = None,
     dbapi_module: str | None = None,
-    pool_size: int = 5,
-    max_overflow: int = 3,
-    timeout: int = 30,
-    recycle: int = 3600,
-    pre_ping: bool = False,
+    pool_size: int | None = None,
+    max_overflow: int | None = None,
+    timeout: int | None = None,
+    recycle: int | None = None,
+    pre_ping: bool | None = None,
 ) -> collections.abc.AsyncGenerator[AsyncPool, None]:
     """
     Async context manager that creates an `AsyncPool` and closes it on exit.
@@ -239,6 +252,11 @@ async def managed_async_pool(
     created when the `async with` block is entered and closed (via
     `close_async_pool`, whose teardown is shielded from cancellation) when the
     block exits, whether normally or by exception.
+
+    Pool-tuning arguments resolve with the same precedence as the sync entry
+    points: an explicit keyword wins, otherwise the config's own field is used
+    (loaded from keywords or environment variables), and the raw driver paths fall
+    back to the built-in defaults.
 
     Three call patterns are supported:
 
@@ -259,11 +277,15 @@ async def managed_async_pool(
         dbapi_module: Dotted module name for a Python package implementing the ADBC
             dbapi interface (e.g. `"adbc_driver_snowflake.dbapi"`). Requires
             `db_kwargs`. Mutually exclusive with `config` and `driver_path`.
-        pool_size: Number of connections to keep in the pool. Default: 5.
-        max_overflow: Extra connections allowed above `pool_size`. Default: 3.
-        timeout: Seconds to wait for a connection before raising. Default: 30.
-        recycle: Seconds before a connection is recycled. Default: 3600.
-        pre_ping: Whether to ping connections before checkout. Default: False.
+        pool_size: Number of connections to keep in the pool. Resolved per the
+            precedence above; the raw-driver fallback is 5.
+        max_overflow: Extra connections allowed above `pool_size`. Raw-driver
+            fallback: 3.
+        timeout: Seconds to wait for a connection before raising. Raw-driver
+            fallback: 30.
+        recycle: Seconds before a connection is recycled. Raw-driver fallback: 3600.
+        pre_ping: Whether to ping connections before checkout. Raw-driver
+            fallback: False.
 
     Yields:
         A configured `AsyncPool`, closed automatically when the block exits.
@@ -283,19 +305,22 @@ async def managed_async_pool(
                 await cur.execute("SELECT 42")
         ```
     """
+    r_pool_size, r_max_overflow, r_timeout, r_recycle, r_pre_ping = _resolve_tuning(
+        config, pool_size, max_overflow, timeout, recycle, pre_ping
+    )
     sync_pool = _create_pool_impl(
         config,
         driver_path,
         db_kwargs,
         entrypoint,
         dbapi_module,
-        pool_size,
-        max_overflow,
-        timeout,
-        recycle,
-        pre_ping,
+        r_pool_size,
+        r_max_overflow,
+        r_timeout,
+        r_recycle,
+        r_pre_ping,
     )
-    pool = AsyncPool(sync_pool, pool_size=pool_size, max_overflow=max_overflow)
+    pool = AsyncPool(sync_pool, pool_size=r_pool_size, max_overflow=r_max_overflow)
     try:
         yield pool
     finally:
