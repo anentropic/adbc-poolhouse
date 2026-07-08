@@ -172,7 +172,9 @@ class TestDatabricksPythonCassetteLeg:
     @pytest.mark.anyio
     @pytest.mark.databricks_python
     @pytest.mark.adbc_cassette("databricks_python_arrow_round_trip")
-    async def test_async_databricks_python_arrow_round_trip(self, anyio_backend_name: str) -> None:
+    async def test_async_databricks_python_arrow_round_trip(
+        self, anyio_backend_name: str, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """
         Drive `create_async_pool(DatabricksPythonConfig)` through the connector cassette.
 
@@ -188,9 +190,11 @@ class TestDatabricksPythonCassetteLeg:
         )
         if not (_CASSETTE_ROOT / "databricks_python_arrow_round_trip").exists():
             pytest.skip("databricks_python_arrow_round_trip cassette absent")
-        os.environ.setdefault("DATABRICKS_PYTHON_HOST", "replay-host")
-        os.environ.setdefault("DATABRICKS_PYTHON_HTTP_PATH", "/sql/1.0/warehouses/replay")
-        os.environ.setdefault("DATABRICKS_PYTHON_TOKEN", "replay-token")  # noqa: S105
+        # monkeypatch restores env after the test, so DATABRICKS_PYTHON_* set here
+        # cannot leak into other tests (e.g. config validation-error cases).
+        monkeypatch.setenv("DATABRICKS_PYTHON_HOST", "replay-host")
+        monkeypatch.setenv("DATABRICKS_PYTHON_HTTP_PATH", "/sql/1.0/warehouses/replay")
+        monkeypatch.setenv("DATABRICKS_PYTHON_TOKEN", "replay-token")  # noqa: S105
         pool = create_async_pool(DatabricksPythonConfig())  # type: ignore[call-arg]
         try:
             async with await pool.connect() as conn:

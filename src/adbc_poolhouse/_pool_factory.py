@@ -150,6 +150,10 @@ def _create_native_pool(
     pool._native_backend = backend  # type: ignore[attr-defined]
 
     def _on_reset(dbapi_conn: object, connection_record: object, reset_state: object) -> None:
+        # The reset event fires with dbapi_conn=None on invalidation paths (same
+        # as the ADBC hook's guard); skip so backends need not handle None.
+        if dbapi_conn is None:
+            return
         backend.on_reset(dbapi_conn)
 
     event.listen(pool, "reset", _on_reset)
