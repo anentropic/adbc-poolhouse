@@ -1,5 +1,5 @@
 """
-ADBC-dbapi adapters over the Databricks Python connector.
+Databricks Python-connector backend: pool backend, ADBC-dbapi adapters, connect().
 
 `adbc-poolhouse` pools ADBC connections and downstream code relies on the ADBC
 DBAPI surface (``cursor.fetch_arrow_table()``, ``adbc_cancel()``, ...). The
@@ -7,15 +7,20 @@ Databricks Python connector (`databricks-sql-connector`) is PEP 249 DB-API 2.0
 but spells its Arrow accessors differently (``fetchall_arrow`` /
 ``fetchmany_arrow``) and lacks the ``adbc_*`` extensions.
 
-[`_AdbcCursorShim`][adbc_poolhouse._native_adapter._AdbcCursorShim] and
-[`_ConnectionAdapter`][adbc_poolhouse._native_adapter._ConnectionAdapter] translate
-a connector connection/cursor into the ADBC DBAPI shape so the native backend is
-indistinguishable from an ADBC one to callers and to the async layer. ADBC-only
-methods that have no faithful connector equivalent raise ``NotSupportedError``
-(the ADBC DBAPI error type, so callers catch the same exception they already do).
+This module holds everything specific to that connector:
 
-All imports of `pyarrow` and the connector are internal to this package; nothing
-here imports the connector, so `import adbc_poolhouse` stays connector-free.
+- ``_DatabricksPythonCursor`` and ``_DatabricksPythonConnection`` translate a
+  connector connection/cursor into the ADBC DBAPI shape, so the backend is
+  indistinguishable from an ADBC one to callers and to the async layer. ADBC-only
+  methods with no faithful connector equivalent raise ``NotSupportedError`` (the
+  ADBC DBAPI error type callers already catch).
+- ``connect`` is the single patchable entry point `pytest-adbc-replay` intercepts
+  (via ``adbc_auto_patch``).
+- ``DatabricksPythonBackend`` is the `ConnectionBackend` the pool factory builds a
+  QueuePool from.
+
+The connector and `pyarrow` are imported lazily, so `import adbc_poolhouse` and
+pytest session-start patching stay connector-free.
 """
 
 from __future__ import annotations
@@ -27,10 +32,12 @@ from typing import TYPE_CHECKING, Any
 from adbc_driver_manager.dbapi import NotSupportedError
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     import pyarrow
 
 
-class _AdbcCursorShim:
+class _DatabricksPythonCursor:
     """
     Present a Databricks connector cursor as an ADBC DBAPI cursor.
 
@@ -41,18 +48,18 @@ class _AdbcCursorShim:
 
     Args:
         cursor: The underlying connector cursor to wrap.
-        connection: The owning `_ConnectionAdapter`, returned by the DB-API
-            ``connection`` attribute.
+        connection: The owning `_DatabricksPythonConnection`, returned by the
+            DB-API ``connection`` attribute.
     """
 
-    def __init__(self, cursor: Any, connection: _ConnectionAdapter) -> None:
+    def __init__(self, cursor: Any, connection: _DatabricksPythonConnection) -> None:
         self._cursor = cursor
         self._connection = connection
         self._closed = False
 
     # ----- DB-API 2.0 pass-through -----
 
-    def execute(self, operation: str, parameters: Any = None) -> _AdbcCursorShim:
+    def execute(self, operation: str, parameters: Any = None) -> _DatabricksPythonCursor:
         """Execute a query, forwarding to the connector cursor."""
         self._cursor.execute(operation, parameters)
         return self
@@ -120,8 +127,8 @@ class _AdbcCursorShim:
         return self._cursor.rownumber
 
     @property
-    def connection(self) -> _ConnectionAdapter:
-        """The `_ConnectionAdapter` that opened this cursor."""
+    def connection(self) -> _DatabricksPythonConnection:
+        """The `_DatabricksPythonConnection` that opened this cursor."""
         return self._connection
 
     # ----- Arrow accessors (ADBC names -> connector names) -----
@@ -218,12 +225,12 @@ class _AdbcCursorShim:
         )
 
 
-class _ConnectionAdapter:
+class _DatabricksPythonConnection:
     """
     Present a Databricks connector connection as an ADBC DBAPI connection.
 
-    Wraps a connector ``Connection``, hands out `_AdbcCursorShim` cursors, and
-    forwards ``close`` / ``commit`` / ``rollback`` / ``autocommit``. ADBC
+    Wraps a connector ``Connection``, hands out `_DatabricksPythonCursor` cursors,
+    and forwards ``close`` / ``commit`` / ``rollback`` / ``autocommit``. ADBC
     connection-metadata methods (``adbc_get_info`` etc.) raise
     ``NotSupportedError``. Open cursors are tracked weakly so the pool's reset
     hook can close them and release Arrow buffers on check-in.
@@ -234,13 +241,13 @@ class _ConnectionAdapter:
 
     def __init__(self, connection: Any) -> None:
         self._conn = connection
-        self._open_cursors: weakref.WeakSet[_AdbcCursorShim] = weakref.WeakSet()
+        self._open_cursors: weakref.WeakSet[_DatabricksPythonCursor] = weakref.WeakSet()
 
-    def cursor(self) -> _AdbcCursorShim:
+    def cursor(self) -> _DatabricksPythonCursor:
         """Open a new ADBC-shaped cursor over the connector connection."""
-        shim = _AdbcCursorShim(self._conn.cursor(), connection=self)
-        self._open_cursors.add(shim)
-        return shim
+        cursor = _DatabricksPythonCursor(self._conn.cursor(), connection=self)
+        self._open_cursors.add(cursor)
+        return cursor
 
     def close(self) -> None:
         """Close the underlying connector connection."""
@@ -264,11 +271,11 @@ class _ConnectionAdapter:
         self._conn.autocommit = value
 
     def _close_open_cursors(self) -> None:
-        """Close any still-open shim cursors to release Arrow/CloudFetch buffers."""
-        for shim in list(self._open_cursors):
-            if not shim._closed:  # noqa: SLF001  (sibling adapter, intentional)
+        """Close any still-open cursors to release Arrow/CloudFetch buffers."""
+        for cursor in list(self._open_cursors):
+            if not cursor._closed:  # noqa: SLF001  (sibling adapter, intentional)
                 with contextlib.suppress(Exception):  # best-effort buffer release
-                    shim.close()
+                    cursor.close()
 
     def _adbc_unsupported(self, name: str) -> Any:
         raise NotSupportedError(
@@ -290,3 +297,74 @@ class _ConnectionAdapter:
     def adbc_get_table_types(self, *args: Any, **kwargs: Any) -> Any:
         """Unsupported: ADBC table-type introspection."""
         return self._adbc_unsupported("adbc_get_table_types")
+
+
+def connect(**kwargs: Any) -> _DatabricksPythonConnection:
+    """
+    Open a Databricks Python-connector connection wrapped as ADBC DBAPI.
+
+    This is the single patchable entry point `pytest-adbc-replay` intercepts (via
+    ``adbc_auto_patch``); recording happens below the returned adapter, which
+    already presents the ADBC DBAPI surface. The connector import is deferred to
+    call time so this module imports connector-free at pytest session start.
+
+    Args:
+        **kwargs: Connector connection kwargs as built by
+            ``DatabricksPythonConfig.to_connect_kwargs()`` (``server_hostname``,
+            ``http_path``, ``access_token`` / ``credentials_provider`` /
+            ``auth_type``, ``catalog``, ``schema``, ``use_kernel``, ...).
+
+    Returns:
+        A `_DatabricksPythonConnection` presenting the ADBC DBAPI surface.
+    """
+    # The connector ships no type stubs; suppressions are concentrated on this
+    # single lazy import + call, the only place the connector is touched directly.
+    from databricks import sql  # type: ignore[reportMissingTypeStubs]  # noqa: PLC0415
+
+    return _DatabricksPythonConnection(sql.connect(**kwargs))  # type: ignore[reportUnknownMemberType, reportUnknownArgumentType]
+
+
+class DatabricksPythonBackend:
+    """
+    A `ConnectionBackend` backed by the Databricks Python connector.
+
+    Each pooled connection is an independent connector connection (there is no
+    cheap ``adbc_clone``), opened through the module-level `connect` so
+    `pytest-adbc-replay` can intercept it. There is no shared source to close;
+    the reset hook closes any open cursors to release Arrow/CloudFetch buffers.
+
+    Args:
+        connect_kwargs: Connector kwargs from
+            ``DatabricksPythonConfig.to_connect_kwargs()``.
+    """
+
+    def __init__(self, connect_kwargs: dict[str, Any]) -> None:
+        self._connect_kwargs = connect_kwargs
+
+    def creator(self) -> Callable[[], Any]:
+        """
+        Return a callable that opens one connector connection.
+
+        The callable resolves ``connect`` off this module at call time (not import
+        time) so a `pytest-adbc-replay` monkeypatch of the module's ``connect`` is
+        honored.
+        """
+        # Reference the module (not the bare function) so attribute access happens
+        # at call time and picks up any patched connect.
+        from adbc_poolhouse._adapters import _databricks_python as module  # noqa: PLC0415
+
+        kwargs = self._connect_kwargs
+
+        def _open() -> Any:
+            return module.connect(**kwargs)
+
+        return _open
+
+    def close(self) -> None:
+        """No shared source to close; pooled connections are closed by ``dispose``."""
+
+    def on_reset(self, dbapi_conn: object) -> None:
+        """Close open cursors on ``dbapi_conn`` to release Arrow buffers, if it tracks any."""
+        closer = getattr(dbapi_conn, "_close_open_cursors", None)
+        if closer is not None:
+            closer()

@@ -2,7 +2,7 @@
 Databricks Python-connector integration tests: cassette-based, CI-safe.
 
 These exercise the non-ADBC ``DatabricksPythonConfig`` backend. Cassettes are
-recorded below the ADBC cursor shim (via the ``adbc_poolhouse._databricks_python_driver``
+recorded below the ADBC cursor adapter (via the ``adbc_poolhouse._adapters._databricks_python``
 module in ``adbc_auto_patch``), so the same replay methodology as the ADBC
 backends applies with no bespoke mocking.
 """

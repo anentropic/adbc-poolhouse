@@ -1,9 +1,9 @@
 """
 Unit tests for the Databricks Python-connector ADBC adapters.
 
-These drive `_AdbcCursorShim` / `_ConnectionAdapter` over a fake connector cursor
-so the ADBC-name translation and the `NotSupportedError` gaps are covered without
-a live connector or a cassette.
+These drive `_DatabricksPythonCursor` / `_DatabricksPythonConnection` over a fake
+connector cursor so the ADBC-name translation and the `NotSupportedError` gaps are
+covered without a live connector or a cassette.
 """
 
 from __future__ import annotations
@@ -14,7 +14,7 @@ import pyarrow as pa
 import pytest
 from adbc_driver_manager.dbapi import NotSupportedError
 
-from adbc_poolhouse._native_adapter import _ConnectionAdapter
+from adbc_poolhouse._adapters._databricks_python import _DatabricksPythonConnection
 
 
 class _FakeCursor:
@@ -92,43 +92,43 @@ def table() -> pa.Table:
 
 
 @pytest.fixture
-def adapter(table: pa.Table) -> _ConnectionAdapter:
-    return _ConnectionAdapter(_FakeConn(table))
+def adapter(table: pa.Table) -> _DatabricksPythonConnection:
+    return _DatabricksPythonConnection(_FakeConn(table))
 
 
-def test_fetch_arrow_table_maps_to_fetchall_arrow(adapter: _ConnectionAdapter) -> None:
+def test_fetch_arrow_table_maps_to_fetchall_arrow(adapter: _DatabricksPythonConnection) -> None:
     cur = adapter.cursor()
     assert cur.fetch_arrow_table().num_rows == 3
     assert cur.fetchallarrow().num_rows == 3
 
 
-def test_fetch_record_batch_streams_all_rows(adapter: _ConnectionAdapter) -> None:
+def test_fetch_record_batch_streams_all_rows(adapter: _DatabricksPythonConnection) -> None:
     cur = adapter.cursor()
     reader = cur.fetch_record_batch()
     total = sum(batch.num_rows for batch in reader)
     assert total == 3
 
 
-def test_fetch_df(adapter: _ConnectionAdapter) -> None:
+def test_fetch_df(adapter: _DatabricksPythonConnection) -> None:
     pytest.importorskip("pandas")
     cur = adapter.cursor()
     assert list(cur.fetch_df()["a"]) == [1, 2, 3]
 
 
-def test_fetch_polars(adapter: _ConnectionAdapter) -> None:
+def test_fetch_polars(adapter: _DatabricksPythonConnection) -> None:
     pytest.importorskip("polars")
     cur = adapter.cursor()
     pl_df = cur.fetch_polars()
     assert pl_df.shape[0] == 3
 
 
-def test_fetchmany_defaults_to_arraysize(adapter: _ConnectionAdapter) -> None:
+def test_fetchmany_defaults_to_arraysize(adapter: _DatabricksPythonConnection) -> None:
     cur = adapter.cursor()
     # arraysize is 2 on the fake cursor; fetchmany(None) must use it.
     assert len(cur.fetchmany()) == 2
 
 
-def test_passthrough_properties(adapter: _ConnectionAdapter) -> None:
+def test_passthrough_properties(adapter: _DatabricksPythonConnection) -> None:
     cur = adapter.cursor()
     assert cur.rowcount == -1
     assert cur.description is not None
@@ -138,13 +138,13 @@ def test_passthrough_properties(adapter: _ConnectionAdapter) -> None:
     assert cur.connection is adapter
 
 
-def test_adbc_cancel_maps_to_connector_cancel(adapter: _ConnectionAdapter) -> None:
+def test_adbc_cancel_maps_to_connector_cancel(adapter: _DatabricksPythonConnection) -> None:
     cur = adapter.cursor()
     cur.adbc_cancel()
     assert adapter._conn._cursor.cancelled is True  # noqa: SLF001
 
 
-def test_close_open_cursors_releases_buffers(adapter: _ConnectionAdapter) -> None:
+def test_close_open_cursors_releases_buffers(adapter: _DatabricksPythonConnection) -> None:
     cur = adapter.cursor()
     adapter._close_open_cursors()  # noqa: SLF001
     assert adapter._conn._cursor.closed is True  # noqa: SLF001
@@ -162,7 +162,7 @@ def test_close_open_cursors_releases_buffers(adapter: _ConnectionAdapter) -> Non
         "adbc_read_partition",
     ],
 )
-def test_cursor_gaps_raise_not_supported(adapter: _ConnectionAdapter, method: str) -> None:
+def test_cursor_gaps_raise_not_supported(adapter: _DatabricksPythonConnection, method: str) -> None:
     cur = adapter.cursor()
     with pytest.raises(NotSupportedError):
         getattr(cur, method)()
@@ -173,7 +173,7 @@ def test_cursor_gaps_raise_not_supported(adapter: _ConnectionAdapter, method: st
     ["adbc_get_info", "adbc_get_objects", "adbc_get_table_schema", "adbc_get_table_types"],
 )
 def test_connection_metadata_gaps_raise_not_supported(
-    adapter: _ConnectionAdapter, method: str
+    adapter: _DatabricksPythonConnection, method: str
 ) -> None:
     with pytest.raises(NotSupportedError):
         getattr(adapter, method)()

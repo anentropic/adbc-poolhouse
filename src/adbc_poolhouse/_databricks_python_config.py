@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any, Self
 from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import SettingsConfigDict
 
-from adbc_poolhouse._backend import NativeConnectorBackend
+from adbc_poolhouse._adapters._databricks_python import DatabricksPythonBackend
 from adbc_poolhouse._base_config import BaseWarehouseConfig
 from adbc_poolhouse._exceptions import ConfigurationError  # noqa: TC001
 
@@ -209,5 +209,5 @@ class DatabricksPythonConfig(BaseWarehouseConfig):
         return _provider
 
     def _make_backend(self) -> ConnectionBackend:
-        """Return a `NativeConnectorBackend` carrying this config's connect kwargs."""
-        return NativeConnectorBackend(self.to_connect_kwargs())
+        """Return a `DatabricksPythonBackend` carrying this config's connect kwargs."""
+        return DatabricksPythonBackend(self.to_connect_kwargs())
