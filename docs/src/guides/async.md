@@ -34,6 +34,15 @@ awaited.
     similar) implement it. On a backend that does not — DuckDB, for example — both
     methods raise the driver's native `NotSupportedError`, surfaced unchanged.
 
+The async wrapper is backend-agnostic: it works with any config `create_pool`
+accepts, including the non-ADBC
+[`DatabricksPythonConfig`][adbc_poolhouse.DatabricksPythonConfig]. That backend runs
+on the Databricks Python connector rather than an ADBC driver, so the ADBC-only
+methods above (`adbc_ingest`, `adbc_prepare` / `adbc_execute_schema`,
+`adbc_execute_partitions` / `adbc_read_partition`, and the `adbc_get_*` metadata
+methods) raise `NotSupportedError` on it — asynchronously as well as synchronously.
+See its [unsupported-methods list](databricks-python.md#unsupported-methods).
+
 ## Install
 
 The async wrapper depends on `anyio`, which ships behind the `[async]` extra:

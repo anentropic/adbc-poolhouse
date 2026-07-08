@@ -23,6 +23,7 @@ adbc-poolhouse manages the pool, not the driver. You also need an ADBC driver fo
 | **PyPI drivers** | |
 | Apache Arrow Flight SQL | `pip install adbc-poolhouse[flightsql]` |
 | BigQuery | `pip install adbc-poolhouse[bigquery]` |
+| Databricks (Python connector, for Lakehouse//RT) | `pip install adbc-poolhouse[databricks-python]` |
 | DuckDB | `pip install adbc-poolhouse[duckdb]` |
 | PostgreSQL | `pip install adbc-poolhouse[postgresql]` |
 | Quack | `pip install --pre adbc-poolhouse[quack]` |
@@ -40,7 +41,7 @@ adbc-poolhouse manages the pool, not the driver. You also need an ADBC driver fo
 
 All supported warehouses have a typed config class.
 
-PyPI-installed: [`BigQueryConfig`][adbc_poolhouse.BigQueryConfig], [`DuckDBConfig`][adbc_poolhouse.DuckDBConfig], [`FlightSQLConfig`][adbc_poolhouse.FlightSQLConfig], [`PostgreSQLConfig`][adbc_poolhouse.PostgreSQLConfig], [`QuackConfig`][adbc_poolhouse.QuackConfig], [`SnowflakeConfig`][adbc_poolhouse.SnowflakeConfig], [`SQLiteConfig`][adbc_poolhouse.SQLiteConfig].
+PyPI-installed: [`BigQueryConfig`][adbc_poolhouse.BigQueryConfig], [`DatabricksPythonConfig`][adbc_poolhouse.DatabricksPythonConfig], [`DuckDBConfig`][adbc_poolhouse.DuckDBConfig], [`FlightSQLConfig`][adbc_poolhouse.FlightSQLConfig], [`PostgreSQLConfig`][adbc_poolhouse.PostgreSQLConfig], [`QuackConfig`][adbc_poolhouse.QuackConfig], [`SnowflakeConfig`][adbc_poolhouse.SnowflakeConfig], [`SQLiteConfig`][adbc_poolhouse.SQLiteConfig].
 
 Foundry-distributed: [`ClickHouseConfig`][adbc_poolhouse.ClickHouseConfig], [`DatabricksConfig`][adbc_poolhouse.DatabricksConfig], [`MSSQLConfig`][adbc_poolhouse.MSSQLConfig], [`MySQLConfig`][adbc_poolhouse.MySQLConfig], [`RedshiftConfig`][adbc_poolhouse.RedshiftConfig], [`TrinoConfig`][adbc_poolhouse.TrinoConfig].
 
