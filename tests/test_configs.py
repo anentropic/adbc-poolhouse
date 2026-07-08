@@ -826,6 +826,11 @@ class TestDatabricksPythonConfig:
         kw = c.to_connect_kwargs()
         assert kw["credentials_provider"] is provider
 
+    def test_non_callable_credentials_provider_raises(self) -> None:
+        """A non-callable credentials_provider is rejected at construction."""
+        with pytest.raises(ValidationError):
+            DatabricksPythonConfig(host="h", http_path="/p", credentials_provider="not-callable")
+
     def test_catalog_and_schema_forwarded(self) -> None:
         """Catalog and schema are forwarded as connector kwargs when set."""
         c = DatabricksPythonConfig(

@@ -19,7 +19,7 @@ class DatabricksPythonConfig(BaseWarehouseConfig):
     """
     Databricks configuration backed by the Python connector (not ADBC).
 
-    Uses `databricks-sql-connector` with ``use_kernel=True`, which connects over
+    Uses ``databricks-sql-connector`` with ``use_kernel=True``, which connects over
     the Statement Execution ("kernel") path instead of Thrift. Prefer
     [`DatabricksConfig`][adbc_poolhouse.DatabricksConfig] (the ADBC driver) for
     normal SQL warehouses; reach for this config only when you need the
@@ -115,6 +115,11 @@ class DatabricksPythonConfig(BaseWarehouseConfig):
             and self.client_id is not None
             and self.client_secret is not None
         )
+        if self.credentials_provider is not None and not callable(self.credentials_provider):
+            raise ConfigurationError(
+                "DatabricksPythonConfig 'credentials_provider' must be callable "
+                "(the connector calls it to obtain credentials at connect time)."
+            )
         has_custom = self.credentials_provider is not None
         if not (has_pat or has_u2m or has_m2m or has_custom):
             raise ConfigurationError(
