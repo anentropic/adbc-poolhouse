@@ -22,7 +22,7 @@ flightsql = ["adbc-driver-flightsql>=1.0.0"]
 bigquery = ["adbc-driver-bigquery>=1.3.0"]
 sqlite = ["adbc-driver-sqlite>=1.0.0"]
 databricks-python = ["databricks-sql-connector[pyarrow]>=4.3.0"]
-databricks-python-m2m = ["adbc-poolhouse[databricks-python]", "databricks-sdk>=0.20"]
+databricks-python-m2m = ["databricks-sql-connector[pyarrow]>=4.3.0", "databricks-sdk>=0.20"]
 async = ["anyio>=4.13"]
 all = [
     "adbc-poolhouse[duckdb]",
