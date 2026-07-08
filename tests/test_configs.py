@@ -1,5 +1,6 @@
 """Unit tests for all adbc_poolhouse config models (TEST-04)."""
 
+import sys
 from pathlib import Path
 
 import pytest
@@ -830,6 +831,22 @@ class TestDatabricksPythonConfig:
         """A non-callable credentials_provider is rejected at construction."""
         with pytest.raises(ValidationError):
             DatabricksPythonConfig(host="h", http_path="/p", credentials_provider="not-callable")
+
+    def test_m2m_without_sdk_points_at_extra(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Invoking the M2M provider without databricks-sdk raises an error naming the extra."""
+        # Force the SDK import to fail regardless of whether it is installed:
+        # a None entry in sys.modules makes `import databricks.sdk.core` raise ImportError.
+        monkeypatch.setitem(sys.modules, "databricks.sdk.core", None)  # type: ignore[arg-type]
+        c = DatabricksPythonConfig(
+            host="h.example.net",
+            http_path="/p",
+            auth_type="OAuthM2M",
+            client_id="cid",
+            client_secret=SecretStr("csecret"),  # pragma: allowlist secret
+        )
+        provider = c.to_connect_kwargs()["credentials_provider"]
+        with pytest.raises(ImportError, match="databricks-python-m2m"):
+            provider()
 
     def test_catalog_and_schema_forwarded(self) -> None:
         """Catalog and schema are forwarded as connector kwargs when set."""

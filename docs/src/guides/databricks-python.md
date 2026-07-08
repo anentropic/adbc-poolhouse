@@ -13,14 +13,20 @@ drivers use. If you are not targeting Lakehouse//RT, prefer
 
 ## Installation
 
-This backend needs the `databricks-python` extra:
+This backend needs the `databricks-python` extra, which pulls in
+`databricks-sql-connector` (with PyArrow):
 
 ```bash
 pip install "adbc-poolhouse[databricks-python]"
 ```
 
-The extra pulls in `databricks-sql-connector` (with PyArrow) and `databricks-sdk`.
-The SDK is only used to build OAuth machine-to-machine credentials.
+OAuth machine-to-machine auth additionally needs `databricks-sdk`, which the
+connector itself does not require. When you use that auth method, install the
+`databricks-python-m2m` extra instead — it adds the SDK on top of everything above:
+
+```bash
+pip install "adbc-poolhouse[databricks-python-m2m]"
+```
 
 ## Connection
 
@@ -57,8 +63,11 @@ config = DatabricksPythonConfig(
 ### OAuth (machine-to-machine)
 
 For a service principal, set `auth_type="OAuthM2M"` with `client_id` and
-`client_secret`. The credentials provider is built lazily when the pool opens a
-connection, so constructing the config does no network work:
+`client_secret`. This mode needs the `databricks-python-m2m` extra (see
+[Installation](#installation)). The credentials provider is built lazily when the
+pool opens a connection, so constructing the config does no network work; if
+`databricks-sdk` is not installed, that first connection fails with an error
+pointing you at the extra:
 
 ```python
 from pydantic import SecretStr

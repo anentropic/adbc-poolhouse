@@ -37,7 +37,8 @@ class DatabricksPythonConfig(BaseWarehouseConfig):
     - **PAT**: set ``token``.
     - **OAuth U2M** (browser): set ``auth_type="OAuthU2M"``.
     - **OAuth M2M** (service principal): set ``auth_type="OAuthM2M"`` with
-      ``client_id`` and ``client_secret``.
+      ``client_id`` and ``client_secret``. Needs the ``databricks-python-m2m``
+      extra, which adds ``databricks-sdk``.
     - **Custom**: pass a ``credentials_provider`` callable (e.g. Azure SP).
 
     Downstream code sees the ADBC DBAPI cursor surface (``fetch_arrow_table`` etc.);
@@ -194,10 +195,19 @@ class DatabricksPythonConfig(BaseWarehouseConfig):
         client_secret = self.client_secret.get_secret_value()
 
         def _provider() -> Any:
-            from databricks.sdk.core import Config  # noqa: PLC0415  (lazy: only M2M needs the SDK)
-            from databricks.sdk.credentials_provider import (  # noqa: PLC0415
-                oauth_service_principal,
-            )
+            try:
+                from databricks.sdk.core import (
+                    Config,  # noqa: PLC0415  (lazy: only M2M needs the SDK)
+                )
+                from databricks.sdk.credentials_provider import (  # noqa: PLC0415
+                    oauth_service_principal,
+                )
+            except ImportError as exc:
+                raise ImportError(
+                    "OAuthM2M auth needs the Databricks SDK, which the 'databricks-python' "
+                    "extra does not install. Add the 'databricks-python-m2m' extra: "
+                    'pip install "adbc-poolhouse[databricks-python-m2m]".'
+                ) from exc
 
             sdk_config = Config(
                 host=f"https://{host}",

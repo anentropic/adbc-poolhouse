@@ -187,6 +187,9 @@ bigquery = [
     { name = "adbc-driver-bigquery" },
 ]
 databricks-python = [
+    { name = "databricks-sql-connector", extra = ["pyarrow"] },
+]
+databricks-python-m2m = [
     { name = "databricks-sdk" },
     { name = "databricks-sql-connector", extra = ["pyarrow"] },
 ]
@@ -250,7 +253,8 @@ requires-dist = [
     { name = "adbc-driver-sqlite", marker = "extra == 'sqlite'", specifier = ">=1.0.0" },
     { name = "adbc-poolhouse", extras = ["async"], marker = "extra == 'all'" },
     { name = "adbc-poolhouse", extras = ["bigquery"], marker = "extra == 'all'" },
-    { name = "adbc-poolhouse", extras = ["databricks-python"], marker = "extra == 'all'" },
+    { name = "adbc-poolhouse", extras = ["databricks-python"], marker = "extra == 'databricks-python-m2m'" },
+    { name = "adbc-poolhouse", extras = ["databricks-python-m2m"], marker = "extra == 'all'" },
     { name = "adbc-poolhouse", extras = ["duckdb"], marker = "extra == 'all'" },
     { name = "adbc-poolhouse", extras = ["flightsql"], marker = "extra == 'all'" },
     { name = "adbc-poolhouse", extras = ["postgresql"], marker = "extra == 'all'" },
@@ -258,13 +262,13 @@ requires-dist = [
     { name = "adbc-poolhouse", extras = ["snowflake"], marker = "extra == 'all'" },
     { name = "adbc-poolhouse", extras = ["sqlite"], marker = "extra == 'all'" },
     { name = "anyio", marker = "extra == 'async'", specifier = ">=4.13" },
-    { name = "databricks-sdk", marker = "extra == 'databricks-python'", specifier = ">=0.20" },
+    { name = "databricks-sdk", marker = "extra == 'databricks-python-m2m'", specifier = ">=0.20" },
     { name = "databricks-sql-connector", extras = ["pyarrow"], marker = "extra == 'databricks-python'", specifier = ">=4.3.0" },
     { name = "duckdb", marker = "extra == 'duckdb'", specifier = ">=0.9.1" },
     { name = "pydantic-settings", specifier = ">=2.0.0" },
     { name = "sqlalchemy", specifier = ">=2.0.0" },
 ]
-provides-extras = ["duckdb", "snowflake", "postgresql", "quack", "flightsql", "bigquery", "sqlite", "databricks-python", "async", "all"]
+provides-extras = ["duckdb", "snowflake", "postgresql", "quack", "flightsql", "bigquery", "sqlite", "databricks-python", "databricks-python-m2m", "async", "all"]
 
 [package.metadata.requires-dev]
 dev = [
