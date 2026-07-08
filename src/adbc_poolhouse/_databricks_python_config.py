@@ -188,6 +188,9 @@ class DatabricksPythonConfig(BaseWarehouseConfig):
         eagerly triggers auth/metadata resolution (network) before any pool is
         even used.
         """
+        # The validator guarantees these are set on the OAuthM2M path; assert so
+        # the captured locals narrow to non-None (str) for the type checker.
+        assert self.host is not None
         assert self.client_id is not None
         assert self.client_secret is not None
         host = self.host

@@ -46,13 +46,21 @@ class _FakeCursor:
         return sliced
 
     def fetchone(self) -> Any:
-        return self._table.slice(0, 1).to_pylist()[0]
+        if self._offset >= self._table.num_rows:
+            return None
+        row = self._table.slice(self._offset, 1).to_pylist()[0]
+        self._offset += 1
+        return row
 
     def fetchmany(self, size: int) -> list[Any]:
-        return self._table.slice(0, size).to_pylist()
+        rows = self._table.slice(self._offset, size).to_pylist()
+        self._offset += len(rows)
+        return rows
 
     def fetchall(self) -> list[Any]:
-        return self._table.to_pylist()
+        rows = self._table.slice(self._offset).to_pylist()
+        self._offset = self._table.num_rows
+        return rows
 
     def setinputsizes(self, sizes: Any) -> None:
         pass
