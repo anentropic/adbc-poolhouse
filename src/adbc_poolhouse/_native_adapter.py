@@ -202,22 +202,19 @@ class _AdbcCursorShim:
     def adbc_execute_schema(self, *args: Any, **kwargs: Any) -> Any:
         """Unsupported: no describe-without-execute on the connector."""
         raise NotSupportedError(
-            "adbc_execute_schema() is not available on the Databricks Python "
-            "connector backend."
+            "adbc_execute_schema() is not available on the Databricks Python connector backend."
         )
 
     def adbc_execute_partitions(self, *args: Any, **kwargs: Any) -> Any:
         """Unsupported: partitioned result distribution is ADBC-specific."""
         raise NotSupportedError(
-            "adbc_execute_partitions() is not available on the Databricks Python "
-            "connector backend."
+            "adbc_execute_partitions() is not available on the Databricks Python connector backend."
         )
 
     def adbc_read_partition(self, *args: Any, **kwargs: Any) -> None:
         """Unsupported: partitioned result distribution is ADBC-specific."""
         raise NotSupportedError(
-            "adbc_read_partition() is not available on the Databricks Python "
-            "connector backend."
+            "adbc_read_partition() is not available on the Databricks Python connector backend."
         )
 
 

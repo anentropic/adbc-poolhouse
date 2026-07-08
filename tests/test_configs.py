@@ -782,7 +782,9 @@ class TestDatabricksPythonConfig:
     def test_pat_connect_kwargs(self) -> None:
         """PAT maps token -> access_token; use_kernel defaults True."""
         c = DatabricksPythonConfig(
-            host="h", http_path="/p", token=SecretStr("dapi-secret")  # pragma: allowlist secret
+            host="h",
+            http_path="/p",
+            token=SecretStr("dapi-secret"),  # pragma: allowlist secret
         )
         kw = c.to_connect_kwargs()
         assert kw["server_hostname"] == "h"
@@ -815,9 +817,7 @@ class TestDatabricksPythonConfig:
     def test_m2m_requires_client_id_and_secret(self) -> None:
         """OAuthM2M without client_id/secret raises ValidationError."""
         with pytest.raises(ValidationError):
-            DatabricksPythonConfig(
-                host="h", http_path="/p", auth_type="OAuthM2M", client_id="cid"
-            )
+            DatabricksPythonConfig(host="h", http_path="/p", auth_type="OAuthM2M", client_id="cid")
 
     def test_explicit_credentials_provider_passthrough(self) -> None:
         """An explicit credentials_provider satisfies auth and is passed verbatim."""
@@ -842,7 +842,9 @@ class TestDatabricksPythonConfig:
     def test_token_is_secret_and_not_leaked(self) -> None:
         """Token stays a SecretStr; plaintext appears only via to_connect_kwargs."""
         c = DatabricksPythonConfig(
-            host="h", http_path="/p", token=SecretStr("dapi-plain")  # pragma: allowlist secret
+            host="h",
+            http_path="/p",
+            token=SecretStr("dapi-plain"),  # pragma: allowlist secret
         )
         assert isinstance(c.token, SecretStr)
         assert "dapi-plain" not in repr(c)
@@ -860,7 +862,9 @@ class TestDatabricksPythonConfig:
     def test_to_adbc_kwargs_not_supported(self) -> None:
         """to_adbc_kwargs is inapplicable for the native connector backend."""
         c = DatabricksPythonConfig(
-            host="h", http_path="/p", token=SecretStr("t")  # pragma: allowlist secret
+            host="h",
+            http_path="/p",
+            token=SecretStr("t"),  # pragma: allowlist secret
         )
         with pytest.raises(NotImplementedError):
             c.to_adbc_kwargs()

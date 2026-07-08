@@ -109,9 +109,15 @@ def test_fetch_record_batch_streams_all_rows(adapter: _ConnectionAdapter) -> Non
     assert total == 3
 
 
-def test_fetch_df_and_polars(adapter: _ConnectionAdapter) -> None:
+def test_fetch_df(adapter: _ConnectionAdapter) -> None:
+    pytest.importorskip("pandas")
     cur = adapter.cursor()
     assert list(cur.fetch_df()["a"]) == [1, 2, 3]
+
+
+def test_fetch_polars(adapter: _ConnectionAdapter) -> None:
+    pytest.importorskip("polars")
+    cur = adapter.cursor()
     pl_df = cur.fetch_polars()
     assert pl_df.shape[0] == 3
 

@@ -109,7 +109,7 @@ real PyArrow objects:
 with pool.connect() as conn:
     cur = conn.cursor()
     cur.execute("SELECT 1 AS n")
-    table = cur.fetch_arrow_table()          # pyarrow.Table
+    table = cur.fetch_arrow_table()  # pyarrow.Table
     # or stream: cur.fetch_record_batch()    # pyarrow.RecordBatchReader
 ```
 

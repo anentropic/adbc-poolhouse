@@ -107,9 +107,7 @@ class DatabricksPythonConfig(BaseWarehouseConfig):
     def check_connection_spec(self) -> Self:
         """Raise ConfigurationError unless host, http_path, and one auth method are set."""
         if self.host is None or self.http_path is None:
-            raise ConfigurationError(
-                "DatabricksPythonConfig requires 'host' and 'http_path'."
-            )
+            raise ConfigurationError("DatabricksPythonConfig requires 'host' and 'http_path'.")
         has_pat = self.token is not None
         has_u2m = self.auth_type == "OAuthU2M"
         has_m2m = (
