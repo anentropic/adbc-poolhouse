@@ -14,7 +14,13 @@ from pathlib import Path
 import pytest
 from dotenv import dotenv_values
 
-from adbc_poolhouse import DatabricksConfig, SnowflakeConfig, close_pool, create_pool
+from adbc_poolhouse import (
+    DatabricksConfig,
+    DatabricksPythonConfig,
+    SnowflakeConfig,
+    close_pool,
+    create_pool,
+)
 
 _dotenv_path = Path(__file__).parent.parent.parent / ".env"
 _dotenv_values: dict[str, str] = (
@@ -66,6 +72,31 @@ def databricks_pool(monkeypatch: pytest.MonkeyPatch):
     _restore_dotenv(monkeypatch)
     _ensure_databricks_env(monkeypatch)
     config = DatabricksConfig()  # type: ignore[call-arg]  # reads DATABRICKS_* env vars
+    pool = create_pool(config)
+    yield pool
+    close_pool(pool)
+
+
+def _ensure_databricks_python_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Set dummy Databricks Python-connector env vars if real credentials are absent."""
+    keys = (
+        "DATABRICKS_PYTHON_HOST",
+        "DATABRICKS_PYTHON_HTTP_PATH",
+        "DATABRICKS_PYTHON_TOKEN",
+    )
+    has_decomposed = all(os.environ.get(k) or k in _dotenv_values for k in keys)
+    if not has_decomposed:
+        monkeypatch.setenv("DATABRICKS_PYTHON_HOST", "replay-host")
+        monkeypatch.setenv("DATABRICKS_PYTHON_HTTP_PATH", "/sql/1.0/warehouses/replay")
+        monkeypatch.setenv("DATABRICKS_PYTHON_TOKEN", "replay-token")
+
+
+@pytest.fixture
+def databricks_python_pool(monkeypatch: pytest.MonkeyPatch):
+    """Databricks Python-connector pool — function-scoped for a per-test cassette path."""
+    _restore_dotenv(monkeypatch)
+    _ensure_databricks_python_env(monkeypatch)
+    config = DatabricksPythonConfig()  # type: ignore[call-arg]  # reads DATABRICKS_PYTHON_* env vars
     pool = create_pool(config)
     yield pool
     close_pool(pool)

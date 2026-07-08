@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-07-08
+
+### Features
+
+- Add `DatabricksPythonConfig`, a Databricks backend built on the `databricks-sql-connector` package rather than the ADBC driver. It connects over the connector's Statement Execution ("kernel") path instead of Thrift, which is what **Lakehouse//RT** requires — RT rejects the Thrift protocol that the ADBC and ODBC drivers use. Reach for it only when you need that non-Thrift path; `DatabricksConfig` (the ADBC driver) stays the default for ordinary SQL warehouses.
+- Install it with the new `databricks-python` extra (`pip install "adbc-poolhouse[databricks-python]"`), which pulls in `databricks-sql-connector[pyarrow]`. OAuth machine-to-machine auth also needs `databricks-sdk`; install the `databricks-python-m2m` extra for that, which layers the SDK on top of the base extra.
+- Supports the same auth methods as `DatabricksConfig`: personal access token, OAuth U2M (browser), OAuth M2M (service principal), or a bring-your-own `credentials_provider` callable. Fields load from `DATABRICKS_PYTHON_*` environment variables, a separate namespace from the `DATABRICKS_*` prefix `DatabricksConfig` uses. Selecting OAuth M2M without `databricks-sdk` installed fails when the pool opens its first connection, with an error that points you at the `databricks-python-m2m` extra.
+- Pooled connections present the ADBC DBAPI cursor surface, so downstream query code is unchanged, and the backend works with both the sync pool and the async surface. The ADBC-only methods the connector has no equivalent for (`adbc_ingest`, `adbc_prepare`, `adbc_execute_partitions`, the `adbc_get_*` metadata methods, and raw `fetch_arrow`) raise `NotSupportedError`.
+
+The existing ADBC backends and public API are unchanged; this release only adds the new backend, so upgrading from 1.5.x needs no code changes.
+
 ## [1.5.1] - 2026-07-07
 
 ### Features

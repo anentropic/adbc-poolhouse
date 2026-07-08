@@ -1,6 +1,6 @@
 [project]
 name = "adbc-poolhouse"
-version = "1.5.1"
+version = "1.6.0"
 description = "Connection pooling for ADBC drivers from typed warehouse configs"
 readme = "README.md"
 authors = [
@@ -21,6 +21,8 @@ quack = ["adbc-driver-quack>=0.1.0a1"]
 flightsql = ["adbc-driver-flightsql>=1.0.0"]
 bigquery = ["adbc-driver-bigquery>=1.3.0"]
 sqlite = ["adbc-driver-sqlite>=1.0.0"]
+databricks-python = ["databricks-sql-connector[pyarrow]>=4.3.0"]
+databricks-python-m2m = ["databricks-sql-connector[pyarrow]>=4.3.0", "databricks-sdk>=0.20"]
 async = ["anyio>=4.13"]
 all = [
     "adbc-poolhouse[duckdb]",
@@ -30,6 +32,7 @@ all = [
     "adbc-poolhouse[flightsql]",
     "adbc-poolhouse[bigquery]",
     "adbc-poolhouse[sqlite]",
+    "adbc-poolhouse[databricks-python-m2m]",
     "adbc-poolhouse[async]",
 ]
 
@@ -77,11 +80,13 @@ docs = [
 adbc_auto_patch = [
     "adbc_driver_snowflake.dbapi",
     "adbc_driver_manager.dbapi",
+    "adbc_poolhouse._adapters._databricks_python",
 ]
 adbc_cassette_dir = "tests/cassettes"
 markers = [
     "snowflake: requires live Snowflake credentials (recording only; cassettes checked in for CI replay)",
     "databricks: requires live Databricks credentials (recording only; cassettes checked in for CI replay)",
+    "databricks_python: requires live Databricks credentials via the Python connector (recording only; cassettes checked in for CI replay)",
 ]
 
 [tool.pyright]

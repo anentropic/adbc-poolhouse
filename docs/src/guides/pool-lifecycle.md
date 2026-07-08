@@ -12,10 +12,11 @@ from adbc_poolhouse import DuckDBConfig, create_pool
 pool = create_pool(DuckDBConfig(database="/tmp/warehouse.db"))
 ```
 
-adbc-poolhouse ships config classes for 13 backends:
+adbc-poolhouse ships config classes for 14 backends:
 [`BigQueryConfig`][adbc_poolhouse.BigQueryConfig],
 [`ClickHouseConfig`][adbc_poolhouse.ClickHouseConfig],
 [`DatabricksConfig`][adbc_poolhouse.DatabricksConfig],
+[`DatabricksPythonConfig`][adbc_poolhouse.DatabricksPythonConfig],
 [`DuckDBConfig`][adbc_poolhouse.DuckDBConfig],
 [`FlightSQLConfig`][adbc_poolhouse.FlightSQLConfig],
 [`MSSQLConfig`][adbc_poolhouse.MSSQLConfig],
@@ -26,7 +27,7 @@ adbc-poolhouse ships config classes for 13 backends:
 [`SnowflakeConfig`][adbc_poolhouse.SnowflakeConfig],
 [`SQLiteConfig`][adbc_poolhouse.SQLiteConfig],
 and [`TrinoConfig`][adbc_poolhouse.TrinoConfig].
-Each config class validates credentials, builds the ADBC connection kwargs, and resolves the driver automatically.
+Each config class validates credentials and prepares its connection automatically: the ADBC backends build the connection kwargs and resolve the driver, while [`DatabricksPythonConfig`][adbc_poolhouse.DatabricksPythonConfig] drives the Databricks Python connector instead (see the [Databricks Python connector guide](databricks-python.md)).
 
 For custom ADBC drivers or cases where a built-in config class does not exist, `create_pool` also accepts [raw driver arguments](configuration.md#raw-driver-arguments) directly.
 

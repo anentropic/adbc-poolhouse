@@ -31,6 +31,7 @@ from adbc_poolhouse._driver_api import create_adbc_connection
 if TYPE_CHECKING:
     import collections.abc
 
+    from adbc_poolhouse._backend import ConnectionBackend
     from adbc_poolhouse._base_config import WarehouseConfig
 
 
@@ -51,6 +52,18 @@ def _create_pool_impl(
         raise TypeError("create_pool() accepts driver_path or dbapi_module, not both")
 
     if config is not None:
+        # Non-ADBC backend path -- a config may declare its own ConnectionBackend
+        # (e.g. the Databricks Python connector) via the optional _make_backend
+        # hook. Accessed via getattr so third-party configs implementing only the
+        # documented WarehouseConfig protocol (no _make_backend) still work and
+        # take the ADBC path.
+        make_backend = getattr(config, "_make_backend", None)
+        native_backend = make_backend() if make_backend is not None else None
+        if native_backend is not None:
+            return _create_native_pool(
+                native_backend, pool_size, max_overflow, timeout, recycle, pre_ping
+            )
+
         # Config path -- extract driver info from config methods
         cfg_driver_path = config._driver_path()
         cfg_dbapi_module = config._dbapi_module()
@@ -104,6 +117,46 @@ def _create_pool_impl(
     pool._adbc_source = source  # type: ignore[attr-defined]
 
     event.listen(pool, "reset", _release_arrow_allocators)
+
+    return pool
+
+
+def _create_native_pool(
+    backend: ConnectionBackend,
+    pool_size: int,
+    max_overflow: int,
+    timeout: int,
+    recycle: int,
+    pre_ping: bool,
+) -> sqlalchemy.pool.QueuePool:
+    """
+    Build a QueuePool from a non-ADBC `ConnectionBackend`.
+
+    Unlike the ADBC path there is no shared source connection cloned per
+    checkout: the backend's creator opens an independent connection each time.
+    The backend is stashed on ``pool._native_backend`` so `close_pool` can tear
+    it down, and its ``on_reset`` runs on the pool ``reset`` event to release
+    Arrow buffers on check-in.
+    """
+    pool = sqlalchemy.pool.QueuePool(
+        backend.creator(),
+        pool_size=pool_size,
+        max_overflow=max_overflow,
+        timeout=timeout,
+        recycle=recycle,
+        pre_ping=pre_ping,
+    )
+
+    pool._native_backend = backend  # type: ignore[attr-defined]
+
+    def _on_reset(dbapi_conn: object, connection_record: object, reset_state: object) -> None:
+        # The reset event fires with dbapi_conn=None on invalidation paths (same
+        # as the ADBC hook's guard); skip so backends need not handle None.
+        if dbapi_conn is None:
+            return
+        backend.on_reset(dbapi_conn)
+
+    event.listen(pool, "reset", _on_reset)
 
     return pool
 
@@ -261,7 +314,11 @@ def close_pool(pool: sqlalchemy.pool.QueuePool) -> None:
         ```
     """
     pool.dispose()
-    pool._adbc_source.close()  # type: ignore[attr-defined]
+    native_backend = getattr(pool, "_native_backend", None)
+    if native_backend is not None:
+        native_backend.close()
+    else:
+        pool._adbc_source.close()  # type: ignore[attr-defined]
 
 
 @overload

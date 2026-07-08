@@ -15,6 +15,7 @@ Each config class reads its fields from environment variables with a prefix matc
 | [`PostgreSQLConfig`][adbc_poolhouse.PostgreSQLConfig] | `POSTGRESQL_` |
 | [`FlightSQLConfig`][adbc_poolhouse.FlightSQLConfig] | `FLIGHTSQL_` |
 | [`DatabricksConfig`][adbc_poolhouse.DatabricksConfig] | `DATABRICKS_` |
+| [`DatabricksPythonConfig`][adbc_poolhouse.DatabricksPythonConfig] | `DATABRICKS_PYTHON_` |
 | [`RedshiftConfig`][adbc_poolhouse.RedshiftConfig] | `REDSHIFT_` |
 | [`TrinoConfig`][adbc_poolhouse.TrinoConfig] | `TRINO_` |
 | [`MSSQLConfig`][adbc_poolhouse.MSSQLConfig] | `MSSQL_` |
