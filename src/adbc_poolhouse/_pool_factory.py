@@ -35,21 +35,68 @@ if TYPE_CHECKING:
     from adbc_poolhouse._base_config import WarehouseConfig
 
 
+_TUNING_DEFAULTS: dict[str, int | bool] = {
+    "pool_size": 5,
+    "max_overflow": 3,
+    "timeout": 30,
+    "recycle": 3600,
+    "pre_ping": False,
+}
+
+
+def _resolve_tuning(
+    config: WarehouseConfig | None,
+    pool_size: int | None,
+    max_overflow: int | None,
+    timeout: int | None,
+    recycle: int | None,
+    pre_ping: bool | None,
+) -> tuple[int, int, int, int, bool]:
+    """
+    Resolve pool-tuning values with precedence: explicit arg > config field > default.
+
+    An explicit `create_pool` keyword (anything other than `None`) always wins. When
+    it is omitted, the value comes from the config's own field, which loads from
+    keyword arguments and environment variables (e.g. `SNOWFLAKE_POOL_SIZE`). The
+    hardcoded defaults are the final fallback for the raw driver paths, which have no
+    config object.
+    """
+
+    def pick(explicit: int | bool | None, field: str) -> int | bool:
+        if explicit is not None:
+            return explicit
+        if config is not None:
+            return getattr(config, field, _TUNING_DEFAULTS[field])
+        return _TUNING_DEFAULTS[field]
+
+    return (
+        int(pick(pool_size, "pool_size")),
+        int(pick(max_overflow, "max_overflow")),
+        int(pick(timeout, "timeout")),
+        int(pick(recycle, "recycle")),
+        bool(pick(pre_ping, "pre_ping")),
+    )
+
+
 def _create_pool_impl(
     config: WarehouseConfig | None,
     driver_path: str | None,
     db_kwargs: dict[str, str] | None,
     entrypoint: str | None,
     dbapi_module: str | None,
-    pool_size: int,
-    max_overflow: int,
-    timeout: int,
-    recycle: int,
-    pre_ping: bool,
+    pool_size: int | None,
+    max_overflow: int | None,
+    timeout: int | None,
+    recycle: int | None,
+    pre_ping: bool | None,
 ) -> sqlalchemy.pool.QueuePool:
     """Internal: create pool from either config or raw driver args."""
     if driver_path is not None and dbapi_module is not None:
         raise TypeError("create_pool() accepts driver_path or dbapi_module, not both")
+
+    pool_size, max_overflow, timeout, recycle, pre_ping = _resolve_tuning(
+        config, pool_size, max_overflow, timeout, recycle, pre_ping
+    )
 
     if config is not None:
         # Non-ADBC backend path -- a config may declare its own ConnectionBackend
@@ -207,11 +254,11 @@ def create_pool(
     db_kwargs: dict[str, str] | None = None,
     entrypoint: str | None = None,
     dbapi_module: str | None = None,
-    pool_size: int = 5,
-    max_overflow: int = 3,
-    timeout: int = 30,
-    recycle: int = 3600,
-    pre_ping: bool = False,
+    pool_size: int | None = None,
+    max_overflow: int | None = None,
+    timeout: int | None = None,
+    recycle: int | None = None,
+    pre_ping: bool | None = None,
 ) -> sqlalchemy.pool.QueuePool:
     """
     Create a SQLAlchemy QueuePool backed by an ADBC driver.
@@ -241,13 +288,21 @@ def create_pool(
             the ADBC dbapi interface (e.g. ``"adbc_driver_snowflake.dbapi"``
             or a custom ``"my_driver.dbapi"``). Requires ``db_kwargs``.
             Mutually exclusive with ``config`` and ``driver_path``.
-        pool_size: Number of connections to keep in the pool. Default: 5.
-        max_overflow: Extra connections allowed above pool_size. Default: 3.
-        timeout: Seconds to wait for a connection before raising. Default: 30.
-        recycle: Seconds before a connection is recycled. Default: 3600.
-        pre_ping: Whether to ping connections before checkout. Default: False.
-            Pre-ping does not function on a standalone QueuePool without a
-            SQLAlchemy dialect; recycle is the preferred health mechanism.
+        pool_size: Number of connections to keep in the pool. When omitted, the
+            config's own ``pool_size`` field is used (which loads from keyword
+            arguments and environment variables such as ``DUCKDB_POOL_SIZE``);
+            passing a value here overrides the config. The raw driver paths, which
+            have no config, fall back to 5.
+        max_overflow: Extra connections allowed above pool_size. Same precedence as
+            ``pool_size`` (config field, then 5's counterpart 3 for raw paths).
+        timeout: Seconds to wait for a connection before raising. Config field, or
+            30 for the raw paths.
+        recycle: Seconds before a connection is recycled. Config field, or 3600 for
+            the raw paths.
+        pre_ping: Whether to ping connections before checkout. Config field, or
+            False for the raw paths. Pre-ping does not function on a standalone
+            QueuePool without a SQLAlchemy dialect; recycle is the preferred health
+            mechanism.
 
     Returns:
         A configured ``sqlalchemy.pool.QueuePool`` ready for use.
@@ -368,11 +423,11 @@ def managed_pool(
     db_kwargs: dict[str, str] | None = None,
     entrypoint: str | None = None,
     dbapi_module: str | None = None,
-    pool_size: int = 5,
-    max_overflow: int = 3,
-    timeout: int = 30,
-    recycle: int = 3600,
-    pre_ping: bool = False,
+    pool_size: int | None = None,
+    max_overflow: int | None = None,
+    timeout: int | None = None,
+    recycle: int | None = None,
+    pre_ping: bool | None = None,
 ) -> collections.abc.Generator[sqlalchemy.pool.QueuePool, None, None]:
     """
     Context manager that creates a pool and closes it on exit.
@@ -402,11 +457,14 @@ def managed_pool(
             the ADBC dbapi interface (e.g. ``"adbc_driver_snowflake.dbapi"``
             or a custom ``"my_driver.dbapi"``). Requires ``db_kwargs``.
             Mutually exclusive with ``config`` and ``driver_path``.
-        pool_size: Number of connections to keep in the pool. Default: 5.
-        max_overflow: Extra connections allowed above pool_size. Default: 3.
-        timeout: Seconds to wait for a connection before raising. Default: 30.
-        recycle: Seconds before a connection is recycled. Default: 3600.
-        pre_ping: Whether to ping connections before checkout. Default: False.
+        pool_size: Number of connections to keep in the pool. When omitted, the
+            config's ``pool_size`` field is used (loaded from keyword arguments or
+            environment variables); passing a value overrides it. The raw driver
+            paths fall back to 5.
+        max_overflow: Extra connections above pool_size. Config field, or 3.
+        timeout: Seconds to wait for a connection before raising. Config field, or 30.
+        recycle: Seconds before a connection is recycled. Config field, or 3600.
+        pre_ping: Whether to ping connections before checkout. Config field, or False.
 
     Yields:
         A configured ``sqlalchemy.pool.QueuePool``. The pool is automatically

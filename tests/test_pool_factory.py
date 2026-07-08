@@ -69,6 +69,52 @@ class TestCreatePoolDuckDB:
             pool._adbc_source.close()  # type: ignore[attr-defined]
 
 
+class TestConfigPoolTuning:
+    """Config tuning fields are forwarded to the pool (precedence: kwarg > config > default)."""
+
+    @staticmethod
+    def _close(pool: sqlalchemy.pool.QueuePool) -> None:
+        pool.dispose()
+        pool._adbc_source.close()  # type: ignore[attr-defined]
+
+    def test_config_pool_size_forwarded(self, tmp_path: Path) -> None:
+        """A config's pool_size/max_overflow reach the pool without an explicit kwarg."""
+        cfg = DuckDBConfig(database=str(tmp_path / "t.db"), pool_size=10, max_overflow=7)
+        pool = create_pool(cfg)
+        try:
+            assert pool.size() == 10
+            assert pool._max_overflow == 7
+        finally:
+            self._close(pool)
+
+    def test_explicit_kwarg_overrides_config(self, tmp_path: Path) -> None:
+        """An explicit create_pool kwarg wins over the config field."""
+        cfg = DuckDBConfig(database=str(tmp_path / "t.db"), pool_size=10)
+        pool = create_pool(cfg, pool_size=2)
+        try:
+            assert pool.size() == 2
+        finally:
+            self._close(pool)
+
+    def test_env_var_pool_size_forwarded(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A pool_size loaded from the environment reaches the pool."""
+        monkeypatch.setenv("DUCKDB_DATABASE", str(tmp_path / "env.db"))
+        monkeypatch.setenv("DUCKDB_POOL_SIZE", "8")
+        pool = create_pool(DuckDBConfig())
+        try:
+            assert pool.size() == 8
+        finally:
+            self._close(pool)
+
+    def test_managed_pool_forwards_config_tuning(self, tmp_path: Path) -> None:
+        """managed_pool honors config tuning the same way as create_pool."""
+        cfg = DuckDBConfig(database=str(tmp_path / "t.db"), pool_size=6)
+        with managed_pool(cfg) as pool:
+            assert pool.size() == 6
+
+
 class TestArrowAllocatorCleanup:
     """POOL-04, TEST-07: Arrow allocator cleanup via reset event."""
 

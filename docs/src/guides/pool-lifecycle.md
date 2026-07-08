@@ -108,7 +108,7 @@ Using `scope="session"` creates one pool for the entire test session. If your te
 
 | Argument | Default | Description |
 |---|---|---|
-| `pool_size` | `5` | Connections kept in the pool at all times (DuckDB defaults to `1`) |
+| `pool_size` | `5` | Connections kept in the pool at all times (DuckDB and SQLite default to `1` in-memory, `5` file-backed) |
 | `max_overflow` | `3` | Extra connections allowed above `pool_size` when demand is high |
 | `timeout` | `30` | Seconds to wait for a connection before raising `sqlalchemy.exc.TimeoutError` |
 | `recycle` | `3600` | Seconds before a connection is closed and replaced |

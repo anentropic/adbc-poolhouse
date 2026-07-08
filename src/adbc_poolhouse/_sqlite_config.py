@@ -26,8 +26,8 @@ class SQLiteConfig(BaseWarehouseConfig):
 
     Example:
         ```python
-        SQLiteConfig(database="/data/warehouse.db", pool_size=5)
-        SQLiteConfig()  # in-memory, pool_size=1 enforced
+        SQLiteConfig(database="/data/warehouse.db")  # file-backed, pool_size defaults to 5
+        SQLiteConfig()  # in-memory, pool_size defaults to 1
         ```
     """
 
@@ -37,14 +37,15 @@ class SQLiteConfig(BaseWarehouseConfig):
     """File path or ':memory:'. Env: SQLITE_DATABASE."""
 
     pool_size: int = 1
-    """Number of connections in the pool. Default 1 for in-memory SQLite.
+    """Number of connections in the pool. Defaults to 5 for a file-backed
+    database and 1 for in-memory.
 
     SQLite in-memory databases are shared across all connections in the
     pool — unlike DuckDB, where each connection gets its own isolated
-    empty DB. Use pool_size=1 for ':memory:', or set database to a file
-    path if you need pool_size > 1. Setting pool_size > 1 with
-    database=':memory:' raises ValidationError.
-    Env: SQLITE_POOL_SIZE.
+    empty DB — and pool_size > 1 races connection state on that single shared
+    DB, so ':memory:' pins the default to 1. A file-backed database defaults to
+    5 like the other backends. Setting pool_size > 1 with database=':memory:'
+    raises ValidationError. Env: SQLITE_POOL_SIZE.
     """
 
     @field_validator("pool_size")
@@ -106,6 +107,20 @@ class SQLiteConfig(BaseWarehouseConfig):
             (or ``':memory:'``).
         """
         return {"uri": self.database}
+
+    @model_validator(mode="after")
+    def default_pool_size_for_file(self) -> Self:
+        """
+        Raise the pool_size default to 5 for a file-backed database.
+
+        The field default is 1, the only safe value for a shared in-memory
+        database. When the database is a file and the caller did not set
+        pool_size explicitly (via keyword or environment), bump it to 5 to match
+        the other backends.
+        """
+        if "pool_size" not in self.model_fields_set and self.database != ":memory:":
+            self.pool_size = 5
+        return self
 
     @model_validator(mode="after")
     def check_memory_pool_size(self) -> Self:

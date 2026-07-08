@@ -45,13 +45,13 @@ All config classes inherit pool tuning fields from [`BaseWarehouseConfig`][adbc_
 
 | Field | Default | Description |
 |---|---|---|
-| `pool_size` | `5` | Number of connections to keep open (DuckDB defaults to `1`) |
+| `pool_size` | `5` | Number of connections to keep open (DuckDB and SQLite default to `1` for in-memory databases, `5` for file-backed) |
 | `max_overflow` | `3` | Extra connections allowed when pool is full |
 | `timeout` | `30` | Seconds to wait for a connection before raising `sqlalchemy.exc.TimeoutError` |
 | `recycle` | `3600` | Seconds before a connection is closed and replaced |
 | `pre_ping` | `False` | Ping connections before checkout. Disabled by default. It does not function on standalone `QueuePool` without a SQLAlchemy dialect; use `recycle` for connection health. |
 
-To override pool size via environment variable:
+[`create_pool`][adbc_poolhouse.create_pool] reads these fields off the config, so setting them on the config (or via its environment prefix) tunes the pool. A tuning keyword passed directly to `create_pool` overrides the config's field. To override pool size via environment variable:
 
 ```bash
 export SNOWFLAKE_POOL_SIZE=10

@@ -19,7 +19,7 @@ import contextlib
 from typing import TYPE_CHECKING, overload
 
 from adbc_poolhouse._async._pool import AsyncPool
-from adbc_poolhouse._pool_factory import _create_pool_impl
+from adbc_poolhouse._pool_factory import _create_pool_impl, _resolve_tuning
 
 if TYPE_CHECKING:
     import collections.abc
@@ -73,11 +73,11 @@ def create_async_pool(
     db_kwargs: dict[str, str] | None = None,
     entrypoint: str | None = None,
     dbapi_module: str | None = None,
-    pool_size: int = 5,
-    max_overflow: int = 3,
-    timeout: int = 30,
-    recycle: int = 3600,
-    pre_ping: bool = False,
+    pool_size: int | None = None,
+    max_overflow: int | None = None,
+    timeout: int | None = None,
+    recycle: int | None = None,
+    pre_ping: bool | None = None,
 ) -> AsyncPool:
     """
     Create an `AsyncPool` backed by an ADBC driver.
@@ -141,19 +141,22 @@ def create_async_pool(
         anyio.run(main)
         ```
     """
+    r_pool_size, r_max_overflow, r_timeout, r_recycle, r_pre_ping = _resolve_tuning(
+        config, pool_size, max_overflow, timeout, recycle, pre_ping
+    )
     sync_pool = _create_pool_impl(
         config,
         driver_path,
         db_kwargs,
         entrypoint,
         dbapi_module,
-        pool_size,
-        max_overflow,
-        timeout,
-        recycle,
-        pre_ping,
+        r_pool_size,
+        r_max_overflow,
+        r_timeout,
+        r_recycle,
+        r_pre_ping,
     )
-    return AsyncPool(sync_pool, pool_size=pool_size, max_overflow=max_overflow)
+    return AsyncPool(sync_pool, pool_size=r_pool_size, max_overflow=r_max_overflow)
 
 
 async def close_async_pool(pool: AsyncPool) -> None:
@@ -226,11 +229,11 @@ async def managed_async_pool(
     db_kwargs: dict[str, str] | None = None,
     entrypoint: str | None = None,
     dbapi_module: str | None = None,
-    pool_size: int = 5,
-    max_overflow: int = 3,
-    timeout: int = 30,
-    recycle: int = 3600,
-    pre_ping: bool = False,
+    pool_size: int | None = None,
+    max_overflow: int | None = None,
+    timeout: int | None = None,
+    recycle: int | None = None,
+    pre_ping: bool | None = None,
 ) -> collections.abc.AsyncGenerator[AsyncPool, None]:
     """
     Async context manager that creates an `AsyncPool` and closes it on exit.
@@ -283,19 +286,22 @@ async def managed_async_pool(
                 await cur.execute("SELECT 42")
         ```
     """
+    r_pool_size, r_max_overflow, r_timeout, r_recycle, r_pre_ping = _resolve_tuning(
+        config, pool_size, max_overflow, timeout, recycle, pre_ping
+    )
     sync_pool = _create_pool_impl(
         config,
         driver_path,
         db_kwargs,
         entrypoint,
         dbapi_module,
-        pool_size,
-        max_overflow,
-        timeout,
-        recycle,
-        pre_ping,
+        r_pool_size,
+        r_max_overflow,
+        r_timeout,
+        r_recycle,
+        r_pre_ping,
     )
-    pool = AsyncPool(sync_pool, pool_size=pool_size, max_overflow=max_overflow)
+    pool = AsyncPool(sync_pool, pool_size=r_pool_size, max_overflow=r_max_overflow)
     try:
         yield pool
     finally:
