@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.6.2] - 2026-08-02
+
+### Fixed
+
+- Cancelling an in-flight async query no longer risks hanging the cancelling task forever. The cancellation path fired the driver's `adbc_cancel` and then immediately invalidated the connection, which closes it — without waiting for the aborted worker thread to come back out of the driver call. Closing a connection while a thread is still inside a call on it is the concurrent access ADBC forbids, and DuckDB deadlocked on it, wedging that worker permanently. Because the offload is deliberately non-abandoning, the awaiting task could then never complete: an enclosing `move_on_after` could not rescue it, so a client disconnect during a query hung that request task and leaked a thread plus a connection. The poison-recovery now waits for the aborted worker to return before it drops the connection.
+
+  Affects `AsyncCursor.execute`, `executemany`, the `fetch_*` methods, `adbc_ingest`, `adbc_execute_partitions`, `adbc_read_partition`, and streaming pulls on `AsyncRecordBatchReader` — every path that invalidates on abort. The non-poisoning paths (`adbc_prepare`, `adbc_execute_schema`, metadata readers) never invalidated and were never affected. No API change.
+
 ## [1.6.1] - 2026-07-08
 
 ### Added

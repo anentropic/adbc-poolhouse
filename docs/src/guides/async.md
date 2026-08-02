@@ -530,7 +530,16 @@ it cooperatively. It calls the driver's thread-safe `adbc_cancel` to unblock the
 worker, joins that worker, then drops the now-poisoned connection from the pool
 with [`AsyncConnection.invalidate`][adbc_poolhouse._async._connection.AsyncConnection.invalidate] rather than returning it. The
 connection count stays correct, so the pool's checked-out count never includes a
-connection that the pool has already reclaimed. Your task sees its own exception and nothing
+connection that the pool has already reclaimed.
+
+That order is load-bearing. Dropping the connection is a close, and closing one
+while its worker thread is still inside a driver call is the concurrent access ADBC
+forbids; DuckDB deadlocks on it and wedges the thread for good. So the recovery
+waits for the aborted worker to come back out of the driver before it touches the
+connection. A cancelled call always returns to you, however long the driver takes
+to acknowledge the abort.
+
+Your task sees its own exception and nothing
 from the driver: `fail_after` raises `TimeoutError`, `move_on_after` returns
 quietly, and an explicit `scope.cancel()` surfaces no value at all. The same
 cleanup runs underneath each of them.

@@ -14,6 +14,12 @@ blocking call through the [`offload`][adbc_poolhouse._async._offload.offload]
 chokepoint). The worker stays `abandon_on_cancel=False`, so it is always joined
 rather than abandoned in an unknown state.
 
+Firing the abort is only half of it: the poison-recovery that follows CLOSES the
+connection, so it must not run until the aborted worker has actually left the
+driver call (D-25-09). Two threads touching one ADBC connection is what the spec
+forbids, and DuckDB deadlocks on it outright --- the watcher therefore waits on the
+worker's `done` event before recovering.
+
 The literal `anyio.to_thread.run_sync` chokepoint stays in `_offload.py`: this
 module calls `offload`, never `to_thread.run_sync` directly, so the
 `scan_async_package` source guard still audits the offload discipline in exactly
@@ -76,8 +82,27 @@ async def cancellable_offload(
     abort cannot abort the abort --- `adbc_cancel` fires exactly once, D-25-07) and
     sets `aborted_by_us` immediately, so the worker's resulting error is recognised
     as OUR interrupt by that flag alone (D-25-02), never by sniffing its type or
-    message. Still shielded, it then awaits `on_abort()` if supplied (the
-    connection's poison-recovery). If `on_abort` itself raises (WR-02) its exception
+    message. Still shielded, it then waits for the aborted worker to LEAVE the driver
+    call --- the same `done` event the worker sets in its `finally` --- and only then
+    awaits `on_abort()` if supplied (the connection's poison-recovery).
+
+    That ordering is load-bearing (D-25-09). `on_abort` is typically
+    `AsyncConnection.invalidate`, which closes the connection, and closing a
+    connection whose worker thread is still unwinding out of the C call is the
+    concurrent single-connection access ADBC forbids: DuckDB deadlocks on it and
+    wedges the worker permanently, which --- with `offload` running
+    `abandon_on_cancel=False` --- hangs the awaiting task forever, beyond the reach of
+    any enclosing `move_on_after`. Waiting first introduces no new hang class,
+    because that same `abandon_on_cancel=False` means the task group could not exit
+    without joining the worker regardless; the wait only moves the join earlier, ahead
+    of the close instead of after it. It is the two-thread-on-one-connection hazard
+    CR-34-01 fixed for the no-op-cancel metadata reader, one step further in: there
+    the worker could not be aborted at all, here it can, but the abort takes non-zero
+    time and the recovery has to wait it out. A stub worker that returns the instant
+    `adbc_cancel` fires makes the wait a no-op, which is exactly why the stub-driven
+    cancel suites never saw the race.
+
+    If `on_abort` itself raises (WR-02) its exception
     is captured in `abort_error` and surfaced *bare* on the cancel branch --- it is
     the actionable failure, raised in place of the expected driver interrupt rather
     than riding out as an opaque multi-member `ExceptionGroup` next to it. The
@@ -98,7 +123,10 @@ async def cancellable_offload(
 
     On the success or error path the worker releases the watcher by setting the
     `Event` in a `finally`, so the watcher exits cleanly without ever entering its
-    `except` branch and `adbc_cancel` is never called.
+    `except` branch and `adbc_cancel` is never called. That same `finally` is what
+    the cancel path waits on before recovering (D-25-09): the worker sets the `Event`
+    once `offload` has returned, which is after it has released its pool token, so a
+    poison-recovery reaching the driver finds the connection genuinely quiescent.
 
     On the **cancel path** the just-aborted worker's blocking call typically
     returns by *raising* the driver's interrupt error (the live DuckDB probe
@@ -141,6 +169,9 @@ async def cancellable_offload(
             genuinely-started call was aborted by `adbc_cancel` --- typically the
             owning connection's `invalidate`. Skipped when the worker never
             started, so a clean (never-poisoned) connection is not invalidated.
+            Run only once the aborted worker has left the driver call (D-25-09), so
+            a recovery that closes the connection never races the worker still
+            unwinding out of it.
 
     Returns:
         Whatever `fn(*args)` returns --- only on the success path. The cancel path
@@ -189,6 +220,19 @@ async def cancellable_offload(
                     # poison-recovery is still attributed to the cancel path.
                     aborted_by_us = True
                     if on_abort is not None:
+                        # D-25-09: let the aborted worker LEAVE the driver call before
+                        # recovering. `on_abort` closes the connection, and closing one
+                        # whose worker thread is still unwinding out of the C call is the
+                        # concurrent single-connection access ADBC forbids --- DuckDB
+                        # deadlocks on it and wedges that worker permanently. The worker
+                        # sets `done` in its `finally`, so this wait ends exactly when it
+                        # is out. It adds no new hang class: `offload` runs
+                        # `abandon_on_cancel=False`, so the task group below cannot exit
+                        # without joining that same worker anyway --- the wait only moves
+                        # the join earlier, ahead of the close instead of after it. Kept
+                        # OUTSIDE the `try` so only an `on_abort` failure lands in
+                        # `abort_error` (WR-02); the shield makes this wait uncancellable.
+                        await done.wait()
                         try:
                             await on_abort()  # poison recovery (D-25-03), shielded
                         except BaseException as exc:  # noqa: BLE001
