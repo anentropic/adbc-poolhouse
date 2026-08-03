@@ -212,6 +212,11 @@ async def cancellable_offload(
     result: dict[str, _T] = {}
     worker_started = False
     aborted_by_us = False
+    # Set when the cancellation arrived too late to abort anything (D-25-10). It routes
+    # the unwind down the SAME cancel branch as `aborted_by_us` --- a cancelled call
+    # surfaces the cancellation, never the worker's error --- without having fired
+    # `adbc_cancel` or the poison-recovery.
+    cancelled_late = False
     # A holder (the same idiom as `result`) so a failed poison-recovery survives the
     # `_watcher` closure without a captured Optional --- mutated, never rebound.
     abort_error: dict[str, BaseException] = {}
@@ -227,7 +232,7 @@ async def cancellable_offload(
         worker_started = True
 
     async def _watcher() -> None:
-        nonlocal aborted_by_us, abort_error
+        nonlocal aborted_by_us, abort_error, cancelled_late
         try:
             await done.wait()  # event-driven park, NOT a poll
         except get_cancelled_exc_class():
@@ -269,6 +274,15 @@ async def cancellable_offload(
                             # instead of letting it ride out as an opaque, multi-member
                             # `ExceptionGroup` next to our own expected interrupt.
                             abort_error["exc"] = exc
+            elif worker_started:
+                # Too late to abort: the worker is already out (D-25-10). Nothing is
+                # fired and nothing is recovered, but the call was still cancelled, so
+                # flag it to unwind down the cancel branch below rather than the
+                # ordinary worker-error path. Otherwise a worker that failed in this
+                # same turn would surface its driver error --- or, under trio, a
+                # two-member `ExceptionGroup` of that error next to the cancellation ---
+                # where every other cancelled call raises the cancellation alone.
+                cancelled_late = True
             raise  # never swallow the cancellation (D-25-06)
 
     async def _worker() -> None:
@@ -287,12 +301,15 @@ async def cancellable_offload(
             tg.start_soon(_watcher)
             tg.start_soon(_worker)
     except BaseExceptionGroup as eg:
-        if aborted_by_us:
-            # CANCEL path: OUR `adbc_cancel` aborted the worker, which returned by
-            # raising the driver's interrupt (e.g. DuckDB's
-            # `ProgrammingError("...Interrupted!")`). That error is the expected
-            # side-effect of our abort, identified by the flag (D-25-02 --- never by
-            # sniffing the type/message).
+        if aborted_by_us or cancelled_late:
+            # CANCEL path, entered on either flag (never by sniffing the error's
+            # type/message, D-25-02). With `aborted_by_us`, OUR `adbc_cancel` aborted the
+            # worker and it returned by raising the driver's interrupt (e.g. DuckDB's
+            # `ProgrammingError("...Interrupted!")`), the expected side-effect of the
+            # abort. With `cancelled_late` the worker was already out and whatever it
+            # carried --- a value or its own error --- belongs to a call the caller has
+            # since cancelled (D-25-10). Both unwind the same way: the cancellation is
+            # what the caller sees.
             if "exc" in abort_error:
                 # The poison-recovery itself failed (WR-02). Surface THAT bare --- it
                 # is the actionable error --- in place of the expected interrupt,
@@ -315,4 +332,10 @@ async def cancellable_offload(
         if len(eg.exceptions) == 1:
             raise eg.exceptions[0] from None
         raise
+    if cancelled_late:
+        # The task group absorbed the cancellation instead of propagating it, so no
+        # group reached the handler above. The call was still cancelled and must not
+        # hand back the value the worker happened to finish with (WR-01/WR-04, D-25-05).
+        await anyio.sleep(0)
+        raise get_cancelled_exc_class() from None
     return result["v"]

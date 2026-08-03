@@ -93,19 +93,31 @@ def _cancel_after_set_event(scope_box: dict[str, anyio.CancelScope]) -> Callable
     return _CancelAfterSetEvent
 
 
+class _DriverError(Exception):
+    """Stand-in for a driver error raised by the worker in the same turn as the cancel."""
+
+
 @pytest.mark.anyio
+@pytest.mark.parametrize("worker_raises", [False, True], ids=["worker-returned", "worker-raised"])
 async def test_cancel_after_worker_finished_does_not_abort(
-    anyio_backend_name: str, monkeypatch: pytest.MonkeyPatch
+    anyio_backend_name: str, monkeypatch: pytest.MonkeyPatch, worker_raises: bool
 ) -> None:
     """
     D-25-10: a cancellation landing after `done` is set fires no abort and no recovery.
 
-    Runs a worker that completes cleanly, then delivers a real cancellation to the
-    watcher at the one moment the event is set but the watcher has not yet resumed.
-    Nothing about that call needs aborting: `adbc_cancel` must not fire and the
-    poison-recovery must not run, or a healthy connection is dropped from the pool.
-    The cancellation itself still propagates --- the caller's scope catches it, and the
-    call does not hand back a value (WR-01/WR-04).
+    Runs a worker that finishes, then delivers a real cancellation to the watcher at the
+    one moment the event is set but the watcher has not yet resumed. Nothing about that
+    call needs aborting: `adbc_cancel` must not fire and the poison-recovery must not
+    run, or a healthy connection is dropped from the pool. The cancellation itself still
+    propagates --- the caller's scope catches it, and the call does not hand back a value
+    (WR-01/WR-04).
+
+    Both worker outcomes are covered, because they unwind differently. When the worker
+    *raised* in that same turn, its error and the cancellation exist at once, and the
+    caller must still see the cancellation alone. Skipping the abort without also
+    routing this case down the cancel branch surfaced the driver error instead under
+    asyncio, and a two-member `ExceptionGroup` of the error next to the cancellation
+    under trio --- the WR-02 group-leak shape, in a new path.
     """
     del anyio_backend_name
     lock = threading.Lock()
@@ -116,6 +128,8 @@ async def test_cancel_after_worker_finished_does_not_abort(
     def fn() -> str:
         with lock:
             state["inside"] += 1
+        if worker_raises:
+            raise _DriverError("driver failed in the same turn as the cancel")
         return "clean result"  # completes normally: never interrupted, never poisoned
 
     def adbc_cancel() -> None:
@@ -128,12 +142,19 @@ async def test_cancel_after_worker_finished_does_not_abort(
 
     limiter = anyio.CapacityLimiter(1)
     monkeypatch.setattr(anyio, "Event", _cancel_after_set_event(scope_box))
+    escaped: dict[str, BaseException] = {}
 
     with anyio.CancelScope() as scope:
         scope_box["scope"] = scope
-        returned["v"] = await cancellable_offload(
-            adbc_cancel, fn, limiter=limiter, on_abort=on_abort
-        )
+        # Capture whatever escapes before the scope absorbs it: the bare/group and
+        # cancellation/driver-error distinctions are exactly what this pins.
+        try:
+            returned["v"] = await cancellable_offload(
+                adbc_cancel, fn, limiter=limiter, on_abort=on_abort
+            )
+        except BaseException as exc:  # noqa: BLE001
+            escaped["exc"] = exc
+            raise
 
     assert state["inside"] == 1, "the worker never ran, so the race was not exercised"
     assert scope.cancelled_caught, "the cancellation did not reach the caller's scope"
@@ -142,3 +163,9 @@ async def test_cancel_after_worker_finished_does_not_abort(
     assert state["aborted"] == 0, "poison-recovery invalidated a connection nothing poisoned"
     # A cancelled call still never hands back a value (WR-01/WR-04).
     assert "v" not in returned
+    # A cancelled call raises the cancellation ALONE --- never the worker's own error,
+    # and never an opaque group carrying both (the regression the parametrization pins).
+    exc = escaped.get("exc")
+    assert isinstance(exc, anyio.get_cancelled_exc_class()), f"expected a cancellation, got {exc!r}"
+    assert not isinstance(exc, BaseExceptionGroup)
+    assert not isinstance(exc, _DriverError)
