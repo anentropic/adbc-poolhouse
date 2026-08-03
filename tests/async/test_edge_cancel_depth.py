@@ -420,15 +420,21 @@ class TestEdgeCancelDepthRealDriver:
         invariant a cancelled in-flight query relies on to leave the pool healthy.
 
         Why this exercises the invalidate path directly rather than racing a live
-        `adbc_cancel`: ADBC's `adbc_cancel` against an in-flight DuckDB query is
-        best-effort (the spec permits a missed cancel) and, in this driver version,
-        intermittently *wedges* the worker thread inside the C `execute` --- a
-        non-deterministic driver-level hang that no test-side gating can prevent and
-        that violates the phase's hard x20-loop / zero-hang gate. The stub `during`
-        leg already proves the cancel -> `adbc_cancel` -> `invalidate` *wiring*
-        deterministically; this leg proves the *real-pool drainage* the wiring
-        targets, deterministically, by driving the same `invalidate()` the cancel
-        path drives. See the SUMMARY deviation note for the wedged-driver evidence.
+        `adbc_cancel`: the stub `during` leg already proves the cancel ->
+        `adbc_cancel` -> `invalidate` *wiring* deterministically, and this leg proves
+        the *real-pool drainage* that wiring targets, equally deterministically, by
+        driving the same `invalidate()` the cancel path drives.
+
+        This docstring used to justify the split differently, claiming that racing a
+        live `adbc_cancel` against DuckDB "intermittently wedges the worker thread
+        inside the C `execute`" and calling that a non-deterministic driver-level hang
+        no test-side gating could prevent. All three parts of that were wrong. The
+        wedge was ours, not the driver's: the watcher closed the connection before the
+        aborted worker had left the call (D-25-09). It was fully deterministic once
+        provoked with a query long enough to still be running. And it was preventable,
+        being a library ordering bug. See
+        `tests/async/test_edge_cancel_live_driver.py`, which races a live
+        `adbc_cancel` on purpose and holds the fix.
         """
         del anyio_backend_name
         conn = await duckdb_async_pool.connect()
