@@ -1,5 +1,7 @@
 # Apache Arrow Flight SQL guide
 
+## Installation
+
 Install the Flight SQL extra:
 
 ```bash
@@ -67,5 +69,5 @@ config = FlightSQLConfig()  # reads from env
 
 ## See also
 
-- [Configuration reference](configuration.md) — env_prefix, pool tuning
+- [Configuration](configuration.md) — env_prefix, pool tuning
 - [Pool lifecycle](pool-lifecycle.md) — close_pool, pytest fixtures

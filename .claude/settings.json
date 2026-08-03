@@ -5,7 +5,11 @@
       "Bash(cargo test:*)",
       "Bash(just test-all)",
       "Bash(just test-sql)",
-      "Bash(just docs-check)"
+      "Bash(just docs-check)",
+      "Bash(.venv/bin/python:*)",
+      "Bash(.venv/bin/mkdocs:*)",
+      "Bash(.venv/bin/pytest:*)",
+      "Bash(.venv/bin/basedpyright:*)"
     ]
   }
 }

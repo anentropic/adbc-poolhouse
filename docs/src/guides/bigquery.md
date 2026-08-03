@@ -1,5 +1,7 @@
 # BigQuery guide
 
+## Installation
+
 Install the BigQuery extra:
 
 ```bash
@@ -29,30 +31,40 @@ pool = create_pool(config)
 
 ### JSON credential file
 
+`auth_credentials` carries the key file path:
+
 ```python
+from adbc_poolhouse import BigQueryConfig
+
 config = BigQueryConfig(
     auth_type="json_credential_file",
-    auth_credentials_path="/keys/service_account.json",
+    auth_credentials="/keys/service_account.json",
     project_id="my-gcp-project",
 )
 ```
 
 ### JSON credential string
 
-Pass the key file contents directly as a string instead of a path:
+`auth_credentials` carries the key file contents directly instead of a path. The same field serves both methods; `auth_type` is what tells the driver how to read it.
 
 ```python
+from pydantic import SecretStr
+from adbc_poolhouse import BigQueryConfig
+
 config = BigQueryConfig(
     auth_type="json_credential_string",
+    auth_credentials=SecretStr('{"type": "service_account", ...}'),
     project_id="my-gcp-project",
 )
 ```
 
-Set `BIGQUERY_AUTH_CREDENTIALS_PATH` or supply the JSON string via your secrets manager before calling [`create_pool`][adbc_poolhouse.create_pool].
+`auth_credentials` is a `SecretStr`, so the JSON is masked in repr output. Rather than embedding the key material in source, set `BIGQUERY_AUTH_CREDENTIALS` or pull the string from your secrets manager before calling [`create_pool`][adbc_poolhouse.create_pool].
 
 ### User authentication (OAuth)
 
 ```python
+from adbc_poolhouse import BigQueryConfig
+
 config = BigQueryConfig(
     auth_type="user_authentication",
     auth_client_id="...",
@@ -77,5 +89,6 @@ config = BigQueryConfig()  # reads from env
 
 ## See also
 
-- [Configuration reference](configuration.md) — env_prefix, pool tuning
+- [Configuration](configuration.md) — env_prefix, pool tuning
+- [Pool lifecycle](pool-lifecycle.md) — close_pool, pytest fixtures
 - [Consumer patterns](consumer-patterns.md) — FastAPI and dbt examples

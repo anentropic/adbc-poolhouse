@@ -1,5 +1,7 @@
 # SQLite guide
 
+## Installation
+
 Install the SQLite extra:
 
 ```bash
@@ -29,7 +31,7 @@ pool = create_pool(config)
 
 ### In-memory
 
-`pool_size` must be `1` for in-memory databases. All connections in the pool share the same in-memory database, unlike DuckDB, where each connection gets its own isolated database. A pool with `pool_size > 1` and `:memory:` raises `ValidationError`.
+`pool_size` defaults to `1` for in-memory databases and cannot be raised. All connections in the pool share the same in-memory database, unlike DuckDB, where each connection gets its own isolated database, so `pool_size > 1` would race connection state on that single database. Combining `pool_size > 1` with `:memory:` raises [`ConfigurationError`][adbc_poolhouse.ConfigurationError] (wrapped as a Pydantic `ValidationError`).
 
 ```python
 config = SQLiteConfig(database=":memory:")
@@ -51,5 +53,5 @@ config = SQLiteConfig()  # reads from env
 
 ## See also
 
-- [Configuration reference](configuration.md) — env_prefix, pool tuning
+- [Configuration](configuration.md) — env_prefix, pool tuning
 - [Pool lifecycle](pool-lifecycle.md) — close_pool, pytest fixtures

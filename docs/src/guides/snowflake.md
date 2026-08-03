@@ -1,5 +1,7 @@
 # Snowflake guide
 
+## Installation
+
 Install the Snowflake extra:
 
 ```bash
@@ -14,7 +16,9 @@ uv add "adbc-poolhouse[snowflake]"
 
 ## Auth methods
 
-[`SnowflakeConfig`][adbc_poolhouse.SnowflakeConfig] supports four auth methods: password, JWT private key, OAuth, and external browser. Set the fields matching your method; unset fields are omitted from the connection.
+[`SnowflakeConfig`][adbc_poolhouse.SnowflakeConfig] supports password auth plus the methods selected by `auth_type`. Leave `auth_type` unset for password auth; otherwise set it to one of `auth_jwt`, `auth_ext_browser`, `auth_oauth`, `auth_mfa`, `auth_okta`, `auth_pat`, or `auth_wif`, and fill in the fields that method needs. Unset fields are omitted from the connection.
+
+The four methods worked through below cover the common cases. The remaining three follow the same shape: set `auth_type` and the credential fields for the method. MFA adds `cache_mfa_token`, Okta adds `okta_url`, and workload identity federation adds `identity_provider`. See the [API Reference](../reference/adbc_poolhouse.md) for the full field list.
 
 ### Password
 
@@ -26,14 +30,16 @@ config = SnowflakeConfig(
     user="me",
     password="s3cret",  # pragma: allowlist secret
     database="MY_DB",
-    schema_="MY_SCHEMA",
+    schema="MY_SCHEMA",
 )
 pool = create_pool(config)
 ```
 
+The `schema` keyword is spelled without a trailing underscore because the field carries `alias="schema"`. Passing `schema_=` is rejected as an unknown field. Reading it back off the config uses the Python attribute name, `config.schema_`.
+
 ### JWT private key
 
-Use either a file path or PEM content, not both. Providing both raises [`ConfigurationError`][adbc_poolhouse.ConfigurationError].
+Use either a file path or PEM content, not both. Providing both fails validation, so `SnowflakeConfig(...)` raises `pydantic.ValidationError`. See [Error handling](configuration.md#error-handling) for what to catch around config construction.
 
 ```python
 from pathlib import Path
@@ -43,6 +49,7 @@ from adbc_poolhouse import SnowflakeConfig
 config = SnowflakeConfig(
     account="myorg-myaccount",
     user="me",
+    auth_type="auth_jwt",
     private_key_path=Path("/keys/rsa.p8"),
 )
 ```
@@ -55,6 +62,7 @@ from adbc_poolhouse import SnowflakeConfig
 config = SnowflakeConfig(
     account="myorg-myaccount",
     user="me",
+    auth_type="auth_jwt",
     private_key_pem=SecretStr("-----BEGIN PRIVATE KEY-----\n..."),
 )
 ```
@@ -63,12 +71,17 @@ config = SnowflakeConfig(
 
 ### OAuth
 
+The bearer token goes in `oauth_token`, which is a `SecretStr`:
+
 ```python
+from pydantic import SecretStr
+from adbc_poolhouse import SnowflakeConfig
+
 config = SnowflakeConfig(
     account="myorg-myaccount",
     user="me",
-    token="eyJ...",
-    authenticator="oauth",
+    auth_type="auth_oauth",
+    oauth_token=SecretStr("eyJ..."),
 )
 ```
 
@@ -77,10 +90,12 @@ config = SnowflakeConfig(
 For interactive SSO logins. Not suitable for headless or CI environments.
 
 ```python
+from adbc_poolhouse import SnowflakeConfig
+
 config = SnowflakeConfig(
     account="myorg-myaccount",
     user="me",
-    authenticator="externalbrowser",
+    auth_type="auth_ext_browser",
 )
 ```
 
@@ -101,5 +116,6 @@ config = SnowflakeConfig()  # reads from env
 
 ## See also
 
-- [Configuration reference](configuration.md) — env_prefix, pool tuning, secret fields
+- [Configuration](configuration.md) — env_prefix, pool tuning, secret fields
+- [Pool lifecycle](pool-lifecycle.md) — close_pool, pytest fixtures
 - [Consumer patterns](consumer-patterns.md) — dbt profile integration

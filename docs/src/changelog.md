@@ -4,6 +4,30 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.6.2] - 2026-08-02
+
+### Fixed
+
+- Cancelling an in-flight async query no longer risks hanging the cancelling task forever. The cancellation path fired the driver's `adbc_cancel` and then immediately invalidated the connection, which closes it — without waiting for the aborted worker thread to come back out of the driver call. Closing a connection while a thread is still inside a call on it is the concurrent access ADBC forbids, and DuckDB deadlocked on it, wedging that worker permanently. Because the offload is deliberately non-abandoning, the awaiting task could then never complete: an enclosing `move_on_after` could not rescue it, so a client disconnect during a query hung that request task and leaked a thread plus a connection. The poison-recovery now waits for the aborted worker to return before it drops the connection.
+
+  Affects `AsyncCursor.execute`, `executemany`, the `fetch_*` methods, `adbc_ingest`, `adbc_execute_partitions`, `adbc_read_partition`, and streaming pulls on `AsyncRecordBatchReader` — every path that invalidates on abort. The non-poisoning paths (`adbc_prepare`, `adbc_execute_schema`, metadata readers) never invalidated and were never affected. No API change.
+
+- A cancellation that arrived just after its query finished no longer evicts a healthy connection. The watcher could not distinguish "the worker is still in the driver" from "the worker just finished", so it fired `adbc_cancel` at a completed statement and ran the poison-recovery on a connection nothing had poisoned, dropping it from the pool. It now checks whether the worker is already out and leaves a finished call alone. The cancellation still propagates as before, so the only visible change is that the pool keeps a connection it used to discard.
+
+### Documentation
+
+The guides were audited against a live database, and the corrections below are behavioural rather than editorial. If you followed any of these, your code was affected.
+
+- `pre_ping` was documented as an inert no-op on the standalone `QueuePool`. It is not inert: `pre_ping=True` raises `NotImplementedError` on the first re-checkout of a pooled connection. The first checkout succeeds, so this passes a smoke test and fails on the second request. Leave it at its `False` default and use `recycle`.
+- Nothing said that pooled ADBC connections are not in autocommit mode. A write you never commit is rolled back when the connection checks in, silently and with the driver's row count already reported back to you. The async bulk-ingest example claimed "6 total" rows and then lost them. A new [Committing writes](guides/pool-lifecycle.md#committing-writes) section covers what to call and when.
+- The SQLAlchemy ORM pattern has been removed rather than fixed. `creator=pool.connect` cannot work with any dialect, because a dialect is written against one specific DBAPI and calls that driver's own extras on every connection. It is replaced by a working FastAPI lifespan example and an explanation of the limitation.
+- `adbc_execute_schema` was said to raise `NotSupportedError` on DuckDB. DuckDB implements it and returns a schema.
+- Several config fields were named wrongly: `SnowflakeConfig` has `oauth_token` and `auth_type` (not `token` / `authenticator`), `BigQueryConfig` has `auth_credentials` (not `auth_credentials_path`), and the Snowflake schema keyword is `schema`, which its own alias requires — `schema_=` is rejected. `MySQLConfig.database` was documented as optional and is required.
+- The raw `driver_path` example raised `ImportError`. A driver installed from PyPI ships no ADBC manifest, so a short name does not resolve to it; pass the package's own path helper, such as `adbc_driver_duckdb.driver_path()`.
+- Config validation errors surface as Pydantic's `ValidationError`, not as `ConfigurationError` or `PoolhouseError`, because the validators run inside Pydantic. `except PoolhouseError` never fired there. Corrected across the ClickHouse, MySQL, Databricks and Databricks Python guides.
+
+New coverage: async pool saturation and limiter sizing, choosing a `recycle` value against a warehouse idle timeout, FastAPI lifespan examples for both pools, a warning against calling the sync pool from an `async def` handler, and a note that non-ADBC connectors are not a supported extension point.
+
 ## [1.6.1] - 2026-07-08
 
 ### Added

@@ -1,5 +1,7 @@
 # ClickHouse guide
 
+## Installation
+
 The ClickHouse ADBC driver is distributed via the ADBC Driver Foundry, not PyPI.
 Follow the [Foundry installation guide](https://arrow.apache.org/adbc/current/driver/installation.html) to install it before using [`ClickHouseConfig`][adbc_poolhouse.ClickHouseConfig].
 
@@ -9,7 +11,7 @@ The driver is currently in alpha. Use the `--pre` flag when installing:
 dbc install --pre clickhouse
 ```
 
-`adbc-poolhouse` does not need a separate extra for ClickHouse:
+adbc-poolhouse does not need a separate extra for ClickHouse:
 
 ```bash
 pip install adbc-poolhouse
@@ -21,7 +23,7 @@ pip install adbc-poolhouse
 ways: a full URI or individual fields (`host` and `username` together, with optional
 `password`, `database`, and `port`).
 
-Construction raises [`ConfigurationError`][adbc_poolhouse.ConfigurationError] if neither mode is fully specified.
+Construction raises [`ConfigurationError`][adbc_poolhouse.ConfigurationError] (wrapped as a Pydantic `ValidationError`) if neither mode is fully specified.
 
 ### URI mode
 
@@ -73,5 +75,5 @@ pool = create_pool(config)
 
 ## See also
 
-- [Configuration reference](configuration.md) — env_prefix, pool tuning
+- [Configuration](configuration.md) — env_prefix, pool tuning
 - [Pool lifecycle](pool-lifecycle.md) — close_pool, pytest fixtures

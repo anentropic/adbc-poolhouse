@@ -1,6 +1,6 @@
 # Pool lifecycle
 
-[`create_pool`][adbc_poolhouse.create_pool] returns a SQLAlchemy `QueuePool`. Internally it holds one ADBC source connection plus a pool of cloned connections derived from it.
+[`create_pool`][adbc_poolhouse.create_pool] returns a SQLAlchemy `QueuePool`. On the ADBC path it holds one ADBC source connection plus a pool of cloned connections derived from it. [`DatabricksPythonConfig`][adbc_poolhouse.DatabricksPythonConfig] is the exception: it opens an independent Databricks Python connector session per pooled connection, with no shared source behind them.
 
 ## Create a pool
 
@@ -12,7 +12,8 @@ from adbc_poolhouse import DuckDBConfig, create_pool
 pool = create_pool(DuckDBConfig(database="/tmp/warehouse.db"))
 ```
 
-adbc-poolhouse ships config classes for 14 backends:
+adbc-poolhouse ships config classes for 14 backends, 13 ADBC drivers plus the
+non-ADBC Databricks Python connector:
 [`BigQueryConfig`][adbc_poolhouse.BigQueryConfig],
 [`ClickHouseConfig`][adbc_poolhouse.ClickHouseConfig],
 [`DatabricksConfig`][adbc_poolhouse.DatabricksConfig],
@@ -48,9 +49,46 @@ Do not hold a connection outside a `with` block. Connections held past the `with
 
 `QueuePool` is thread-safe, so one pool can serve many concurrent workers: call `pool.connect()` from each request handler or worker thread and every checkout returns a distinct connection. Keep to one connection per thread. A checked-out connection should be used by a single thread at a time, never shared across concurrent tasks. The pool hands out at most `pool_size + max_overflow` connections at once; when they are all checked out, the next `pool.connect()` waits up to `timeout` seconds and then raises `sqlalchemy.exc.TimeoutError`. Size the pool against the connections you expect to be in use at the same time (see [Sizing under load](configuration.md#sizing-under-load)).
 
+!!! warning "This pool is synchronous"
+
+    `pool.connect()` and every driver call made through it block the calling thread. In an `async def` handler that stalls the event loop for the length of the query, and with it every other request the process is serving. Either declare the handler as a plain `def` so your framework runs it in a threadpool, or use the async pool. [Consumer patterns](consumer-patterns.md#do-not-call-the-sync-pool-from-an-async-def-handler) shows both.
+
+## Committing writes
+
+ADBC DBAPI connections are not in autocommit mode. Anything you write, whether that is a `CREATE TABLE`, an `INSERT`, or an `adbc_ingest`, sits in an open transaction until you commit it. Returning the connection to the pool does not commit that transaction: check-in calls `rollback()` on the connection, so uncommitted work is discarded. No exception is raised, and the row count the driver reported for the write is still whatever it was. The data is simply gone the next time you look.
+
+Call `conn.commit()` before the `with` block exits:
+
+```python
+from adbc_poolhouse import DuckDBConfig, managed_pool
+
+with managed_pool(DuckDBConfig(database="/tmp/warehouse.db")) as pool:
+    with pool.connect() as conn:
+        cursor = conn.cursor()
+        cursor.execute("CREATE TABLE IF NOT EXISTS events (id INTEGER)")
+        cursor.execute("INSERT INTO events VALUES (1)")
+        conn.commit()  # without this, both statements are rolled back at check-in
+```
+
+The async surface behaves identically, with `await` in front:
+
+```python
+from adbc_poolhouse import DuckDBConfig, managed_async_pool
+
+async with managed_async_pool(DuckDBConfig(database="/tmp/warehouse.db")) as pool:
+    async with await pool.connect() as conn:
+        async with conn.cursor() as cur:
+            await cur.execute("INSERT INTO events VALUES (2)")
+        await conn.commit()
+```
+
+Two consequences are worth planning for. Until you commit, the write is invisible to every other connection in the pool, including connections your own process checked out for a different request. And a connection the pool invalidates part-way through, which is what happens when an in-flight async write is cancelled, takes its open transaction down with it, so on a transactional driver the write never lands. `conn.rollback()` is available when you want to abandon the work deliberately rather than leave it to check-in.
+
+Reads need no commit. If a handler only runs `SELECT` statements, checking the connection back in is enough.
+
 ## Closing the pool
 
-A pool holds a real ADBC source connection, a file handle or network socket, so it must be closed when you are done with it. There are two ways to close a pool, and which one fits depends on whether the pool's lifetime maps cleanly onto a single block of code.
+A pool holds real driver resources, a file handle or a network socket, so it must be closed when you are done with it. There are two ways to close a pool, and which one fits depends on whether the pool's lifetime maps cleanly onto a single block of code.
 
 ### Explicit close, for lifetimes that span your app
 
@@ -62,9 +100,11 @@ from adbc_poolhouse import close_pool
 close_pool(pool)
 ```
 
-`close_pool` drains the pool, closes each pooled connection, and releases the ADBC source connection in one call. Calling `pool.dispose()` alone leaves a file handle or network socket open until the process exits.
+`close_pool` drains the pool and closes each pooled connection, and on the ADBC path it also releases the shared source connection, all in one call. Calling `pool.dispose()` alone leaves a file handle or network socket open until the process exits.
 
-In practice you wire this into your framework's startup and shutdown hooks: create the pool when the app boots and call `close_pool` when it shuts down. See [Consumer patterns](consumer-patterns.md) for a FastAPI lifespan example that does exactly this.
+What it does not do is wait. Connections that are still checked out when you call it are neither closed nor waited for, and the source connection closes immediately regardless. Call it once the work using the pool has finished, not alongside it.
+
+In practice you wire this into your framework's startup and shutdown hooks: create the pool when the app boots and call `close_pool` when it shuts down. [Consumer patterns](consumer-patterns.md#the-sync-pool-in-a-fastapi-lifespan) has a FastAPI lifespan that does exactly this.
 
 ### Context manager, for lifetimes that fit a scope
 
@@ -80,7 +120,7 @@ with managed_pool(DuckDBConfig(database="/tmp/test.db")) as pool:
 # pool is automatically closed when the with block exits
 ```
 
-Not every use case suits a context manager; a pool tied to your app's lifetime does not. But for the cases that do fit a scope, `managed_pool` is the preferred option: it guarantees `close_pool` runs on exit, including when the block raises, so you cannot leak the source connection by forgetting to close it or by hitting an early return.
+More lifetimes fit inside a scope than you might expect. A framework's lifespan hook is itself a block, so a pool that lives as long as the whole application can still be wrapped: [Consumer patterns](consumer-patterns.md#fastapi-lifespan-with-the-async-pool) does exactly that with [`managed_async_pool`][adbc_poolhouse.managed_async_pool]. Wherever a scope does fit, it is the preferred option: `managed_pool` guarantees `close_pool` runs on exit, including when the block raises, so you cannot leak the source connection by forgetting to close it or by hitting an early return.
 
 ## Pytest fixture pattern
 
@@ -88,15 +128,13 @@ For test suites, create the pool once per session and dispose it in the fixture 
 
 ```python
 import pytest
-from adbc_poolhouse import DuckDBConfig, create_pool
+from adbc_poolhouse import DuckDBConfig, close_pool, create_pool
 
 
 @pytest.fixture(scope="session")
 def pool():
     p = create_pool(DuckDBConfig(database="/tmp/test.db"))
     yield p
-    from adbc_poolhouse import close_pool
-
     close_pool(p)
 ```
 
@@ -104,21 +142,15 @@ Using `scope="session"` creates one pool for the entire test session. If your te
 
 ## Tuning the pool
 
-`create_pool` (and `managed_pool`) accept keyword arguments to tune pool behaviour. The defaults are conservative and appropriate for most use cases:
+`create_pool` (and `managed_pool`) accept five keyword arguments that tune pool behaviour: `pool_size`, `max_overflow`, `timeout`, `recycle`, and `pre_ping`. The defaults are conservative and appropriate for most use cases. [Pool tuning](configuration.md#pool-tuning) in the configuration guide is the single description of what each one does, its default, and how it loads from an environment variable.
 
-| Argument | Default | Description |
-|---|---|---|
-| `pool_size` | `5` | Connections kept in the pool at all times (DuckDB and SQLite default to `1` in-memory, `5` file-backed) |
-| `max_overflow` | `3` | Extra connections allowed above `pool_size` when demand is high |
-| `timeout` | `30` | Seconds to wait for a connection before raising `sqlalchemy.exc.TimeoutError` |
-| `recycle` | `3600` | Seconds before a connection is closed and replaced |
-| `pre_ping` | `False` | Ping connections before checkout (disabled: does not function on standalone `QueuePool` without a SQLAlchemy dialect; use `recycle` instead) |
-
-Pass any of these to `create_pool`:
+A keyword passed here overrides whatever the config carries:
 
 ```python
 pool = create_pool(config, pool_size=10, recycle=7200)
 ```
+
+Two of the five shape how the pool behaves in a long-running process. `pool_size` plus `max_overflow` is the checkout ceiling described above, so it decides when callers start waiting on `timeout`. And `recycle` is what stops a long-lived connection going stale, because `pre_ping` cannot run on the standalone `QueuePool` this library builds: setting `pre_ping=True` raises `NotImplementedError` on the first re-checkout of a pooled connection. [Keeping connections healthy with recycle](configuration.md#keeping-connections-healthy-with-recycle) covers how to pick a `recycle` value.
 
 ## Common mistakes
 
@@ -128,7 +160,7 @@ pool = create_pool(config, pool_size=10, recycle=7200)
 
 **Using `database=":memory:"` with `pool_size > 1`**
 
-Each DuckDB connection cloned from an in-memory source gets its own isolated empty database. `DuckDBConfig` raises `ValidationError` at construction if you pass `pool_size > 1` with an in-memory database, which prevents this silent data-loss bug. Use a file-backed database when you need multiple connections.
+Each DuckDB connection cloned from an in-memory source gets its own isolated empty database. [`DuckDBConfig`][adbc_poolhouse.DuckDBConfig] raises [`ConfigurationError`][adbc_poolhouse.ConfigurationError] at construction (wrapped by Pydantic as a `ValidationError`) if you pass `pool_size > 1` with an in-memory database, which prevents this silent data-loss bug. Use a file-backed database when you need multiple connections.
 
 **Holding connections outside the `with` block**
 
@@ -141,13 +173,22 @@ cursor = conn.cursor()
 cursor.execute("SELECT 1")
 ```
 
-The pool will exhaust its connections and subsequent `pool.connect()` calls will block until the timeout.
+The pool will exhaust its connections and subsequent `pool.connect()` calls will block until the timeout and then raise `sqlalchemy.exc.TimeoutError`.
+
+**Writing without committing**
+
+A write that is never committed is rolled back when the connection checks in, and nothing tells you so. See [Committing writes](#committing-writes).
 
 ## Catching errors
 
-adbc-poolhouse's own exceptions both subclass [`PoolhouseError`][adbc_poolhouse.PoolhouseError]: [`ConfigurationError`][adbc_poolhouse.ConfigurationError] for invalid configuration and [`ConnectionBusyError`][adbc_poolhouse.ConnectionBusyError] for concurrent use of one async connection. Catch `PoolhouseError` to handle any library-specific error in one place. A saturated-pool checkout instead raises `sqlalchemy.exc.TimeoutError`, SQLAlchemy's own class, which does not subclass the builtin `TimeoutError`, so catch it separately from this hierarchy.
+adbc-poolhouse's own exceptions both subclass [`PoolhouseError`][adbc_poolhouse.PoolhouseError]: [`ConfigurationError`][adbc_poolhouse.ConfigurationError] for invalid configuration and [`ConnectionBusyError`][adbc_poolhouse.ConnectionBusyError] for concurrent use of one async connection. `except PoolhouseError` catches `ConnectionBusyError` at runtime.
+
+It does not catch a configuration failure. Config validation runs inside Pydantic validators, so building a config surfaces `pydantic.ValidationError`, which sits outside this hierarchy however the validator failed. Guard config construction with `except pydantic.ValidationError` and the runtime paths with `except PoolhouseError`.
+
+A saturated-pool checkout raises something else again: `sqlalchemy.exc.TimeoutError`, SQLAlchemy's own class, which does not subclass the builtin `TimeoutError`. Catch it by its full name, separately from both of the above.
 
 ## See also
 
-- [Consumer patterns](consumer-patterns.md) -- FastAPI lifespan and dbt profiles examples
-- [Configuration reference](configuration.md) -- env var loading, pool tuning fields, and per-backend field details
+- [Consumer patterns](consumer-patterns.md) — FastAPI lifespan and dbt profiles examples
+- [Pool tuning](configuration.md#pool-tuning) — the five tuning fields, their defaults, and recycle guidance
+- [Configuration](configuration.md) — env var loading and per-backend field details

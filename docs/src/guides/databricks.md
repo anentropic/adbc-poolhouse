@@ -1,9 +1,11 @@
 # Databricks guide
 
+## Installation
+
 The Databricks ADBC driver is distributed via the ADBC Driver Foundry, not PyPI.
 Follow the [Foundry installation guide](https://arrow.apache.org/adbc/current/driver/installation.html) to install it before using [`DatabricksConfig`][adbc_poolhouse.DatabricksConfig].
 
-`adbc-poolhouse` does not need a separate extra for Databricks:
+adbc-poolhouse does not need a separate extra for Databricks:
 
 ```bash
 pip install adbc-poolhouse
@@ -15,7 +17,7 @@ pip install adbc-poolhouse
 using a personal access token (PAT). You must specify the connection in one of two
 ways: a full URI or individual fields (`host`, `http_path`, and `token` together).
 
-Construction raises [`ConfigurationError`][adbc_poolhouse.ConfigurationError] if neither mode is fully specified.
+Construction raises [`ConfigurationError`][adbc_poolhouse.ConfigurationError] (wrapped as a Pydantic `ValidationError`) if neither mode is fully specified.
 
 ### URI mode
 
@@ -68,13 +70,13 @@ pool = create_pool(config)
 
 With this config, `SELECT * FROM orders` resolves to `main.sales.orders`. Both
 fields are optional: set one, the other, or neither. In URI mode, put the
-namespace in the DSN yourself, and `adbc-poolhouse` returns the URI untouched.
+namespace in the DSN yourself, and adbc-poolhouse returns the URI untouched.
 
 ## Loading from environment variables
 
 [`DatabricksConfig`][adbc_poolhouse.DatabricksConfig] reads all fields from environment variables with the `DATABRICKS_` prefix.
 For individual field mode, all three variables must be set at the same time. Setting only
-`DATABRICKS_HOST` or `DATABRICKS_TOKEN` alone causes [`ConfigurationError`][adbc_poolhouse.ConfigurationError] at construction.
+`DATABRICKS_HOST` or `DATABRICKS_TOKEN` alone causes [`ConfigurationError`][adbc_poolhouse.ConfigurationError] at construction, wrapped as a Pydantic `ValidationError`.
 
 ```bash
 export DATABRICKS_HOST=adb-xxx.azuredatabricks.net
@@ -109,5 +111,5 @@ runs on the `databricks-sql-connector` package. See the
 ## See also
 
 - [Databricks Python connector guide](databricks-python.md) — the non-Thrift backend for Lakehouse//RT
-- [Configuration reference](configuration.md) — env_prefix, pool tuning
+- [Configuration](configuration.md) — env_prefix, pool tuning
 - [Pool lifecycle](pool-lifecycle.md) — close_pool, pytest fixtures

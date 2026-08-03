@@ -1,5 +1,7 @@
 # DuckDB guide
 
+## Installation
+
 Install the DuckDB extra:
 
 ```bash
@@ -29,7 +31,7 @@ pool = create_pool(config)
 
 ### In-memory (single connection)
 
-`pool_size` is forced to `1` for in-memory databases. Requesting a larger pool would give each connection its own empty database, which is almost always unintended.
+`pool_size` defaults to `1` for in-memory databases, and a larger value is rejected: [`DuckDBConfig`][adbc_poolhouse.DuckDBConfig] raises [`ConfigurationError`][adbc_poolhouse.ConfigurationError] (wrapped as a Pydantic `ValidationError`) when `pool_size > 1` is combined with `:memory:`. Each connection would otherwise get its own empty database, which is almost always unintended.
 
 ```python
 config = DuckDBConfig(database=":memory:")
@@ -58,5 +60,5 @@ config = DuckDBConfig()  # reads from env
 
 ## See also
 
-- [Configuration reference](configuration.md) — env_prefix, pool tuning
+- [Configuration](configuration.md) — env_prefix, pool tuning
 - [Pool lifecycle](pool-lifecycle.md) — close_pool, pytest fixtures

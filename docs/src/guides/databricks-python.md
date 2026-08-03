@@ -20,9 +20,9 @@ This backend needs the `databricks-python` extra, which pulls in
 pip install "adbc-poolhouse[databricks-python]"
 ```
 
-OAuth machine-to-machine auth additionally needs `databricks-sdk`, which the
+OAuth machine-to-machine auth also needs `databricks-sdk`, which the
 connector itself does not require. When you use that auth method, install the
-`databricks-python-m2m` extra instead — it adds the SDK on top of everything above:
+`databricks-python-m2m` extra instead. It adds the SDK on top of everything above:
 
 ```bash
 pip install "adbc-poolhouse[databricks-python-m2m]"
@@ -31,8 +31,8 @@ pip install "adbc-poolhouse[databricks-python-m2m]"
 ## Connection
 
 Set `host` and `http_path`, plus one auth method. Construction raises
-[`ConfigurationError`][adbc_poolhouse.ConfigurationError] when the host, the HTTP path,
-or a usable auth method is missing.
+[`ConfigurationError`][adbc_poolhouse.ConfigurationError] (wrapped as a Pydantic
+`ValidationError`) when the host, the HTTP path, or a usable auth method is missing.
 
 ### Personal access token
 
@@ -236,6 +236,6 @@ pool = create_pool(config)
 ## See also
 
 - [Databricks guide](databricks.md) — the ADBC driver backend, the default for SQL warehouses
-- [Configuration reference](configuration.md) — env_prefix, pool tuning
+- [Configuration](configuration.md) — env_prefix, pool tuning
 - [Pool lifecycle](pool-lifecycle.md) — close_pool, pytest fixtures
 - [Async pool](async.md) — the asyncio/trio wrapper and its concurrency model

@@ -722,7 +722,12 @@ class AsyncConnection:
         still holds the only pool token until its thread returns, so borrowing the
         pool token here would deadlock recovery behind the very worker it just
         aborted. Teardown is not throughput-bounded, so giving it a private token
-        is correct and removes the unenforced scheduler-ordering dependency.
+        is correct and removes the unenforced scheduler-ordering dependency. Since
+        D-25-09 the cancel path also waits for the aborted worker to return before
+        calling this, so the pool token is already free by then --- the private
+        limiter is now belt-and-braces on that path rather than the only thing
+        preventing the deadlock, and it still keeps teardown off the pool's budget
+        for every other caller.
 
         It is the poison-recovery counterpart to `close`: invalidate is the cancel
         path, `close` the normal check-in. A `close()` after an `invalidate()` is a
