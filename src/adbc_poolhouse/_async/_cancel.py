@@ -20,6 +20,11 @@ driver call (D-25-09). Two threads touching one ADBC connection is what the spec
 forbids, and DuckDB deadlocks on it outright --- the watcher therefore waits on the
 worker's `done` event before recovering.
 
+The same event decides whether to abort at all (D-25-10). A cancellation that lands
+after the worker has finished has nothing to abort: the watcher checks the event
+before firing, so a completed call is never sent an `adbc_cancel` and a healthy
+connection is never invalidated out of the pool.
+
 The literal `anyio.to_thread.run_sync` chokepoint stays in `_offload.py`: this
 module calls `offload`, never `to_thread.run_sync` directly, so the
 `scan_async_package` source guard still audits the offload discipline in exactly
@@ -77,9 +82,19 @@ async def cancellable_offload(
     needs a limiter token would wait forever behind the very workers saturating
     the limiter.
 
-    When the worker *had* started, the watcher fires `adbc_cancel()` inside
-    `anyio.CancelScope(shield=True)` (so a second cancellation arriving during the
-    abort cannot abort the abort --- `adbc_cancel` fires exactly once, D-25-07) and
+    A worker that has already finished is treated the same way (D-25-10). If the
+    cancellation lands after the worker set `done` --- reachable on both backends,
+    since setting the event only schedules the parked watcher rather than resuming it
+    --- then the driver call is over, its token is released, and its result or error is
+    in hand. There is nothing to abort and nothing poisoned to recover, so the watcher
+    skips both and simply lets the cancellation propagate. Without that check the
+    library fired `adbc_cancel` at a completed statement and invalidated a healthy
+    connection, evicting it from the pool for no reason.
+
+    When the worker had started and is still inside the call, the watcher fires
+    `adbc_cancel()` inside `anyio.CancelScope(shield=True)` (so a second cancellation
+    arriving during the abort cannot abort the abort --- `adbc_cancel` fires exactly
+    once, D-25-07) and
     sets `aborted_by_us` immediately, so the worker's resulting error is recognised
     as OUR interrupt by that flag alone (D-25-02), never by sniffing its type or
     message. Still shielded, it then waits for the aborted worker to LEAVE the driver
@@ -123,9 +138,11 @@ async def cancellable_offload(
 
     On the success or error path the worker releases the watcher by setting the
     `Event` in a `finally`, so the watcher exits cleanly without ever entering its
-    `except` branch and `adbc_cancel` is never called. That same `finally` is what
-    the cancel path waits on before recovering (D-25-09): the worker sets the `Event`
-    once `offload` has returned, which is after it has released its pool token, so a
+    `except` branch and `adbc_cancel` is never called. A cancellation arriving in that
+    same scheduler turn does enter the `except` branch, but finds the event set and
+    leaves the finished call alone (D-25-10). That same `finally` is what the cancel
+    path waits on before recovering (D-25-09): the worker sets the `Event` once
+    `offload` has returned, which is after it has released its pool token, so a
     poison-recovery reaching the driver finds the connection genuinely quiescent.
 
     On the **cancel path** the just-aborted worker's blocking call typically
@@ -156,8 +173,10 @@ async def cancellable_offload(
         adbc_cancel: The driver's thread-safe cancel hook (e.g.
             `cursor.adbc_cancel`). Called once, shielded, from the loop thread
             only when the surrounding scope is cancelled while the worker is
-            genuinely running the driver call. Never called on the success path
-            nor when the worker was cancelled while still queued for a token.
+            genuinely running the driver call. Never called on the success path,
+            nor when the worker was cancelled while still queued for a token, nor
+            when the worker finished before the cancellation reached the watcher
+            (D-25-10).
         fn: The blocking callable to run off the event loop (typically a bound
             method of the sync cursor).
         *args: Positional arguments forwarded to `fn`.
@@ -168,7 +187,8 @@ async def cancellable_offload(
         on_abort: Optional async poison-recovery to run (shielded) only when a
             genuinely-started call was aborted by `adbc_cancel` --- typically the
             owning connection's `invalidate`. Skipped when the worker never
-            started, so a clean (never-poisoned) connection is not invalidated.
+            started and when it had already finished (D-25-10), so a clean
+            (never-poisoned) connection is not invalidated in either case.
             Run only once the aborted worker has left the driver call (D-25-09), so
             a recovery that closes the connection never races the worker still
             unwinding out of it.
@@ -211,7 +231,15 @@ async def cancellable_offload(
         try:
             await done.wait()  # event-driven park, NOT a poll
         except get_cancelled_exc_class():
-            if worker_started:
+            # A set `done` means the worker is already OUT of the driver call, off its
+            # pool token, and its result (or error) is in hand: there is nothing left to
+            # abort and nothing poisoned to recover from (D-25-10). The cancellation is
+            # real and still propagates below --- what is skipped is firing `adbc_cancel`
+            # at a statement that has already finished and invalidating a connection that
+            # was never poisoned. That interleaving is reachable on both backends: `set()`
+            # only schedules the waiting watcher, so a cancellation delivered before it
+            # resumes lands here with the event already set.
+            if worker_started and not done.is_set():
                 with anyio.CancelScope(shield=True):
                     adbc_cancel()  # thread-safe; unblocks the worker, fires ONCE
                     # From here the worker's resulting error is OUR interrupt,

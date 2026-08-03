@@ -604,7 +604,10 @@ cleanup runs underneath each of them.
 A query cancelled before it reaches the driver (for example, the limiter is
 saturated and the call is still queued for a worker) touches no connection and
 leaves the pool unchanged: no `adbc_cancel`, no invalidate, nothing to recover.
-Recovery itself runs under a shield, so a second cancellation arriving during
+The same holds at the other end, for a cancellation that arrives once the query has
+already finished. There is nothing in flight to abort, so the connection goes back
+to the pool intact and only the cancellation itself surfaces.
+Recovery runs under a shield, so a second cancellation arriving during
 cleanup cannot leave the pool miscounted. The behaviour is identical under asyncio
 and trio. Only the surfaced exception type differs, and that difference comes from
 anyio's scope, not from anything the pool does.
