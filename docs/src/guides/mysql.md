@@ -1,9 +1,11 @@
 # MySQL guide
 
+## Installation
+
 The MySQL ADBC driver is distributed via the ADBC Driver Foundry, not PyPI.
 Follow the [Foundry installation guide](https://arrow.apache.org/adbc/current/driver/installation.html) to install it before using [`MySQLConfig`][adbc_poolhouse.MySQLConfig].
 
-`adbc-poolhouse` does not need a separate extra for MySQL:
+adbc-poolhouse does not need a separate extra for MySQL:
 
 ```bash
 pip install adbc-poolhouse
@@ -12,10 +14,10 @@ pip install adbc-poolhouse
 ## Connection
 
 [`MySQLConfig`][adbc_poolhouse.MySQLConfig] connects to a MySQL server. You must specify the connection in one of two
-ways: a full URI or individual fields (`host` and `user` together, with optional
-`password`, `database`, and `port`).
+ways: a full URI or individual fields (`host`, `user`, and `database` together, with optional
+`password` and `port`).
 
-Construction raises [`ConfigurationError`][adbc_poolhouse.ConfigurationError] if neither mode is fully specified.
+Construction raises [`ConfigurationError`][adbc_poolhouse.ConfigurationError] (wrapped as a Pydantic `ValidationError`) if neither mode is fully specified.
 
 ### URI mode
 
@@ -44,7 +46,7 @@ config = MySQLConfig(
 pool = create_pool(config)
 ```
 
-`password` is optional, since MySQL supports passwordless connections. `port` defaults to `3306`.
+`password` is optional, since MySQL supports passwordless connections. `port` defaults to `3306`. `database` is not optional in this mode: omitting it fails validation, the same as omitting `host` or `user`.
 
 ## Loading from environment variables
 
@@ -64,5 +66,5 @@ pool = create_pool(config)
 
 ## See also
 
-- [Configuration reference](configuration.md) — env_prefix, pool tuning
+- [Configuration](configuration.md) — env_prefix, pool tuning
 - [Pool lifecycle](pool-lifecycle.md) — close_pool, pytest fixtures

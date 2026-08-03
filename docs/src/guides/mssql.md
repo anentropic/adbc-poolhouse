@@ -1,9 +1,11 @@
 # MSSQL guide
 
+## Installation
+
 The MSSQL ADBC driver is distributed via the ADBC Driver Foundry, not PyPI.
 Follow the [Foundry installation guide](https://arrow.apache.org/adbc/current/driver/installation.html) to install it before using [`MSSQLConfig`][adbc_poolhouse.MSSQLConfig].
 
-`adbc-poolhouse` does not need a separate extra for MSSQL:
+adbc-poolhouse does not need a separate extra for MSSQL:
 
 ```bash
 pip install adbc-poolhouse
@@ -58,5 +60,5 @@ pool = create_pool(config)
 
 ## See also
 
-- [Configuration reference](configuration.md) — env_prefix, pool tuning, Foundry backends
+- [Configuration](configuration.md) — env_prefix, pool tuning, Foundry backends
 - [Pool lifecycle](pool-lifecycle.md) — close_pool, pytest fixtures

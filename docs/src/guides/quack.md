@@ -1,11 +1,11 @@
-# Quack
+# Quack guide
 
 !!! warning "Alpha driver"
-    The [`adbc-driver-quack`](https://github.com/gizmodata/adbc-driver-quack) package is an alpha release (latest: `0.1.0a6` as of this writing). APIs and behaviour may change between releases.
+    The [`adbc-driver-quack`](https://github.com/gizmodata/adbc-driver-quack) package is an alpha release. APIs and behaviour may change between releases.
 
 Quack is a remote protocol for DuckDB servers. [`QuackConfig`][adbc_poolhouse.QuackConfig] connects to a Quack endpoint and accepts either a full `quack://` URI or decomposed `host`/`port` fields, with optional bearer token and TLS flags.
 
-## Install
+## Installation
 
 ```bash
 pip install --pre adbc-poolhouse[quack]
@@ -79,6 +79,5 @@ The same mutual-exclusion rule applies to env-loaded fields. Set `QUACK_URI` or 
 
 ## See also
 
-- [Configuration reference](configuration.md) — env_prefix, pool tuning, secret handling
-- [Pool lifecycle](pool-lifecycle.md) — `close_pool`, pytest fixtures
-- [QuackConfig][adbc_poolhouse.QuackConfig] — API reference
+- [Configuration](configuration.md) — env_prefix, pool tuning, secret handling
+- [Pool lifecycle](pool-lifecycle.md) — close_pool, pytest fixtures

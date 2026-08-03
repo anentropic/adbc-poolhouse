@@ -5,7 +5,7 @@ These mirror the synchronous `create_pool` / `managed_pool` / `close_pool` entry
 points exactly --- same three call patterns, same keyword defaults --- and reuse
 the unchanged sync core (`_create_pool_impl`, `close_pool`) verbatim. There is no
 per-backend code here: the factory touches only the `WarehouseConfig` Protocol and
-the sync `QueuePool`, so all 13 backends are supported by construction (CORE-04,
+the sync `QueuePool`, so all 14 backends are supported by construction (CORE-04,
 D-24-04).
 
 Pool construction stays synchronous --- `_create_pool_impl` does no per-call I/O,

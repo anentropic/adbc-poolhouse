@@ -1,9 +1,21 @@
 # Custom backends
 
-adbc-poolhouse ships config classes for 13 ADBC backends. If your driver is not
-on that list you have two options: pass
+adbc-poolhouse ships config classes for 13 ADBC backends (14 config classes in
+total, the extra one being the non-ADBC
+[`DatabricksPythonConfig`][adbc_poolhouse.DatabricksPythonConfig]). If your ADBC
+driver is not on that list you have two options: pass
 [raw driver arguments](configuration.md#raw-driver-arguments) to [`create_pool()`][adbc_poolhouse.create_pool]
 directly, or write a config class as described below.
+
+Both of those routes assume a driver that speaks ADBC, and a connector that does
+not is out of scope: non-ADBC connectors are not a supported extension point.
+adbc-poolhouse does pool one itself through
+[`DatabricksPythonConfig`][adbc_poolhouse.DatabricksPythonConfig], but the seam
+that makes that work is private, undocumented, and free to change in any release,
+so nothing here describes it and no third-party config should build against it.
+If you need a native connector backend, please
+[open an issue](https://github.com/anentropic/adbc-poolhouse/issues) rather than
+reaching for internals.
 
 ## The short version
 
@@ -34,10 +46,10 @@ class MyDriverConfig(BaseWarehouseConfig):
 pool = create_pool(MyDriverConfig(host="db.example.com"))
 ```
 
-That is the complete implementation. `BaseWarehouseConfig` provides pool tuning
-fields (`pool_size`, `max_overflow`, `timeout`, `recycle`) with sensible
-defaults, and the `_adbc_entrypoint()` and `_dbapi_module()` methods return
-`None` -- the right default for most drivers.
+That is the complete implementation. `BaseWarehouseConfig` provides the pool
+tuning fields (`pool_size`, `max_overflow`, `timeout`, `recycle`, `pre_ping`)
+with defaults, and the `_adbc_entrypoint()` and `_dbapi_module()` methods return
+`None`, the right default for most drivers.
 
 Library authors who prefer not to add a dependency on adbc-poolhouse (or
 pydantic) can implement the
@@ -87,7 +99,7 @@ The exact keys depend on your driver. Common patterns:
 Return the driver's init symbol name, or `None` for the default.
 
 Most ADBC drivers use a default init function. Override this only when your
-driver requires a non-standard symbol. Among the 13 built-in backends, only
+driver requires a non-standard symbol. Among the 13 ADBC backends, only
 DuckDB and SQLite override this method.
 
 ```python
@@ -135,32 +147,32 @@ that `db_kwargs` is always passed by name, so it is fine for your `connect()`
 to declare it keyword-only.
 
 Return `None` from `_dbapi_module()` when the driver should route through
-`adbc_driver_manager.dbapi.connect()` instead (the Foundry path). That is
-the right default for native shared-library drivers without a Python `dbapi`
-submodule.
+`adbc_driver_manager.dbapi.connect()` instead, which is the path the ADBC Driver
+Foundry drivers take. That is the right default for native shared-library
+drivers without a Python `dbapi` submodule.
 
 ## Pool tuning
 
-`BaseWarehouseConfig` inherits four pool fields from
-[`BaseSettings`](https://docs.pydantic.dev/latest/concepts/pydantic_settings/):
-
-| Field | Default | Description |
-|---|---|---|
-| `pool_size` | `5` | Connections kept in the pool |
-| `max_overflow` | `3` | Extra connections above `pool_size` |
-| `timeout` | `30` | Seconds to wait before `sqlalchemy.exc.TimeoutError` |
-| `recycle` | `3600` | Seconds before a connection is replaced |
+`BaseWarehouseConfig` is a Pydantic
+[`BaseSettings`](https://docs.pydantic.dev/latest/concepts/pydantic_settings/)
+model that defines five pool fields, which your subclass inherits: `pool_size`,
+`max_overflow`, `timeout`, `recycle`, and `pre_ping`. Their defaults, meanings,
+and the guidance for choosing a `recycle` value live in one place, under
+[Pool tuning](configuration.md#pool-tuning) in the configuration guide.
 
 Your config's `env_prefix` applies to these fields automatically. With
 `env_prefix="MYDRIVER_"`, setting `MYDRIVER_POOL_SIZE=10` in the environment
-overrides the default.
-
-For details, see the [configuration reference](configuration.md).
+overrides the default. That works because the fields are declared on
+`BaseWarehouseConfig` itself, so your subclass's prefix covers them alongside
+your own fields.
 
 ## Without BaseWarehouseConfig
 
 You do not have to inherit from `BaseWarehouseConfig`. Any class that satisfies
-the [`WarehouseConfig`][adbc_poolhouse.WarehouseConfig] protocol works:
+the [`WarehouseConfig`][adbc_poolhouse.WarehouseConfig] protocol works. The
+protocol asks for the four tuning fields below, but not `pre_ping`:
+[`create_pool`][adbc_poolhouse.create_pool] reads `pre_ping` as `False` when a
+config does not declare it.
 
 ```python
 class StandaloneConfig:
@@ -202,6 +214,6 @@ API reference:
 
 ## See also
 
-- [Pool lifecycle](pool-lifecycle.md) -- creating, using, and disposing pools
-- [Configuration reference](configuration.md) -- env var loading and pool tuning
-- [Raw driver arguments](configuration.md#raw-driver-arguments) -- using `create_pool()` without a config class
+- [Pool lifecycle](pool-lifecycle.md) — creating, using, and disposing pools
+- [Configuration](configuration.md) — env var loading and pool tuning
+- [Raw driver arguments](configuration.md#raw-driver-arguments) — using `create_pool()` without a config class

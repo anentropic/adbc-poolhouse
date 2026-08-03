@@ -1,5 +1,7 @@
 # PostgreSQL guide
 
+## Installation
+
 Install the PostgreSQL extra:
 
 ```bash
@@ -42,7 +44,7 @@ config = PostgreSQLConfig(
 pool = create_pool(config)
 ```
 
-`port` defaults to 5432 when omitted. `password` and `sslmode` are optional.
+`port`, `password`, and `sslmode` are all optional. An omitted `port` is left out of the connection URI entirely, so PostgreSQL's own default of 5432 applies.
 
 ## Loading from environment variables
 
@@ -62,5 +64,5 @@ pool = create_pool(config)
 
 ## See also
 
-- [Configuration reference](configuration.md) — env_prefix, pool tuning
+- [Configuration](configuration.md) — env_prefix, pool tuning
 - [Pool lifecycle](pool-lifecycle.md) — close_pool, pytest fixtures
