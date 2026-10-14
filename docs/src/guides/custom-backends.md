@@ -14,7 +14,7 @@ adbc-poolhouse does pool one itself through
 that makes that work is private, undocumented, and free to change in any release,
 so nothing here describes it and no third-party config should build against it.
 If you need a native connector backend, please
-[open an issue](https://github.com/anentropic/adbc-poolhouse/issues) rather than
+[open an issue](https://github.com/s-layer/adbc-poolhouse/issues) rather than
 reaching for internals.
 
 ## The short version

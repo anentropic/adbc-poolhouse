@@ -1,8 +1,8 @@
 site_name: adbc-poolhouse
 site_description: Connection pooling for ADBC drivers from typed warehouse configs
-site_url: https://anentropic.github.io/adbc-poolhouse/
-repo_url: https://github.com/anentropic/adbc-poolhouse
-repo_name: anentropic/adbc-poolhouse
+site_url: https://s-layer.github.io/adbc-poolhouse/
+repo_url: https://github.com/s-layer/adbc-poolhouse
+repo_name: s-layer/adbc-poolhouse
 edit_uri: edit/main/docs/src/
 docs_dir: docs/src
 watch:

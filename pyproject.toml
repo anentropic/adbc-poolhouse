@@ -37,10 +37,10 @@ all = [
 ]
 
 [project.urls]
-Homepage = "https://anentropic.github.io/adbc-poolhouse/"
-Documentation = "https://anentropic.github.io/adbc-poolhouse/"
-Source = "https://github.com/anentropic/adbc-poolhouse"
-Changelog = "https://anentropic.github.io/adbc-poolhouse/changelog/"
+Homepage = "https://s-layer.github.io/adbc-poolhouse/"
+Documentation = "https://s-layer.github.io/adbc-poolhouse/"
+Source = "https://github.com/s-layer/adbc-poolhouse"
+Changelog = "https://s-layer.github.io/adbc-poolhouse/changelog/"
 
 [build-system]
 requires = ["uv_build>=0.9.18,<1.0.0"]
