@@ -205,3 +205,32 @@ jobs:
 
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
+
+  github-release:
+    name: Create GitHub Release
+    needs: [publish-pypi, changelog]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - name: Download distributions
+        uses: actions/download-artifact@v8
+        with:
+          name: dist
+          path: dist/
+
+      - name: Download changelog
+        uses: actions/download-artifact@v8
+        with:
+          name: changelog
+          path: changelog/
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v3
+        with:
+          files: dist/*
+          body_path: changelog/CHANGELOG.md
+          draft: false
+          # The trigger only admits vX.Y.Z and vX.Y.Z-<suffix>; a suffix means a prerelease.
+          prerelease: ${{ contains(github.ref_name, '-') }}
