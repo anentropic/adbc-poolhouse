@@ -96,7 +96,7 @@ jobs:
         run: |
           uv venv --python ${{ matrix.python-version }} test-env-wheel
           uv pip install --python test-env-wheel/bin/python dist/*.whl
-          test-env-wheel/bin/python -c "import adbc_poolhouse; print('Wheel installation OK')"
+          test-env-wheel/bin/python -c "from adbc_poolhouse import create_pool, DuckDBConfig; print('Wheel installation OK')"
 
       - name: Test sdist installation
         run: |
@@ -143,51 +143,9 @@ jobs:
           name: changelog
           path: CHANGELOG.md
 
-  publish-testpypi:
-    name: Publish to TestPyPI
-    needs: [validate, changelog]
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    environment:
-      name: testpypi
-      url: https://test.pypi.org/p/adbc-poolhouse
-    permissions:
-      id-token: write
-      contents: read
-    steps:
-      - name: Download distributions
-        uses: actions/download-artifact@v8
-        with:
-          name: dist
-          path: dist/
-      - name: Publish to TestPyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          repository-url: https://test.pypi.org/legacy/
-
-  smoke-test-testpypi:
-    name: Smoke-test from TestPyPI
-    needs: [publish-testpypi]
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - name: Set up uv
-        uses: astral-sh/setup-uv@v7
-        with:
-          enable-cache: false
-      - name: Install from TestPyPI and smoke-test
-        run: |
-          uv venv smoke-env
-          uv pip install \
-            --python smoke-env/bin/python \
-            --index-url https://test.pypi.org/simple/ \
-            --extra-index-url https://pypi.org/simple/ \
-            adbc-poolhouse
-          smoke-env/bin/python -c "from adbc_poolhouse import create_pool, DuckDBConfig; print('TestPyPI smoke OK')"
-
   publish-pypi:
     name: Publish to PyPI
-    needs: [smoke-test-testpypi]
+    needs: [validate, changelog]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     environment:
