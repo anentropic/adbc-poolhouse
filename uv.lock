@@ -155,7 +155,7 @@ wheels = [
 
 [[package]]
 name = "adbc-poolhouse"
-version = "1.6.2"
+version = "1.6.3"
 source = { editable = "." }
 dependencies = [
     { name = "adbc-driver-manager" },

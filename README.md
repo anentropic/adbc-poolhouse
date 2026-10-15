@@ -1,6 +1,6 @@
 # adbc-poolhouse
 
-[ [Docs](https://anentropic.github.io/adbc-poolhouse/) ]
+[ [Docs](https://s-layer.github.io/adbc-poolhouse/) ]
 
 Connection pooling for ADBC drivers from typed warehouse configs.
 
@@ -12,7 +12,7 @@ One config in, one pool out — `create_pool(SnowflakeConfig(...))` returns a re
 pip install adbc-poolhouse
 ```
 
-Driver extras are available for each supported warehouse (BigQuery, DuckDB, FlightSQL, PostgreSQL, Snowflake, SQLite). See the [documentation](https://anentropic.github.io/adbc-poolhouse/) for the full list.
+Driver extras are available for each supported warehouse (BigQuery, DuckDB, FlightSQL, PostgreSQL, Snowflake, SQLite). See the [documentation](https://s-layer.github.io/adbc-poolhouse/) for the full list.
 
 ## Quick example
 
@@ -44,9 +44,9 @@ close_pool(pool)
 
 ## Links
 
-- [Documentation](https://anentropic.github.io/adbc-poolhouse/)
-- [Changelog](https://anentropic.github.io/adbc-poolhouse/changelog/)
-- [Source](https://github.com/anentropic/adbc-poolhouse)
+- [Documentation](https://s-layer.github.io/adbc-poolhouse/)
+- [Changelog](https://s-layer.github.io/adbc-poolhouse/changelog/)
+- [Source](https://github.com/s-layer/adbc-poolhouse)
 - [PyPI](https://pypi.org/project/adbc-poolhouse/)
 
 ## License

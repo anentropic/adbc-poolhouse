@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.6.3] - 2026-10-14
+
+### Changed
+
+- The project moved to the s-layer GitHub organisation. The package's Homepage, Documentation, Source and Changelog links now point at github.com/s-layer/adbc-poolhouse and s-layer.github.io/adbc-poolhouse. No code changes.
+
 ## [1.6.2] - 2026-08-03
 
 ### Fixed
