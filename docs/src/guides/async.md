@@ -382,8 +382,8 @@ polars 2 the ADBC driver manager's own `fetch_polars` returns a one-column struc
 `Series` instead, so if you call the sync driver cursor directly you will see that.
 
 pandas and polars are not adbc-poolhouse dependencies. You install whichever you use.
-adbc-poolhouse never imports them: the driver imports pandas or polars on the worker
-thread as part of the fetch, so a missing install surfaces the native
+adbc-poolhouse does not import either before the driver does: the driver imports pandas
+or polars on the worker thread as part of the fetch, so a missing install surfaces the native
 `ModuleNotFoundError` unchanged. adbc-poolhouse adds no availability pre-check and no
 wrapping, exactly as the underlying sync ADBC method behaves.
 
