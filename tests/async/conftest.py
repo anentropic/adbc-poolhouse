@@ -38,6 +38,7 @@ from adbc_poolhouse import (
     DuckDBConfig,
     FlightSQLConfig,
     SnowflakeConfig,
+    SQLiteConfig,
     close_async_pool,
     create_async_pool,
 )
@@ -101,6 +102,27 @@ async def duckdb_async_pool() -> AsyncIterator[AsyncPool]:
     """
     tmpdir = tempfile.mkdtemp()
     pool = create_async_pool(DuckDBConfig(database=str(Path(tmpdir) / "async_edge.db")))
+    try:
+        yield pool
+    finally:
+        await pool.close()
+
+
+@pytest.fixture
+async def sqlite_async_pool() -> AsyncIterator[AsyncPool]:
+    """
+    A real-driver SQLite `AsyncPool` on a temp file, closed on teardown.
+
+    The native-error leg for metadata the SQLite driver leaves unimplemented
+    (`adbc_get_statistics` / `adbc_get_statistic_names` raise
+    `adbc_driver_manager.NotSupportedError`). DuckDB implements both as of
+    `duckdb` 1.5.6, so it can no longer stand in for "unsupported".
+
+    Yields:
+        A ready `AsyncPool` wrapping a real in-process SQLite driver.
+    """
+    tmpdir = tempfile.mkdtemp()
+    pool = create_async_pool(SQLiteConfig(database=str(Path(tmpdir) / "async_edge.sqlite")))
     try:
         yield pool
     finally:

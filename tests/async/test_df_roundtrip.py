@@ -25,11 +25,16 @@ the real driver leg.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import pytest
 
+from adbc_poolhouse._async._cursor import _fetch_polars_frame
+
 if TYPE_CHECKING:
+    import polars as pl
+
+    from adbc_poolhouse._async._cursor import _SyncCursor
     from adbc_poolhouse._async._pool import AsyncPool
 
 
@@ -75,3 +80,60 @@ class TestDf02FetchPolarsRoundTrip:
             df = await cur.fetch_polars()
         assert isinstance(df, polars.DataFrame)
         assert df.to_dict(as_series=False) == {"a": [1], "b": [2]}
+
+    @pytest.mark.anyio
+    async def test_fetch_polars_empty_result_keeps_columns(
+        self, duckdb_async_pool: AsyncPool
+    ) -> None:
+        """
+        An empty result still comes back as a `polars.DataFrame` with its columns.
+
+        Under polars 2 the driver's `polars.from_arrow` yields a struct `Series`;
+        the zero-row case is where an unnest could lose the schema. The frame must
+        keep both column names and their dtypes, with no rows.
+        """
+        polars = pytest.importorskip("polars")
+        async with await duckdb_async_pool.connect() as conn:
+            cur = conn.cursor()
+            await cur.execute("SELECT 1::BIGINT AS a, 'x' AS b WHERE false")
+            df = await cur.fetch_polars()
+        assert isinstance(df, polars.DataFrame)
+        assert df.height == 0
+        assert df.schema == polars.Schema({"a": polars.Int64, "b": polars.String})
+
+
+class _FixedPolarsCursor:
+    """A sync-cursor fake whose `fetch_polars` returns a preset object."""
+
+    def __init__(self, result: object) -> None:
+        self._result = result
+
+    def fetch_polars(self) -> object:
+        return self._result
+
+
+class TestFetchPolarsFrameNormalization:
+    """
+    Both branches of `_fetch_polars_frame`, whatever polars version is installed.
+
+    The real-driver tests above only reach the branch the locked polars takes
+    (the struct-`Series` unnest under polars 2). These drive the helper directly
+    so a frame passes through untouched and a struct `Series` is unnested on any
+    polars version.
+    """
+
+    def test_dataframe_passes_through_unchanged(self) -> None:
+        """A driver that already returns a frame (polars 1, Databricks) gets it back as-is."""
+        polars = pytest.importorskip("polars")
+        frame = polars.DataFrame({"a": [1, 2], "b": ["x", "y"]})
+        cursor = cast("_SyncCursor", _FixedPolarsCursor(frame))
+        assert _fetch_polars_frame(cursor) is frame
+
+    def test_struct_series_is_unnested_into_frame(self) -> None:
+        """A one-column struct `Series` (polars 2 stream result) becomes the frame it wraps."""
+        polars = pytest.importorskip("polars")
+        frame = polars.DataFrame({"a": [1, 2], "b": ["x", "y"]})
+        cursor = cast("_SyncCursor", _FixedPolarsCursor(frame.to_struct("result")))
+        result = _fetch_polars_frame(cursor)
+        assert isinstance(result, polars.DataFrame)
+        assert cast("pl.DataFrame", result).equals(frame)

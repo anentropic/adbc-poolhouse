@@ -103,6 +103,33 @@ class _SyncCursor(Protocol):
     def close(self) -> None: ...
 
 
+def _fetch_polars_frame(cursor: _SyncCursor) -> object:
+    """
+    Run the driver's `fetch_polars` and guarantee a `polars.DataFrame` back.
+
+    `adbc_driver_manager` builds the frame with `polars.from_arrow` on a raw Arrow
+    stream handle. polars 2 changed that call to return a one-column struct
+    `Series` for stream input, so the driver hands back a `Series` whose struct
+    fields are the result columns. Unnesting it restores the frame (same columns,
+    dtypes and rows). A driver that already returns a frame passes through
+    unchanged.
+
+    Args:
+        cursor: The sync driver cursor holding the current result set.
+
+    Returns:
+        The materialized `polars.DataFrame`.
+    """
+    result = cursor.fetch_polars()
+    # The driver call above has already imported polars, so this import is free
+    # and cannot be the first to raise ModuleNotFoundError.
+    import polars
+
+    if isinstance(result, polars.Series):
+        return result.struct.unnest()
+    return result
+
+
 class AsyncCursor:
     """
     Async wrapper over a sync ADBC cursor.
@@ -442,10 +469,12 @@ class AsyncCursor:
         checked in --- it is never bound to the (soon-closed) cursor's C stream
         (EDGE-21 / Pitfall 7).
 
-        `polars` is not a poolhouse dependency --- you install it yourself. poolhouse
-        never imports it: the driver imports `polars` inside the worker, so a missing
-        install surfaces the native `ModuleNotFoundError` unchanged, with no
-        pre-check and no wrapping.
+        `polars` is not a poolhouse dependency --- you install it yourself. The
+        driver imports `polars` inside the worker, so a missing install surfaces
+        the native `ModuleNotFoundError` unchanged, with no pre-check and no
+        wrapping. Under polars 2, the driver's `polars.from_arrow` call yields a
+        one-column struct `Series` rather than a frame; poolhouse unnests it back
+        into the `polars.DataFrame` the driver meant to return.
 
         If the surrounding scope is cancelled or times out while the result is
         being materialized, the in-flight C call is aborted with
@@ -470,15 +499,14 @@ class AsyncCursor:
             ```
         """
         with self._owner._offloading():  # noqa: SLF001
-            # `_SyncCursor.fetch_polars` is typed `-> object` to keep the Protocol
-            # driver-agnostic (D-31-06); cast back to the public return type. No
-            # runtime effect --- the driver materializes and returns the
-            # polars.DataFrame itself.
+            # `_fetch_polars_frame` returns `object` to keep the `_SyncCursor`
+            # Protocol driver-agnostic (D-31-06); cast back to the public return
+            # type. No runtime effect.
             return cast(
                 "polars.DataFrame",
                 await cancellable_offload(
                     self._adbc_cancel,
-                    self._cursor.fetch_polars,
+                    functools.partial(_fetch_polars_frame, self._cursor),
                     limiter=self._limiter,
                     on_abort=self._owner.invalidate,  # poison recovery on a real abort (D-25-03)
                 ),
