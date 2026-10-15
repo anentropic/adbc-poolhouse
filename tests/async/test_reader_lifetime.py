@@ -27,7 +27,7 @@ structure is copied from `test_edge_resource.py`.
 from __future__ import annotations
 
 import importlib
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import pyarrow
 import pytest
@@ -71,7 +71,7 @@ class TestStream04DrainThenCheckin:
                 await cur.execute(f"SELECT * FROM range({i}, {i + 3}) AS t(n)")
                 async with await cur.fetch_record_batch() as reader:
                     async for batch in reader:
-                        values.extend(batch.column("n").to_pylist())
+                        values.extend(cast("list[int]", batch.column("n").to_pylist()))
             assert duckdb_async_pool._pool.checkedout() == 0  # noqa: SLF001
             assert sorted(values) == [i, i + 1, i + 2]
 

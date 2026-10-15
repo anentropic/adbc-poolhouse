@@ -288,7 +288,7 @@ class AsyncRecordBatchReader:
                 # no-op-cancel metadata reader must NOT invalidate (CR-34-01).
                 on_abort=self._owner.invalidate if self._poison_on_cancel else None,
             )
-        if batch is _EXHAUSTED:
+        if isinstance(batch, _Exhausted):  # the `_EXHAUSTED` singleton; narrows the type
             raise StopAsyncIteration  # does NOT clear _reader_open (D-29-11)
         return batch
 

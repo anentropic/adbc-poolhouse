@@ -133,6 +133,35 @@ class TestMeta02Stream:
         ):
             assert reader._poison_on_cancel is False  # noqa: SLF001
 
+    @pytest.mark.anyio
+    @pytest.mark.parametrize(
+        ("method", "expected_columns"),
+        [
+            ("adbc_get_statistics", ["catalog_name", "catalog_db_schemas"]),
+            ("adbc_get_statistic_names", ["statistic_name", "statistic_key"]),
+        ],
+    )
+    async def test_statistics_stream_then_checkin_duckdb(
+        self, duckdb_async_pool: AsyncPool, method: str, expected_columns: list[str]
+    ) -> None:
+        """
+        The statistics methods stream the driver's native result on DuckDB.
+
+        `duckdb` 1.5.6 implements both statistics calls (the SQLite leg in
+        `test_meta_unsupported.py` keeps the `NotSupportedError` passthrough
+        covered). The async wrapper hands back an `AsyncRecordBatchReader` whose
+        schema is the ADBC-spec schema for that call, its batches are
+        `pyarrow.RecordBatch`, and draining it inside the scope releases the
+        connection back to the pool.
+        """
+        async with await duckdb_async_pool.connect() as conn:
+            reader = await getattr(conn, method)()
+            async with reader:
+                assert reader.schema.names == expected_columns
+                async for batch in reader:
+                    assert isinstance(batch, pyarrow.RecordBatch)
+        assert duckdb_async_pool._pool.checkedout() == 0  # noqa: SLF001
+
 
 if __name__ == "__main__":  # pragma: no cover
     raise SystemExit(pytest.main([__file__, "-q"]))

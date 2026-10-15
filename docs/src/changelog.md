@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- `AsyncCursor.fetch_polars` returns a `polars.DataFrame` again under polars 2.0. polars 2 changed `polars.from_arrow` to return a one-column struct `Series` when it is given an Arrow stream, which is what the ADBC driver manager passes it, so the method was handing back a `Series` whose single struct column held every result column. adbc-poolhouse now unnests it into the frame you expect, with the same column names, dtypes and rows. polars 1 is unaffected.
+
 ## [1.6.3] - 2026-10-14
 
 ### Changed

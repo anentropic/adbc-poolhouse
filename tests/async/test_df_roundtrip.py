@@ -75,3 +75,23 @@ class TestDf02FetchPolarsRoundTrip:
             df = await cur.fetch_polars()
         assert isinstance(df, polars.DataFrame)
         assert df.to_dict(as_series=False) == {"a": [1], "b": [2]}
+
+    @pytest.mark.anyio
+    async def test_fetch_polars_empty_result_keeps_columns(
+        self, duckdb_async_pool: AsyncPool
+    ) -> None:
+        """
+        An empty result still comes back as a `polars.DataFrame` with its columns.
+
+        Under polars 2 the driver's `polars.from_arrow` yields a struct `Series`;
+        the zero-row case is where an unnest could lose the schema. The frame must
+        keep both column names and their dtypes, with no rows.
+        """
+        polars = pytest.importorskip("polars")
+        async with await duckdb_async_pool.connect() as conn:
+            cur = conn.cursor()
+            await cur.execute("SELECT 1::BIGINT AS a, 'x' AS b WHERE false")
+            df = await cur.fetch_polars()
+        assert isinstance(df, polars.DataFrame)
+        assert df.height == 0
+        assert df.schema == polars.Schema({"a": polars.Int64, "b": polars.String})

@@ -187,7 +187,7 @@ class _DatabricksPythonCursor:
         """Fetch the result as a ``polars.DataFrame``."""
         import polars  # noqa: PLC0415  (lazy: optional consumer dependency)
 
-        return polars.from_arrow(self._cursor.fetchall_arrow())
+        return polars.DataFrame(self._cursor.fetchall_arrow())
 
     def adbc_cancel(self) -> None:
         """Abort the in-flight statement (maps to the connector's ``cancel``)."""

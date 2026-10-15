@@ -54,6 +54,9 @@ dev = [
     "ipython>=9.10.0",
     "pdbpp>=0.12.0.post1",
     "pyarrow>=23.0.1",
+    # pyarrow 25+ wheels ship no type information (24 had a placeholder stub
+    # that typed every attribute as Any), so strict basedpyright needs stubs.
+    "pyarrow-stubs>=20.0.0.20260819",
     "pandas>=2.0",
     "pandas-stubs>=2.0",
     "polars>=1.0",

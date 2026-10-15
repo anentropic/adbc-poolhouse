@@ -25,7 +25,9 @@ class _FakeCursor:
         self._offset = 0
         self.arraysize = 2
         self.rowcount = -1
-        self.description = [(f.name, None, None, None, None, None, None) for f in table.schema]
+        self.description = [
+            (name, None, None, None, None, None, None) for name in table.schema.names
+        ]
         self.rownumber = 0
         self.cancelled = False
         self.closed = False

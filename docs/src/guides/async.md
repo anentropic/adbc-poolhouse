@@ -377,6 +377,10 @@ returned frame owns its buffers, so it stays valid after the connection is check
 in. You can read it outside the `async with` block, the same way a
 `fetch_arrow_table` result survives check-in.
 
+`fetch_polars` returns a `polars.DataFrame` on polars 1 and polars 2 alike. Under
+polars 2 the ADBC driver manager's own `fetch_polars` returns a one-column struct
+`Series` instead, so if you call the sync driver cursor directly you will see that.
+
 pandas and polars are not adbc-poolhouse dependencies. You install whichever you use.
 adbc-poolhouse never imports them: the driver imports pandas or polars on the worker
 thread as part of the fetch, so a missing install surfaces the native
@@ -420,8 +424,9 @@ open, a foreign call on the same connection raises
 with `async with` before the next operation.
 
 `adbc_get_statistics` and `adbc_get_statistic_names` follow the same streaming shape,
-but not every backend implements them. DuckDB raises the driver's native
-`NotSupportedError`, which adbc-poolhouse passes through unwrapped.
+but not every backend implements them. SQLite raises the driver's native
+`NotSupportedError`, which adbc-poolhouse passes through unwrapped. DuckDB implements
+both as of `duckdb` 1.5.6; older releases raise `NotSupportedError` too.
 
 ## Prepared statements
 

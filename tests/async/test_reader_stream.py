@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import threading
 from collections.abc import Callable
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import pyarrow
 import pytest
@@ -79,7 +79,7 @@ class TestStream02IteratesBatchesOffLoop:
             async with await cur.fetch_record_batch() as reader:
                 async for batch in reader:
                     assert isinstance(batch, pyarrow.RecordBatch)
-                    values.extend(batch.column("n").to_pylist())
+                    values.extend(cast("list[int]", batch.column("n").to_pylist()))
         assert sorted(values) == [0, 1, 2, 3, 4]
 
     @pytest.mark.anyio

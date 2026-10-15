@@ -45,14 +45,14 @@ import pyarrow as pa
 import pyarrow.flight as fl
 
 if TYPE_CHECKING:
-    from collections.abc import Generator
+    from collections.abc import Generator, Iterator
 
 # The result set the server serves, split across two partitions. Rows are fixed so
 # tests can assert exact values after reassembling the partitions.
 RESULT_SCHEMA = pa.schema([("id", pa.int64()), ("name", pa.string())])
 PARTITION_BATCHES: dict[bytes, pa.RecordBatch] = {
-    b"partition-0": pa.record_batch([[1, 2], ["a", "b"]], schema=RESULT_SCHEMA),
-    b"partition-1": pa.record_batch([[3, 4], ["c", "d"]], schema=RESULT_SCHEMA),
+    b"partition-0": pa.record_batch({"id": [1, 2], "name": ["a", "b"]}, schema=RESULT_SCHEMA),
+    b"partition-1": pa.record_batch({"id": [3, 4], "name": ["c", "d"]}, schema=RESULT_SCHEMA),
 }
 
 # The spec-defined Flight SQL GetSqlInfo response schema. The driver probes this on
@@ -122,7 +122,7 @@ class PartitionFlightServer(fl.FlightServerBase):
     def get_flight_info(self, context: object, descriptor: fl.FlightDescriptor) -> fl.FlightInfo:
         """Route the driver's capability probe vs. its query to the right endpoints."""
         del context
-        if b"GetSqlInfo" in descriptor.command:
+        if descriptor.command is not None and b"GetSqlInfo" in descriptor.command:
             endpoint = fl.FlightEndpoint(_SQLINFO_TICKET, [])
             return fl.FlightInfo(_SQLINFO_SCHEMA, descriptor, [endpoint], -1, -1)
         # Any real query (CommandStatementQuery or CommandPreparedStatementQuery):
@@ -138,7 +138,7 @@ class PartitionFlightServer(fl.FlightServerBase):
         batch = PARTITION_BATCHES[ticket.ticket]
         return fl.RecordBatchStream(pa.Table.from_batches([batch]))
 
-    def do_action(self, context: object, action: fl.Action) -> object:
+    def do_action(self, context: object, action: fl.Action) -> Iterator[bytes]:
         """Answer CreatePreparedStatement with a handle; no-op every other action."""
         del context
         if action.type == "CreatePreparedStatement":

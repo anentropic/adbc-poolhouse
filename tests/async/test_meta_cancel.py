@@ -28,7 +28,7 @@ from __future__ import annotations
 import functools
 import importlib
 from collections.abc import Callable
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import anyio
 import pytest
@@ -38,6 +38,7 @@ from adbc_poolhouse._async._reader import AsyncRecordBatchReader
 
 if TYPE_CHECKING:
     from adbc_poolhouse._async._connection import AsyncConnection
+    from adbc_poolhouse._async._reader import _SyncReader
     from tests._async_harness.stubs import BlockingStubConnection
 
 # `tests/async/` cannot be imported with a dotted path (`async` is a reserved
@@ -83,7 +84,9 @@ class TestCr3401MetadataReaderCancel:
         sync_reader = stub_cursor.fetch_record_batch(batches=[object()])
         # Build the reader exactly as the streaming metadata methods do.
         reader = AsyncRecordBatchReader(
-            sync_reader,
+            # The stub's `schema` is an untyped stand-in (it is never inspected), so
+            # it only structurally matches `_SyncReader` once cast.
+            cast("_SyncReader", sync_reader),
             async_conn._limiter,  # noqa: SLF001
             async_conn,
             _noop_cancel,

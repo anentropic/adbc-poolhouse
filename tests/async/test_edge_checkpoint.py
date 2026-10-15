@@ -31,12 +31,14 @@ from __future__ import annotations
 
 import importlib
 from collections.abc import Callable
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import anyio
 import pytest
 
 if TYPE_CHECKING:
+    import pyarrow
+
     from adbc_poolhouse._async._connection import AsyncConnection
     from tests._async_harness.stubs import BlockingStubConnection
 
@@ -75,7 +77,7 @@ async def test_cancel_before_ingest_is_clean(
     with real_clock_watchdog(stub_conn.cursors) as tripped:
         with anyio.CancelScope() as scope:
             scope.cancel()  # cancel BEFORE entering the offload; no intervening await
-            await cur.adbc_ingest("t", object())
+            await cur.adbc_ingest("t", cast("pyarrow.Table", object()))
     assert tripped[0] is False
     assert sc.ingest_call_count == 0  # the driver was never touched — delivered at the checkpoint
     assert sc.adbc_cancel_call_count == 0  # nothing to abort — fn never started

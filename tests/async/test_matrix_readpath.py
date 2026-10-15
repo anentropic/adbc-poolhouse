@@ -28,7 +28,7 @@ looked up case-insensitively and compared by value.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Any, cast
 
 import pyarrow
 import pytest
@@ -60,7 +60,7 @@ _BACKENDS = [
 _READ_QUERY = "SELECT 1 AS n, 'hello' AS s"
 
 
-def _col(table: pyarrow.Table, name: str) -> pyarrow.ChunkedArray:
+def _col(table: pyarrow.Table, name: str) -> pyarrow.ChunkedArray[Any]:
     """
     Look a column up case-insensitively, backend-neutrally.
 
