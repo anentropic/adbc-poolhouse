@@ -143,10 +143,13 @@ wait, so they capture the GIL behaviour rather than real network concurrency. A
 networked backend has genuine I/O latency to overlap, which is exactly the case
 the worker-thread model is built for.
 
-The pool caps concurrency for you. Each [`AsyncPool`][adbc_poolhouse._async._pool.AsyncPool] owns one
-`anyio.CapacityLimiter` sized to `pool_size + max_overflow`, so the calls you make
-through the pool can never have more in flight than its checkout ceiling. There is
-no separate knob to tune and no global limiter to collide with.
+The pool caps concurrency for you. Each [`AsyncPool`][adbc_poolhouse._async._pool.AsyncPool] owns two
+`anyio.CapacityLimiter`s, both sized to `pool_size + max_overflow`: one for calls on
+checked-out connections and one for checkouts. Calls on connections never have more
+in flight than the checkout ceiling, and at most the same number of checkouts wait
+on worker threads beside them, so a pool uses up to `2 x (pool_size + max_overflow)`
+worker threads. There is no separate knob to tune and no global limiter to collide
+with.
 
 ## When the pool is saturated
 
@@ -154,19 +157,21 @@ Two limits sit between an `await pool.connect()` and a connection, and they
 behave differently. Which one you have hit decides what a request handler can do
 about it.
 
-The first is the pool's own `anyio.CapacityLimiter`, sized to
-`pool_size + max_overflow`. Every call you make on a connection borrows one token
-from it for the duration of that single call and releases the token when the call
-returns. `pool.connect()` itself draws on a second limiter of the same size, so
-tasks waiting for a connection never use up the tokens the tasks holding
-connections need to finish and hand them back.
-That is the transient-token model: a token tracks a call in the driver, not a
+The first is the pool's checkout limiter, an `anyio.CapacityLimiter` sized to
+`pool_size + max_overflow`. Each `pool.connect()` borrows a token from it while its
+worker thread waits for a connection. It is separate from the limiter that calls on
+connections use, so tasks waiting for a connection never use up the tokens the
+tasks holding connections need to finish and hand them back.
+
+Every call you make on a connection borrows one token from that second limiter,
+also sized to `pool_size + max_overflow`, for the duration of that single call and
+releases the token when the call returns. That is the transient-token model: a token tracks a call in the driver, not a
 connection in your hands. A checked-out connection sitting idle between queries
 holds no token, while one `execute` or `fetch_arrow_table` holds one for as long
 as the driver takes to answer.
 
-When every token is borrowed, the next call queues at the limiter, and nothing
-times that wait out. `timeout` does not apply to it and the limiter raises
+When every token in either limiter is borrowed, the next call queues at it, and
+nothing times that wait out. `timeout` does not apply to it and the limiter raises
 nothing; the task waits until a token frees.
 
 The second limit is the underlying `QueuePool`'s checkout ceiling, also
@@ -195,14 +200,19 @@ async with conn:
 
 Running more concurrent tasks than the pool has connections is fine: the extra
 tasks wait in checkout and each one picks up a connection as another task
-finishes with it. Only a wait longer than `timeout` fails.
+finishes with it. `timeout` bounds only the wait on a worker thread inside the
+checkout. Once `pool_size + max_overflow` checkouts are already waiting there,
+further callers queue at the checkout limiter first, with no time limit, and their
+`timeout` starts only when they reach a worker. So the 503 pattern above sheds load
+but does not cap total latency; wrap the whole request in your own deadline if you
+need one.
 
 One thing follows for your choice of `timeout` in a server: the checkout is not
 cooperatively cancellable, unlike `execute` and the `fetch*` methods. Wrapping `await pool.connect()` in `fail_after` will not abort a
 checkout that is already blocking on its worker thread; the deadline is deferred
 until the checkout returns or `timeout` expires. `timeout` is the knob for this,
 not the surrounding scope. A checkout cancelled while it is still queued at the
-limiter, before any worker ran, does cancel cleanly and touches no connection.
+checkout limiter, before any worker ran, does cancel cleanly and touches no connection.
 
 ## Streaming a result set batch by batch
 

@@ -1,11 +1,11 @@
 """
-`AsyncPool`: the async pool wrapper owning its dedicated `CapacityLimiter`.
+`AsyncPool`: the async pool wrapper owning its dedicated `CapacityLimiter`s.
 
 `AsyncPool` wraps a synchronous SQLAlchemy `QueuePool` (built unchanged by the
-sync factory) and adds the async surface. It owns ONE dedicated
+sync factory) and adds the async surface. It owns a dedicated
 `anyio.CapacityLimiter(pool_size + max_overflow)` --- never anyio's global
-40-token default --- so concurrency is bounded to exactly the pool's checkout
-ceiling (CORE-02). Every blocking call goes through the single
+40-token default --- so calls on connections are bounded to exactly the pool's
+checkout ceiling (CORE-02). Every blocking call goes through the single
 [`offload`][adbc_poolhouse._async._offload.offload] chokepoint with that limiter,
 except the checkout itself, which runs under a second limiter of the same size
 so a task waiting for a free connection never holds a token that a connection

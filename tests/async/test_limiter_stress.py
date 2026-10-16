@@ -2,11 +2,12 @@
 TEST-04 limiter saturation stress: no deadlock or starvation above `pool_size`.
 
 The dedicated per-pool `CapacityLimiter(pool_size + max_overflow)` is the only
-thing that caps how many blocking `execute` offloads run at once. This module
+thing that caps how many blocking `execute` offloads run at once (checkouts run
+under a separate `_checkout_limiter` of the same size). This module
 proves it holds that bound under a deliberate flood, without self-deadlock and
 without starving any queued worker.
 
-Two complementary tests, both `@pytest.mark.anyio` (run under BOTH asyncio and
+Three complementary tests, all `@pytest.mark.anyio` (run under BOTH asyncio and
 trio):
 
 - The PRIMARY proof is a stub-gated deterministic flood (D-27-10), reusing the
@@ -20,6 +21,10 @@ trio):
   drains and asserts every queued worker eventually ran (`borrowed_tokens == 0`, no
   starvation). It uses the shipped defaults `pool_size=5 + max_overflow=3 = 8`, so
   the flood proves the real bound the library ships (Open Question 1).
+- An ungated real-DuckDB checkout queue (`TestCheckoutQueueNoDeadlock`): more
+  concurrent round trips than the pool has connections, so tasks queue inside
+  `QueuePool.connect()`. Pins that checkout waiters cannot take the tokens that
+  connection holders need to return a connection.
 - A small real-DuckDB smoke flood adds realism: `4 x bound` genuine
   connect -> execute -> fetch round trips against `duckdb_async_pool` all complete
   and leave `checkedout() == 0`.
@@ -35,7 +40,7 @@ Two load-bearing landmines (Phase 24-26):
   worker that has not yet entered, whereas a plain `release()` re-arms on the next
   `_block` and strands a late worker (the Phase 26 lost-wakeup).
 
-No `src/` changes. The gated mechanics stay DuckDB + stub only --- the Snowflake
+The gated mechanics stay DuckDB + stub only --- the Snowflake
 cassette `ReplayCursor` cannot block-gate (D-27-06).
 """
 
@@ -206,6 +211,7 @@ class TestCheckoutQueueNoDeadlock:
             assert sorted(results) == list(range(8))
             assert pool._pool.checkedout() == 0  # noqa: SLF001
             assert pool._limiter.borrowed_tokens == 0  # noqa: SLF001
+            assert pool._checkout_limiter.borrowed_tokens == 0  # noqa: SLF001
         finally:
             await pool.close()
 
@@ -267,3 +273,4 @@ class TestLimiterSmokeFlood:
         # No checkout leak: every connection the flood borrowed is back in the pool.
         assert duckdb_async_pool._pool.checkedout() == 0
         assert duckdb_async_pool._limiter.borrowed_tokens == 0
+        assert duckdb_async_pool._checkout_limiter.borrowed_tokens == 0
