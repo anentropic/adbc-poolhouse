@@ -155,9 +155,11 @@ behave differently. Which one you have hit decides what a request handler can do
 about it.
 
 The first is the pool's own `anyio.CapacityLimiter`, sized to
-`pool_size + max_overflow`. Every call you make through the pool borrows one token
+`pool_size + max_overflow`. Every call you make on a connection borrows one token
 from it for the duration of that single call and releases the token when the call
-returns.
+returns. `pool.connect()` itself draws on a second limiter of the same size, so
+tasks waiting for a connection never use up the tokens the tasks holding
+connections need to finish and hand them back.
 That is the transient-token model: a token tracks a call in the driver, not a
 connection in your hands. A checked-out connection sitting idle between queries
 holds no token, while one `execute` or `fetch_arrow_table` holds one for as long
@@ -168,8 +170,8 @@ times that wait out. `timeout` does not apply to it and the limiter raises
 nothing; the task waits until a token frees.
 
 The second limit is the underlying `QueuePool`'s checkout ceiling, also
-`pool_size + max_overflow` connections. Once `pool.connect()` holds a token it
-runs the blocking checkout on a worker thread. If every connection is already
+`pool_size + max_overflow` connections. `pool.connect()` runs the blocking
+checkout on a worker thread. If every connection is already
 checked out, that worker waits up to `timeout` seconds and then raises
 `sqlalchemy.exc.TimeoutError`, SQLAlchemy's own class rather than the builtin
 `TimeoutError`. The wrapper never re-wraps an exception raised on a worker
@@ -191,12 +193,12 @@ async with conn:
         await cur.execute("SELECT 1")
 ```
 
-Two things follow for your choice of `timeout` in a server.
-A blocked checkout keeps its limiter token for the whole wait, so a burst of
-checkouts against a full pool competes for the same budget the in-flight queries
-draw on: a generous `timeout` costs throughput as well as latency. And the
-checkout is not cooperatively cancellable, unlike `execute` and the `fetch*`
-methods. Wrapping `await pool.connect()` in `fail_after` will not abort a
+Running more concurrent tasks than the pool has connections is fine: the extra
+tasks wait in checkout and each one picks up a connection as another task
+finishes with it. Only a wait longer than `timeout` fails.
+
+One thing follows for your choice of `timeout` in a server: the checkout is not
+cooperatively cancellable, unlike `execute` and the `fetch*` methods. Wrapping `await pool.connect()` in `fail_after` will not abort a
 checkout that is already blocking on its worker thread; the deadline is deferred
 until the checkout returns or `timeout` expires. `timeout` is the knob for this,
 not the surrounding scope. A checkout cancelled while it is still queued at the

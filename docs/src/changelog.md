@@ -6,6 +6,7 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- The async pool no longer stalls when more tasks use it at once than it has connections. `AsyncPool.connect()` ran its blocking checkout under the same limiter that `execute`, the `fetch*` methods and `close` use. Once the pool was full, the tasks waiting for a connection took every limiter token while they waited, so the tasks holding connections could not run the calls that would give one back. Nothing moved until the pool's `timeout` expired: with a 2 + 3 pool and 10 concurrent queries, 5 finished after the full timeout and 5 raised `sqlalchemy.exc.TimeoutError`. Checkout now has its own limiter of the same size, so extra tasks simply queue for a connection. The sync pool was never affected.
 - `AsyncCursor.fetch_polars` returns a `polars.DataFrame` again under polars 2.0. polars 2 changed `polars.from_arrow` to return a one-column struct `Series` when it is given an Arrow stream, which is what the ADBC driver manager passes it, so the method was handing back a `Series` whose single struct column held every result column. adbc-poolhouse now unnests it into the frame you expect, with the same column names, dtypes and rows. polars 1 is unaffected.
 
 ## [1.6.3] - 2026-10-14
