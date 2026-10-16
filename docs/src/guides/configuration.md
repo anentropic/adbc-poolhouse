@@ -97,7 +97,7 @@ pip install adbc-poolhouse[async]
 
 The three async entry points ([`create_async_pool`][adbc_poolhouse.create_async_pool], [`managed_async_pool`][adbc_poolhouse.managed_async_pool], and [`close_async_pool`][adbc_poolhouse.close_async_pool]) mirror the signatures of their sync counterparts (`create_pool`, `managed_pool`, [`close_pool`][adbc_poolhouse.close_pool]). The same `pool_size`, `max_overflow`, `timeout`, `recycle`, and `pre_ping` fields documented in [Pool tuning](#pool-tuning) apply, with the same defaults.
 
-Each async pool sizes its own `anyio.CapacityLimiter` to `pool_size + max_overflow`. That limiter caps how many blocking ADBC calls run on worker threads at once, so the same tuning fields that size the underlying `QueuePool` also govern async concurrency. There is no separate knob.
+Each async pool sizes two `anyio.CapacityLimiter`s to `pool_size + max_overflow`: one caps how many blocking ADBC calls on connections run on worker threads at once, and the other caps how many checkouts wait on worker threads for a connection. The same tuning fields that size the underlying `QueuePool` therefore govern async concurrency. There is no separate knob.
 
 For the first-query walkthrough, concurrency limits, and the one-connection-per-task rule, see the [async pool guide](async.md).
 
