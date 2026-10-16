@@ -47,11 +47,15 @@ from typing import TYPE_CHECKING
 
 import anyio
 import pytest
+import sqlalchemy.exc
 
+from adbc_poolhouse import DuckDBConfig, create_async_pool
 from adbc_poolhouse._async._connection import AsyncConnection
 from tests._async_harness.stubs import BlockingStubConnection
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from adbc_poolhouse._async._pool import AsyncPool
 
 # `tests/async/` cannot be imported with a dotted path (`async` is a reserved
@@ -152,6 +156,60 @@ class TestLimiterFloodBound:
         assert limiter.borrowed_tokens == 0  # every queued worker ran; full drain
 
 
+class TestCheckoutQueueNoDeadlock:
+    """More concurrent tasks than connections queue for checkout without stalling holders."""
+
+    @pytest.mark.anyio
+    async def test_oversubscribed_checkouts_do_not_starve_holders(self, tmp_path: Path) -> None:
+        """
+        `connect()` waiters must not hold the tokens that connection holders need.
+
+        A 1 + 1 pool serves 8 concurrent connect -> execute -> fetch -> close round
+        trips with no caller-side gate. Tasks beyond the pool's two connections wait
+        inside the blocking `QueuePool.connect()` for one to come back. When that
+        wait ran under the same `CapacityLimiter` the holders use for `execute`,
+        `fetch` and `close`, the waiters took every token, no holder could return
+        its connection, and the waiters timed out with
+        `sqlalchemy.exc.TimeoutError` after the pool's `timeout`. Every round trip
+        must instead finish, with no checkout and no token left over.
+
+        The pool `timeout` doubles as the deadlock detector: a stall surfaces as a
+        `TimeoutError` from the real driver path, so no virtual-clock deadline is
+        needed (a `fail_after` would autojump under the trio `MockClock`).
+        """
+        pool = create_async_pool(
+            DuckDBConfig(
+                database=str(tmp_path / "checkout_queue.db"),
+                pool_size=1,
+                max_overflow=1,
+                timeout=3,
+            )
+        )
+        results: list[int] = []
+        errors: list[BaseException] = []
+
+        async def _round_trip(i: int) -> None:
+            try:
+                async with await pool.connect() as conn:
+                    cur = conn.cursor()
+                    await cur.execute(f"SELECT {i} AS n")
+                    tbl = await cur.fetch_arrow_table()
+                    results.append(tbl.column("n")[0].as_py())
+            except sqlalchemy.exc.TimeoutError as exc:
+                errors.append(exc)
+
+        try:
+            async with anyio.create_task_group() as tg:
+                for i in range(8):
+                    tg.start_soon(_round_trip, i)
+            assert errors == []
+            assert sorted(results) == list(range(8))
+            assert pool._pool.checkedout() == 0  # noqa: SLF001
+            assert pool._limiter.borrowed_tokens == 0  # noqa: SLF001
+        finally:
+            await pool.close()
+
+
 class TestLimiterSmokeFlood:
     """TEST-04 realism leg: a small real-DuckDB flood drains cleanly (D-27-10)."""
 
@@ -164,11 +222,13 @@ class TestLimiterSmokeFlood:
         under the same saturation shape. `_FLOOD` genuine round trips run against
         `duckdb_async_pool`, but each task acquires a `CapacityLimiter(_BOUND)` slot
         BEFORE calling `connect` so no more than `_BOUND` connections are held at
-        once --- otherwise the `_FLOOD` concurrent holders would exceed the real
-        `QueuePool` (size `_POOL_SIZE` + overflow `_MAX_OVERFLOW`) and block in
-        checkout (a real bounded-resource limit, not a wrapper bug). Each connection
-        is held only across its own round trip and released promptly, so the bounded
-        pool cycles all `_FLOOD` workers through and `checkedout() == 0` afterwards.
+        once. This keeps the leg about the execute limiter alone; the ungated case,
+        where extra tasks queue inside checkout, is covered by
+        `TestCheckoutQueueNoDeadlock` (an earlier version of this docstring called
+        that queueing a real bounded-resource limit, but it was a wrapper deadlock).
+        Each connection is held only across its own round trip and released
+        promptly, so the bounded pool cycles all `_FLOOD` workers through and
+        `checkedout() == 0` afterwards.
 
         Deadlock backstop: unlike the stub leg, this flood has NO blocking stub the
         watchdog could `close()` to force a stranded worker open --- the real ADBC
