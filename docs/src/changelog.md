@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.6.4] - 2026-10-16
+
 ### Fixed
 
 - The async pool no longer stalls when more tasks use it at once than it has connections. `AsyncPool.connect()` ran its blocking checkout under the same limiter that `execute`, the `fetch*` methods and `close` use. Once the pool was full, the tasks waiting for a connection took every limiter token while they waited, so the tasks holding connections could not run the calls that would give one back. Nothing moved until the pool's `timeout` expired: with a 2 + 3 pool and 10 concurrent queries, 5 finished after the full timeout and 5 raised `sqlalchemy.exc.TimeoutError`. Checkout now has its own limiter of the same size, so extra tasks simply queue for a connection. The sync pool was never affected.
