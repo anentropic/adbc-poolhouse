@@ -158,15 +158,16 @@ behave differently. Which one you have hit decides what a request handler can do
 about it.
 
 The first is the pool's checkout limiter, an `anyio.CapacityLimiter` sized to
-`pool_size + max_overflow`. Each `pool.connect()` borrows a token from it while its
-worker thread waits for a connection. It is separate from the limiter that calls on
+`pool_size + max_overflow`. Each
+[`pool.connect()`][adbc_poolhouse._async._pool.AsyncPool.connect] borrows a token
+from it while its worker thread waits for a connection. It is separate from the limiter that calls on
 connections use, so tasks waiting for a connection never use up the tokens the
 tasks holding connections need to finish and hand them back.
 
 Every call you make on a connection borrows one token from that second limiter,
 also sized to `pool_size + max_overflow`, for the duration of that single call and
-releases the token when the call returns. That is the transient-token model: a token tracks a call in the driver, not a
-connection in your hands. A checked-out connection sitting idle between queries
+releases the token when the call returns. That is the transient-token model: a
+token tracks a call in the driver, not a connection in your hands. A checked-out connection sitting idle between queries
 holds no token, while one `execute` or `fetch_arrow_table` holds one for as long
 as the driver takes to answer.
 
@@ -208,11 +209,12 @@ but does not cap total latency; wrap the whole request in your own deadline if y
 need one.
 
 One thing follows for your choice of `timeout` in a server: the checkout is not
-cooperatively cancellable, unlike `execute` and the `fetch*` methods. Wrapping `await pool.connect()` in `fail_after` will not abort a
-checkout that is already blocking on its worker thread; the deadline is deferred
-until the checkout returns or `timeout` expires. `timeout` is the knob for this,
-not the surrounding scope. A checkout cancelled while it is still queued at the
-checkout limiter, before any worker ran, does cancel cleanly and touches no connection.
+cooperatively cancellable, unlike `execute` and the `fetch*` methods. Wrapping
+`await pool.connect()` in `fail_after` will not abort a checkout that is already
+blocking on its worker thread; the deadline is deferred until the checkout returns
+or `timeout` expires. `timeout` is the knob for this, not the surrounding scope. A
+checkout cancelled while it is still queued at the checkout limiter, before any
+worker ran, does cancel cleanly and touches no connection.
 
 ## Streaming a result set batch by batch
 
@@ -389,15 +391,16 @@ returned frame owns its buffers, so it stays valid after the connection is check
 in. You can read it outside the `async with` block, the same way a
 `fetch_arrow_table` result survives check-in.
 
-`fetch_polars` returns a `polars.DataFrame` on polars 1 and polars 2 alike. Under
+[`fetch_polars`][adbc_poolhouse._async._cursor.AsyncCursor.fetch_polars] returns a
+`polars.DataFrame` on polars 1 and polars 2 alike. Under
 polars 2 the ADBC driver manager's own `fetch_polars` returns a one-column struct
 `Series` instead, so if you call the sync driver cursor directly you will see that.
 
 pandas and polars are not adbc-poolhouse dependencies. You install whichever you use.
-adbc-poolhouse does not import either before the driver does: the driver imports pandas
-or polars on the worker thread as part of the fetch, so a missing install surfaces the native
-`ModuleNotFoundError` unchanged. adbc-poolhouse adds no availability pre-check and no
-wrapping, exactly as the underlying sync ADBC method behaves.
+adbc-poolhouse does not import either before the driver does: the driver imports
+pandas or polars on the worker thread as part of the fetch, so a missing install
+surfaces the native `ModuleNotFoundError` unchanged. adbc-poolhouse adds no
+availability pre-check and no wrapping, exactly as the underlying sync ADBC method behaves.
 
 ## Connection metadata
 
