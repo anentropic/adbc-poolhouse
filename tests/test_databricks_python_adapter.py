@@ -187,3 +187,174 @@ def test_connection_metadata_gaps_raise_not_supported(
 ) -> None:
     with pytest.raises(NotSupportedError):
         getattr(adapter, method)()
+
+
+# ----- Connector errors surface as ADBC DBAPI errors -----
+#
+# Callers catch `adbc_driver_manager` errors; a connector `databricks.sql.exc` error that
+# passed through unchanged slipped past every such handler. The adapter re-raises each one as
+# the ADBC class of the same PEP 249 category, chaining the connector error as `__cause__`.
+
+dbsql_exc = pytest.importorskip("databricks.sql.exc")
+
+
+def _error_classes() -> list[tuple[str, str]]:
+    """(connector class name, expected ADBC class name), most specific connector class first."""
+    return [
+        ("ServerOperationError", "DatabaseError"),
+        ("RequestError", "OperationalError"),
+        ("OperationalError", "OperationalError"),
+        ("ProgrammingError", "ProgrammingError"),
+        ("NotSupportedError", "NotSupportedError"),
+        ("IntegrityError", "IntegrityError"),
+        ("DataError", "DataError"),
+        ("InternalError", "InternalError"),
+        ("InterfaceError", "InterfaceError"),
+        ("DatabaseError", "DatabaseError"),
+        ("Error", "Error"),
+    ]
+
+
+class _RaisingCursor(_FakeCursor):
+    """A fake connector cursor whose every connector call raises ``error``."""
+
+    def __init__(self, table: pa.Table, error: BaseException) -> None:
+        super().__init__(table)
+        self.error = error
+
+    def _raise(self, *args: Any, **kwargs: Any) -> Any:
+        raise self.error
+
+    execute = executemany = fetchone = fetchmany = fetchall = _raise
+    fetchall_arrow = fetchmany_arrow = cancel = _raise
+
+
+def _raising_adapter(table: pa.Table, error: BaseException) -> _DatabricksPythonConnection:
+    conn = _FakeConn(table)
+    conn._cursor = _RaisingCursor(table, error)  # noqa: SLF001
+    return _DatabricksPythonConnection(conn)
+
+
+@pytest.mark.parametrize(("connector_cls", "adbc_cls"), _error_classes())
+def test_execute_reraises_connector_errors_as_adbc(
+    table: pa.Table, connector_cls: str, adbc_cls: str
+) -> None:
+    import adbc_driver_manager.dbapi as adbc
+
+    error = getattr(dbsql_exc, connector_cls)("warehouse said no")
+    cur = _raising_adapter(table, error).cursor()
+
+    with pytest.raises(adbc.Error) as info:
+        cur.execute("SELECT 1")
+
+    assert type(info.value) is getattr(adbc, adbc_cls)
+    assert info.value.__cause__ is error
+    assert "warehouse said no" in str(info.value)
+
+
+@pytest.mark.parametrize(
+    "call",
+    [
+        lambda cur: cur.executemany("INSERT", [()]),
+        lambda cur: cur.fetchone(),
+        lambda cur: cur.fetchmany(1),
+        lambda cur: cur.fetchall(),
+        lambda cur: cur.fetch_arrow_table(),
+        lambda cur: cur.fetchallarrow(),
+        lambda cur: cur.fetch_record_batch(),
+        lambda cur: cur.fetch_df(),
+        lambda cur: cur.fetch_polars(),
+        lambda cur: cur.adbc_cancel(),
+    ],
+    ids=[
+        "executemany",
+        "fetchone",
+        "fetchmany",
+        "fetchall",
+        "fetch_arrow_table",
+        "fetchallarrow",
+        "fetch_record_batch",
+        "fetch_df",
+        "fetch_polars",
+        "adbc_cancel",
+    ],
+)
+def test_every_cursor_call_translates(table: pa.Table, call: Any) -> None:
+    import adbc_driver_manager.dbapi as adbc
+
+    error = dbsql_exc.RequestError("connection dropped")
+    cur = _raising_adapter(table, error).cursor()
+
+    with pytest.raises(adbc.OperationalError) as info:
+        call(cur)
+
+    assert info.value.__cause__ is error
+
+
+def test_a_failure_mid_stream_translates(table: pa.Table) -> None:
+    """An error fetching a later batch surfaces from ``read_next_batch`` as an ADBC error."""
+    import adbc_driver_manager.dbapi as adbc
+
+    conn = _FakeConn(table)
+    calls = {"n": 0}
+    real = conn._cursor.fetchmany_arrow  # noqa: SLF001
+    error = dbsql_exc.RequestError("CloudFetch link expired")
+
+    def _second_call_fails(size: int) -> pa.Table:
+        calls["n"] += 1
+        if calls["n"] > 1:
+            raise error
+        return real(size)
+
+    conn._cursor.fetchmany_arrow = _second_call_fails  # type: ignore[method-assign]  # noqa: SLF001
+    reader = _DatabricksPythonConnection(conn).cursor().fetch_record_batch()
+
+    reader.read_next_batch()
+    with pytest.raises(adbc.OperationalError) as info:
+        reader.read_next_batch()
+    assert info.value.__cause__ is error
+
+
+@pytest.mark.parametrize("method", ["close", "commit", "rollback", "cursor"])
+def test_connection_calls_translate(table: pa.Table, method: str) -> None:
+    import adbc_driver_manager.dbapi as adbc
+
+    error = dbsql_exc.InterfaceError("session closed")
+    conn = _FakeConn(table)
+
+    def _raise(*_args: Any) -> Any:
+        raise error
+
+    setattr(conn, method, _raise)
+
+    with pytest.raises(adbc.InterfaceError) as info:
+        getattr(_DatabricksPythonConnection(conn), method)()
+    assert info.value.__cause__ is error
+
+
+def test_connect_translates_connector_errors(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A refused connection (bad token, unreachable host) is an ADBC ``OperationalError``."""
+    import adbc_driver_manager.dbapi as adbc
+    import databricks.sql
+
+    from adbc_poolhouse._adapters import _databricks_python
+
+    error = dbsql_exc.RequestError("Error during request to server: 401")
+
+    def _refuse(**_kwargs: Any) -> Any:
+        raise error
+
+    monkeypatch.setattr(databricks.sql, "connect", _refuse)
+
+    with pytest.raises(adbc.OperationalError) as info:
+        _databricks_python.connect(server_hostname="h", http_path="p")
+    assert info.value.__cause__ is error
+
+
+def test_non_connector_errors_pass_through(table: pa.Table) -> None:
+    """Only connector DB-API errors are translated; a plain bug keeps its own type."""
+    error = ValueError("not a database error")
+    cur = _raising_adapter(table, error).cursor()
+
+    with pytest.raises(ValueError, match="not a database error"):
+        cur.execute("SELECT 1")
