@@ -22,8 +22,17 @@ This backend needs the `databricks-python` extra, which pulls in
 pip install "adbc-poolhouse[databricks-python]"
 ```
 
-The kernel currently requires `pyarrow>=23.0.1,<24`, so this extra holds PyArrow
-below 24 in your environment.
+The kernel brings a few install constraints:
+
+- It requires `pyarrow>=23.0.1,<24`, so this extra holds PyArrow below 24 in your
+  environment. The `all` extra includes this backend, so it holds PyArrow below
+  24 too.
+- PyArrow 23 has no wheels for Python 3.15, so on 3.15 pip falls back to building
+  it from source, which needs the Arrow C++ toolchain. Use Python 3.14 or older
+  with this extra until the kernel allows a newer PyArrow.
+- The kernel ships wheels for macOS, Windows (x86-64) and Linux with glibc 2.28 or
+  newer (x86-64 and aarch64). It has none for musl (Alpine) or older glibc, so
+  there pip has to compile it from source.
 
 OAuth machine-to-machine auth also needs `databricks-sdk`, which the
 connector itself does not require. When you use that auth method, install the
