@@ -14,11 +14,13 @@ Or with uv:
 uv add "adbc-poolhouse[duckdb]"
 ```
 
+The extra requires DuckDB 1.4.1 or later. Earlier releases ship an ADBC driver that `DuckDBConfig` cannot load.
+
 ## Connection
 
 [`DuckDBConfig`][adbc_poolhouse.DuckDBConfig] supports file-backed and in-memory databases.
 
-Both default to a pool of 5 connections. The pool clones every connection from one source connection, so they all open the same database. With `:memory:` that means one in-memory database shared by the whole pool: a table one connection creates and commits is visible to the others, including connections the pool opens later to replace recycled ones. The database lasts until you close the pool.
+Both default to a [`pool_size`][adbc_poolhouse.DuckDBConfig.pool_size] of 5 connections. The pool clones every connection from one source connection, so they all open the same database. With `:memory:` that means one in-memory database shared by the whole pool: a table one connection creates and commits is visible to the others, including connections the pool opens later to replace ones it [recycled](configuration.md#keeping-connections-healthy-with-recycle). The database lasts until you close the pool with [`close_pool`][adbc_poolhouse.close_pool], or until the [`managed_pool`][adbc_poolhouse.managed_pool] block exits.
 
 ### File-backed
 
@@ -34,6 +36,8 @@ pool = create_pool(config)
 Set up tables and data once, on any connection, and commit. ADBC connections start with autocommit off, so other connections see nothing until you commit.
 
 ```python
+from adbc_poolhouse import DuckDBConfig, create_pool
+
 config = DuckDBConfig(database=":memory:")
 pool = create_pool(config)
 
