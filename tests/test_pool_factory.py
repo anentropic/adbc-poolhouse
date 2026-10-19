@@ -69,6 +69,74 @@ class TestCreatePoolDuckDB:
             pool._adbc_source.close()  # type: ignore[attr-defined]
 
 
+class TestDuckDBInMemoryShared:
+    """Every pooled :memory: connection opens the one database its source connection holds."""
+
+    @staticmethod
+    def _create_table(conn: sqlalchemy.pool.PoolProxiedConnection) -> None:
+        cur = conn.cursor()
+        cur.execute("CREATE TABLE shared AS SELECT 42 AS x")
+        cur.close()
+        conn.commit()
+
+    @staticmethod
+    def _read_table(conn: sqlalchemy.pool.PoolProxiedConnection) -> list[tuple[int, ...]]:
+        cur = conn.cursor()
+        cur.execute("SELECT x FROM shared")
+        rows = [tuple(row) for row in cur.fetchall()]
+        cur.close()
+        return rows
+
+    def test_default_memory_pool_has_five_connections(self) -> None:
+        with managed_pool(DuckDBConfig()) as pool:
+            assert pool.size() == 5
+
+    def test_concurrent_connections_share_one_database(self) -> None:
+        """A table committed on one checked-out connection is visible on another."""
+        with managed_pool(DuckDBConfig(pool_size=2, max_overflow=0)) as pool:
+            a = pool.connect()
+            b = pool.connect()
+            try:
+                assert a.dbapi_connection is not b.dbapi_connection
+                self._create_table(a)
+                assert self._read_table(b) == [(42,)]
+            finally:
+                a.close()
+                b.close()
+
+    def test_replacement_connection_sees_existing_data(self) -> None:
+        """A connection opened after every earlier one was discarded still sees the data."""
+        with managed_pool(DuckDBConfig(pool_size=1, max_overflow=0)) as pool:
+            conn = pool.connect()
+            first = conn.dbapi_connection
+            self._create_table(conn)
+            conn.invalidate()  # closes the physical connection, as a recycle does
+            conn.close()
+
+            conn = pool.connect()
+            try:
+                assert conn.dbapi_connection is not first
+                assert self._read_table(conn) == [(42,)]
+            finally:
+                conn.close()
+
+    def test_separate_pools_do_not_share(self) -> None:
+        """Sharing is per pool: a second :memory: pool starts with an empty database."""
+        with (
+            managed_pool(DuckDBConfig()) as first,
+            managed_pool(DuckDBConfig()) as second,
+        ):
+            with first.connect() as conn:
+                self._create_table(conn)
+            with second.connect() as conn:
+                cur = conn.cursor()
+                cur.execute(
+                    "SELECT count(*) FROM information_schema.tables WHERE table_name = 'shared'"
+                )
+                assert cur.fetchone() == (0,)
+                cur.close()
+
+
 class TestConfigPoolTuning:
     """Config tuning fields are forwarded to the pool (precedence: kwarg > config > default)."""
 
@@ -334,13 +402,6 @@ class TestExceptionHierarchy:
     def test_configuration_error_hierarchy(self) -> None:
         assert issubclass(ConfigurationError, PoolhouseError)
         assert issubclass(ConfigurationError, ValueError)
-
-    def test_duckdb_memory_raises_configuration_error(self) -> None:
-        """TEST-02: DuckDBConfig(:memory:, pool_size=2) raises ValidationError."""
-        from pydantic import ValidationError
-
-        with pytest.raises(ValidationError):
-            DuckDBConfig(database=":memory:", pool_size=2)
 
     def test_pool_size_zero_raises_configuration_error(self) -> None:
         """pool_size=0 is rejected (must be > 0)."""

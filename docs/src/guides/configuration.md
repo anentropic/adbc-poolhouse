@@ -47,7 +47,7 @@ All config classes inherit pool tuning fields from [`BaseWarehouseConfig`][adbc_
 
 | Field | Default | Description |
 |---|---|---|
-| `pool_size` | `5` | Number of connections to keep open (DuckDB and SQLite default to `1` for in-memory databases, `5` for file-backed) |
+| `pool_size` | `5` | Number of connections to keep open (SQLite defaults to `1` for an in-memory database, `5` for file-backed) |
 | `max_overflow` | `3` | Extra connections allowed when pool is full |
 | `timeout` | `30` | Seconds to wait for a connection before raising `sqlalchemy.exc.TimeoutError` |
 | `recycle` | `3600` | Seconds before a connection is closed and replaced |

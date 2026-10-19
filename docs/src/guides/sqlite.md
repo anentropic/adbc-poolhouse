@@ -18,7 +18,7 @@ uv add "adbc-poolhouse[sqlite]"
 
 [`SQLiteConfig`][adbc_poolhouse.SQLiteConfig] supports file-backed and in-memory databases.
 
-For a pool with more than one connection, use a file path. In-memory SQLite is shared across all connections in the pool, unlike DuckDB, where each connection gets its own isolated database.
+For a pool with more than one connection, use a file path. In-memory SQLite is limited to one connection.
 
 ### File-backed
 
@@ -31,7 +31,7 @@ pool = create_pool(config)
 
 ### In-memory
 
-`pool_size` defaults to `1` for in-memory databases and cannot be raised. All connections in the pool share the same in-memory database, unlike DuckDB, where each connection gets its own isolated database, so `pool_size > 1` would race connection state on that single database. Combining `pool_size > 1` with `:memory:` raises [`ConfigurationError`][adbc_poolhouse.ConfigurationError] (wrapped as a Pydantic `ValidationError`).
+`pool_size` defaults to `1` for in-memory databases and cannot be raised. All connections in the pool share the same in-memory database, so `pool_size > 1` would race connection state on that single database. Combining `pool_size > 1` with `:memory:` raises [`ConfigurationError`][adbc_poolhouse.ConfigurationError] (wrapped as a Pydantic `ValidationError`).
 
 ```python
 config = SQLiteConfig(database=":memory:")

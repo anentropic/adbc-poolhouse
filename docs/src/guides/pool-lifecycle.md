@@ -158,10 +158,6 @@ Two of the five shape how the pool behaves in a long-running process. `pool_size
 
 `pool.dispose()` drains the pool but does not close the ADBC source connection. Always use `close_pool(pool)` (or `managed_pool` as a context manager). Do not call `pool.dispose()` directly.
 
-**Using `database=":memory:"` with `pool_size > 1`**
-
-Each DuckDB connection cloned from an in-memory source gets its own isolated empty database. [`DuckDBConfig`][adbc_poolhouse.DuckDBConfig] raises [`ConfigurationError`][adbc_poolhouse.ConfigurationError] at construction (wrapped by Pydantic as a `ValidationError`) if you pass `pool_size > 1` with an in-memory database, which prevents this silent data-loss bug. Use a file-backed database when you need multiple connections.
-
 **Holding connections outside the `with` block**
 
 If you call `pool.connect()` without a context manager, the connection is checked out and never returned:

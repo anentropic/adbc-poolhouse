@@ -21,7 +21,7 @@ class ConfigurationError(PoolhouseError, ValueError):
 
     Example:
         ```python
-        DuckDBConfig(database=":memory:", pool_size=2)
+        DuckDBConfig(pool_size=0)
         # raises pydantic.ValidationError (wraps ConfigurationError)
         ```
     """
