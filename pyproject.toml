@@ -14,7 +14,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-duckdb = ["duckdb>=0.9.1"]
+duckdb = ["duckdb>=1.4.1"]
 snowflake = ["adbc-driver-snowflake>=1.0.0"]
 postgresql = ["adbc-driver-postgresql>=1.0.0"]
 quack = ["adbc-driver-quack>=0.1.0a1"]

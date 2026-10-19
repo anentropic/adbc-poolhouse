@@ -261,7 +261,7 @@ requires-dist = [
     { name = "databricks-sdk", marker = "extra == 'databricks-python-m2m'", specifier = ">=0.20" },
     { name = "databricks-sql-connector", extras = ["pyarrow"], marker = "extra == 'databricks-python'", specifier = ">=4.3.0" },
     { name = "databricks-sql-connector", extras = ["pyarrow"], marker = "extra == 'databricks-python-m2m'", specifier = ">=4.3.0" },
-    { name = "duckdb", marker = "extra == 'duckdb'", specifier = ">=0.9.1" },
+    { name = "duckdb", marker = "extra == 'duckdb'", specifier = ">=1.4.1" },
     { name = "pydantic-settings", specifier = ">=2.0.0" },
     { name = "sqlalchemy", specifier = ">=2.0.0" },
 ]

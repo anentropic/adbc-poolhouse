@@ -96,3 +96,50 @@ jobs:
       - name: Cache pruning
         if: always()
         run: uv cache prune --ci
+
+  min-duckdb:
+    name: Sync suite on minimum DuckDB
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+          python-version: "3.11"
+
+      # The lock only ever exercises the newest DuckDB, so a floor in the
+      # `duckdb` extra that is too low goes unnoticed (it was once >=0.9.1 while
+      # DuckDBConfig needed 1.4.1). Read the floor from pyproject.toml and run
+      # the sync suite against exactly that release.
+      - name: Read the DuckDB floor
+        id: floor
+        run: |
+          version=$(python3 -c "import re, tomllib; deps = tomllib.load(open('pyproject.toml', 'rb'))['project']['optional-dependencies']['duckdb']; print(next(re.fullmatch(r'duckdb>=([0-9.]+)', d).group(1) for d in deps if d.startswith('duckdb>=')))")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      # --with layers the pinned DuckDB over the project's locked one; fail
+      # loudly if the floor release is not the one actually imported.
+      - name: Assert the floor release is the one imported
+        run: >-
+          uv run --no-default-groups --extra duckdb --extra sqlite
+          --with "duckdb==${{ steps.floor.outputs.version }}"
+          python -c "import duckdb, sys; print(duckdb.__version__);
+          sys.exit(0 if duckdb.__version__ == '${{ steps.floor.outputs.version }}' else 'wrong duckdb')"
+
+      - name: Run sync suite on the floor release
+        run: >-
+          uv run --no-default-groups --extra duckdb --extra sqlite
+          --with "duckdb==${{ steps.floor.outputs.version }}"
+          --with pytest --with pytest-adbc-replay
+          pytest tests/ --ignore=tests/async --ignore=tests/_async_harness
+          -m "not snowflake and not databricks"
+
+      - name: Cache pruning
+        if: always()
+        run: uv cache prune --ci
