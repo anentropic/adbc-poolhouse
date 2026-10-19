@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- The `duckdb` extra now requires `duckdb>=1.4.1`, up from `>=0.9.1`. `DuckDBConfig` never worked below 1.4.1: older releases have no `adbc_driver_duckdb.driver_path()`, so creating a pool failed with `KeyError: 'driver_path'`, and in 1.4.0 that function points at a library without the ADBC entrypoint. CI now also runs the sync suite against the minimum DuckDB it declares, so the floor can't drift out of date again.
+- `DuckDBConfig(database=":memory:")` now accepts `pool_size > 1` and defaults to 5 connections, like a file-backed database. The 1-connection cap rested on the belief that each pooled connection got its own empty in-memory database. That was never true: every connection is cloned from one source connection and shares its database, on every DuckDB release from 0.9.1 to 1.5.6, including connections the pool opens to replace recycled ones. If you relied on an in-memory pool holding a single connection, for example to keep a temporary table or a `SET` visible on every checkout, pass `pool_size=1, max_overflow=0`.
+
 ## [1.6.4] - 2026-10-16
 
 ### Fixed

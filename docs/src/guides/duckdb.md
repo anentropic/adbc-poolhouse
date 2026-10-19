@@ -18,7 +18,7 @@ uv add "adbc-poolhouse[duckdb]"
 
 [`DuckDBConfig`][adbc_poolhouse.DuckDBConfig] supports file-backed and in-memory databases.
 
-For a pool with more than one connection, use a file path. Each in-memory connection gets its own isolated database, so sharing state across connections is not possible with `:memory:`.
+Both default to a pool of 5 connections. The pool clones every connection from one source connection, so they all open the same database. With `:memory:` that means one in-memory database shared by the whole pool: a table one connection creates and commits is visible to the others, including connections the pool opens later to replace recycled ones. The database lasts until you close the pool.
 
 ### File-backed
 
@@ -29,14 +29,22 @@ config = DuckDBConfig(database="/tmp/warehouse.db")
 pool = create_pool(config)
 ```
 
-### In-memory (single connection)
+### In-memory
 
-`pool_size` defaults to `1` for in-memory databases, and a larger value is rejected: [`DuckDBConfig`][adbc_poolhouse.DuckDBConfig] raises [`ConfigurationError`][adbc_poolhouse.ConfigurationError] (wrapped as a Pydantic `ValidationError`) when `pool_size > 1` is combined with `:memory:`. Each connection would otherwise get its own empty database, which is almost always unintended.
+Set up tables and data once, on any connection, and commit. ADBC connections start with autocommit off, so other connections see nothing until you commit.
 
 ```python
 config = DuckDBConfig(database=":memory:")
 pool = create_pool(config)
+
+with pool.connect() as conn:
+    cur = conn.cursor()
+    cur.execute("CREATE TABLE events AS SELECT 1 AS id")
+    cur.close()
+    conn.commit()
 ```
+
+Temporary tables and connection-level settings such as `SET search_path` still belong to one connection, as they do with a file-backed database.
 
 ### Read-only
 

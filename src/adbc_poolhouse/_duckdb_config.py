@@ -2,9 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Self
-
-from pydantic import field_validator, model_validator
+from pydantic import field_validator
 from pydantic_settings import SettingsConfigDict
 
 from adbc_poolhouse._base_config import BaseWarehouseConfig
@@ -21,8 +19,8 @@ class DuckDBConfig(BaseWarehouseConfig):
 
     Example:
         ```python
-        DuckDBConfig(database="/data/warehouse.db")  # file-backed, pool_size defaults to 5
-        DuckDBConfig()  # in-memory, pool_size defaults to 1
+        DuckDBConfig(database="/data/warehouse.db")  # file-backed
+        DuckDBConfig()  # in-memory, shared by every pooled connection
         ```
     """
 
@@ -31,15 +29,16 @@ class DuckDBConfig(BaseWarehouseConfig):
     database: str = ":memory:"
     """File path or ':memory:'. Env: DUCKDB_DATABASE."""
 
-    pool_size: int = 1
-    """Number of connections in the pool. Defaults to 5 for a file-backed
-    database and 1 for in-memory.
+    pool_size: int = 5
+    """Number of connections in the pool. Env: DUCKDB_POOL_SIZE.
 
-    In-memory DuckDB databases are isolated per connection — each pool
-    connection gets a different empty DB — so ':memory:' pins the default to 1.
-    A file-backed database has no such constraint, so it defaults to 5 like the
-    other backends. Setting pool_size > 1 with database=':memory:' raises
-    ValidationError. Env: DUCKDB_POOL_SIZE.
+    Defaults to 5 for both file-backed and in-memory databases. Every pooled
+    connection is cloned from one source connection and opens the same
+    database, so with ':memory:' all of them share one in-memory database,
+    which lives until the pool is closed. Tables, views, attached catalogs and
+    loaded extensions are visible from every connection, including ones the
+    pool opens later to replace a recycled connection. Temporary tables and
+    connection-scoped settings stay per connection, as they do for a file.
     """
 
     read_only: bool = False
@@ -99,29 +98,3 @@ class DuckDBConfig(BaseWarehouseConfig):
         if self.read_only:
             result["access_mode"] = "READ_ONLY"
         return result
-
-    @model_validator(mode="after")
-    def default_pool_size_for_file(self) -> Self:
-        """
-        Raise the pool_size default to 5 for a file-backed database.
-
-        The field default is 1, the only safe value for isolated in-memory
-        databases. When the database is a file and the caller did not set
-        pool_size explicitly (via keyword or environment), bump it to 5 to match
-        the other backends.
-        """
-        if "pool_size" not in self.model_fields_set and self.database != ":memory:":
-            self.pool_size = 5
-        return self
-
-    @model_validator(mode="after")
-    def check_memory_pool_size(self) -> Self:
-        if self.database == ":memory:" and self.pool_size > 1:
-            raise ConfigurationError(
-                'pool_size > 1 with database=":memory:" will give each pool '
-                "connection an isolated in-memory database (each connection "
-                "sees a different empty DB, so shared state is impossible). "
-                "Use pool_size=1 for in-memory DuckDB, or set database to a "
-                "file path for shared state across connections."
-            )
-        return self

@@ -40,15 +40,23 @@ class TestDuckDBConfig:
     def test_default_construction(self) -> None:
         d = DuckDBConfig()
         assert d.database == ":memory:"
-        assert d.pool_size == 1  # DuckDB in-memory default is 1
+        assert d.pool_size == 5  # in-memory shares one database, so no 1-connection cap
         assert d.max_overflow == 3
         assert d.timeout == 30
         assert d.recycle == 3600
         assert d.read_only is False
 
-    def test_memory_pool_size_validator_fires(self) -> None:
-        with pytest.raises(ValidationError, match="pool_size > 1"):
-            DuckDBConfig(database=":memory:", pool_size=2)
+    def test_memory_pool_size_gt1_is_valid(self) -> None:
+        """Pooled :memory: connections share one database, so pool_size > 1 is allowed."""
+        d = DuckDBConfig(database=":memory:", pool_size=4)
+        assert d.pool_size == 4
+
+    def test_env_memory_pool_size_gt1_is_valid(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """DUCKDB_POOL_SIZE > 1 with the default :memory: database is accepted."""
+        monkeypatch.setenv("DUCKDB_POOL_SIZE", "3")
+        d = DuckDBConfig()
+        assert d.database == ":memory:"
+        assert d.pool_size == 3
 
     def test_memory_pool_size_1_is_valid(self) -> None:
         d = DuckDBConfig(database=":memory:", pool_size=1)
@@ -59,7 +67,7 @@ class TestDuckDBConfig:
         assert d.pool_size == 5
 
     def test_file_database_defaults_pool_size_5(self) -> None:
-        """A file-backed database defaults pool_size to 5, not the in-memory 1."""
+        """A file-backed database defaults pool_size to 5."""
         d = DuckDBConfig(database="/tmp/test.duckdb")
         assert d.pool_size == 5
 
@@ -69,14 +77,12 @@ class TestDuckDBConfig:
         assert DuckDBConfig().pool_size == 5
 
     def test_env_prefix_pool_size(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        # Use a file database since pool_size > 1 with :memory: raises ValidationError
         monkeypatch.setenv("DUCKDB_POOL_SIZE", "8")
         monkeypatch.setenv("DUCKDB_DATABASE", "/tmp/test.duckdb")
         d = DuckDBConfig()
         assert d.pool_size == 8
 
     def test_env_prefix_isolation(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        # Use a file database since pool_size > 1 with :memory: raises ValidationError
         monkeypatch.setenv("DUCKDB_POOL_SIZE", "8")
         monkeypatch.setenv("DUCKDB_DATABASE", "/tmp/test.duckdb")
         monkeypatch.setenv("SNOWFLAKE_POOL_SIZE", "3")
@@ -356,7 +362,7 @@ class TestSQLiteConfig:
         assert s.pool_size == 5
 
     def test_file_database_defaults_pool_size_5(self) -> None:
-        """A file-backed database defaults pool_size to 5, not the in-memory 1."""
+        """A file-backed database defaults pool_size to 5."""
         s = SQLiteConfig(database="/tmp/x.db")
         assert s.pool_size == 5
 

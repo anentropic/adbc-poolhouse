@@ -19,8 +19,8 @@ class SQLiteConfig(BaseWarehouseConfig):
     (pool_size, max_overflow, timeout, recycle) are inherited from
     BaseWarehouseConfig and loaded from SQLITE_* environment variables.
 
-    Unlike DuckDB, an SQLite in-memory database is shared across all
-    connections in the pool. This means pool_size > 1 with
+    An SQLite in-memory database is shared across all connections in the
+    pool. This means pool_size > 1 with
     database=':memory:' is almost always unintended (connection state
     races across a single shared DB), so it is rejected by a validator.
 
@@ -41,8 +41,7 @@ class SQLiteConfig(BaseWarehouseConfig):
     database and 1 for in-memory.
 
     SQLite in-memory databases are shared across all connections in the
-    pool — unlike DuckDB, where each connection gets its own isolated
-    empty DB — and pool_size > 1 races connection state on that single shared
+    pool, and pool_size > 1 races connection state on that single shared
     DB, so ':memory:' pins the default to 1. A file-backed database defaults to
     5 like the other backends. Setting pool_size > 1 with database=':memory:'
     raises ValidationError. Env: SQLITE_POOL_SIZE.
@@ -127,7 +126,7 @@ class SQLiteConfig(BaseWarehouseConfig):
         if self.database == ":memory:" and self.pool_size > 1:
             raise ConfigurationError(
                 'pool_size > 1 with database=":memory:" is not supported for '
-                "in-memory SQLite. Unlike DuckDB, in-memory SQLite is shared "
+                "in-memory SQLite. In-memory SQLite is shared "
                 "across all connections in the pool — so pool_size > 1 creates "
                 "connection state races on a single shared in-memory database. "
                 "Use pool_size=1 for in-memory SQLite, or set database to a "
