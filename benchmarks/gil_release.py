@@ -103,8 +103,7 @@ def _pool(n: int) -> Iterator[object]:
     """
     Yield a file-backed DuckDB pool sized for `n` concurrent connections.
 
-    Uses a temp-file database (never `:memory:`, which `DuckDBConfig` rejects for
-    `pool_size > 1`). Pairs `pool.dispose()` with `pool._adbc_source.close()` in a
+    Uses a temp-file database. Pairs `pool.dispose()` with `pool._adbc_source.close()` in a
     `finally` -- the verbatim teardown idiom from `tests/test_pool_factory.py` --
     and asserts `pool.checkedout() == 0` afterward to prove the checkout path is
     leak-free. The temp directory (and its `bench.db`) is removed last, after the

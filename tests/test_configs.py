@@ -77,14 +77,12 @@ class TestDuckDBConfig:
         assert DuckDBConfig().pool_size == 5
 
     def test_env_prefix_pool_size(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        # Use a file database since pool_size > 1 with :memory: raises ValidationError
         monkeypatch.setenv("DUCKDB_POOL_SIZE", "8")
         monkeypatch.setenv("DUCKDB_DATABASE", "/tmp/test.duckdb")
         d = DuckDBConfig()
         assert d.pool_size == 8
 
     def test_env_prefix_isolation(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        # Use a file database since pool_size > 1 with :memory: raises ValidationError
         monkeypatch.setenv("DUCKDB_POOL_SIZE", "8")
         monkeypatch.setenv("DUCKDB_DATABASE", "/tmp/test.duckdb")
         monkeypatch.setenv("SNOWFLAKE_POOL_SIZE", "3")

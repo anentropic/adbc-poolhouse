@@ -87,9 +87,18 @@ class TestDuckDBInMemoryShared:
         cur.close()
         return rows
 
-    def test_default_memory_pool_has_five_connections(self) -> None:
-        with managed_pool(DuckDBConfig()) as pool:
+    def test_default_memory_pool_serves_five_connections_at_once(self) -> None:
+        """The default :memory: pool hands out 5 distinct, working connections together."""
+        with managed_pool(DuckDBConfig(max_overflow=0)) as pool:
             assert pool.size() == 5
+            conns = [pool.connect() for _ in range(5)]
+            try:
+                assert len({id(c.dbapi_connection) for c in conns}) == 5
+                self._create_table(conns[0])
+                assert [self._read_table(c) for c in conns] == [[(42,)]] * 5
+            finally:
+                for c in conns:
+                    c.close()
 
     def test_concurrent_connections_share_one_database(self) -> None:
         """A table committed on one checked-out connection is visible on another."""
