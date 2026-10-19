@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- `DatabricksPythonConfig` pools now raise `adbc_driver_manager.dbapi` errors. The connector's own `databricks.sql.exc` errors used to pass through unchanged, so a handler written for the ADBC backends, `except adbc_driver_manager.dbapi.Error`, missed a failed connection or a rejected query on this one. Each is now re-raised as the ADBC class of the same DB-API category, with the connector's error as `__cause__`.
+
 ## [1.7.0] - 2026-10-19
 
 ### Changed

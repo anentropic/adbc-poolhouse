@@ -14,6 +14,9 @@ This module holds everything specific to that connector:
   indistinguishable from an ADBC one to callers and to the async layer. ADBC-only
   methods with no faithful connector equivalent raise ``NotSupportedError`` (the
   ADBC DBAPI error type callers already catch).
+- ``_translate_errors`` re-raises the connector's own DB-API errors
+  (``databricks.sql.exc``) as the ADBC DBAPI class of the same PEP 249 category,
+  so callers catching ``adbc_driver_manager`` errors see them too.
 - ``connect`` is the single patchable entry point `pytest-adbc-replay` intercepts
   (via ``adbc_auto_patch``).
 - ``DatabricksPythonBackend`` is the `ConnectionBackend` the pool factory builds a
@@ -29,12 +32,67 @@ import contextlib
 import weakref
 from typing import TYPE_CHECKING, Any
 
+import adbc_driver_manager.dbapi as adbc
+from adbc_driver_manager import AdbcStatusCode as _Status
 from adbc_driver_manager.dbapi import NotSupportedError
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Callable, Generator
 
     import pyarrow
+
+# PEP 249 category name -> (ADBC DBAPI class, status code), most specific first. The
+# connector's own subclasses (``RequestError``, ``ServerOperationError``, ...) resolve to
+# the first category they inherit from, so a missing table (``ServerOperationError``, a
+# ``DatabaseError``) stays a ``DatabaseError`` rather than being guessed into a narrower one.
+# ``NotSupportedError`` fixes its own status code, so it carries ``None`` here.
+_ADBC_EQUIVALENTS: tuple[tuple[str, type[adbc.Error], _Status | None], ...] = (
+    ("NotSupportedError", adbc.NotSupportedError, None),
+    ("ProgrammingError", adbc.ProgrammingError, _Status.INVALID_ARGUMENT),
+    ("IntegrityError", adbc.IntegrityError, _Status.INTEGRITY),
+    ("DataError", adbc.DataError, _Status.INVALID_DATA),
+    ("InternalError", adbc.InternalError, _Status.INTERNAL),
+    ("OperationalError", adbc.OperationalError, _Status.IO),
+    ("DatabaseError", adbc.DatabaseError, _Status.UNKNOWN),
+    ("InterfaceError", adbc.InterfaceError, _Status.INVALID_STATE),
+    ("Error", adbc.Error, _Status.UNKNOWN),
+)
+
+
+@contextlib.contextmanager
+def _translate_errors() -> Generator[None]:
+    """
+    Re-raise a connector DB-API error as the ADBC DBAPI error of the same category.
+
+    The connector raises ``databricks.sql.exc`` classes, which share PEP 249's names but
+    not ``adbc_driver_manager``'s hierarchy, so a caller's ``except adbc_driver_manager.Error``
+    would miss them. The connector error is kept as ``__cause__``. Anything that is not a
+    connector DB-API error (a ``ValueError`` from bad arguments, say) propagates unchanged.
+
+    Yields:
+        Nothing; the block runs inside the translation.
+
+    Raises:
+        adbc_driver_manager.dbapi.Error: The ADBC subclass matching the connector error.
+    """
+    try:
+        yield
+    except Exception as exc:
+        # Lazy, like every connector import here: the connector is installed whenever a
+        # connector call could have raised, and only then is the module consulted.
+        from databricks.sql import (
+            exc as dbsql_exc,  # type: ignore[reportMissingTypeStubs]  # noqa: PLC0415
+        )
+
+        if not isinstance(exc, dbsql_exc.Error):
+            raise
+        for name, adbc_cls, status in _ADBC_EQUIVALENTS:
+            connector_cls = getattr(dbsql_exc, name, None)
+            if connector_cls is not None and isinstance(exc, connector_cls):
+                if status is None:
+                    raise adbc.NotSupportedError(str(exc)) from exc
+                raise adbc_cls(str(exc), status_code=status) from exc
+        raise  # unreachable: every connector error is a dbsql_exc.Error
 
 
 class _DatabricksPythonCursor:
@@ -61,16 +119,19 @@ class _DatabricksPythonCursor:
 
     def execute(self, operation: str, parameters: Any = None) -> _DatabricksPythonCursor:
         """Execute a query, forwarding to the connector cursor."""
-        self._cursor.execute(operation, parameters)
+        with _translate_errors():
+            self._cursor.execute(operation, parameters)
         return self
 
     def executemany(self, operation: str, seq_of_parameters: Any) -> None:
         """Execute a query once per parameter sequence."""
-        self._cursor.executemany(operation, seq_of_parameters)
+        with _translate_errors():
+            self._cursor.executemany(operation, seq_of_parameters)
 
     def fetchone(self) -> Any:
         """Fetch the next row, or ``None`` when exhausted."""
-        return self._cursor.fetchone()
+        with _translate_errors():
+            return self._cursor.fetchone()
 
     def fetchmany(self, size: int | None = None) -> list[Any]:
         """
@@ -82,17 +143,20 @@ class _DatabricksPythonCursor:
                 own ``fetchmany`` requires an explicit size, so the default is
                 resolved here.
         """
-        return self._cursor.fetchmany(self._cursor.arraysize if size is None else size)
+        with _translate_errors():
+            return self._cursor.fetchmany(self._cursor.arraysize if size is None else size)
 
     def fetchall(self) -> list[Any]:
         """Fetch all remaining rows."""
-        return self._cursor.fetchall()
+        with _translate_errors():
+            return self._cursor.fetchall()
 
     def close(self) -> None:
         """Close the underlying connector cursor (idempotent)."""
         if not self._closed:
             self._closed = True
-            self._cursor.close()
+            with _translate_errors():
+                self._cursor.close()
 
     def setinputsizes(self, sizes: Any) -> None:
         """DB-API no-op, forwarded for compatibility."""
@@ -135,11 +199,12 @@ class _DatabricksPythonCursor:
 
     def fetch_arrow_table(self) -> pyarrow.Table:
         """Fetch the whole result as a ``pyarrow.Table`` (ADBC name)."""
-        return self._cursor.fetchall_arrow()
+        with _translate_errors():
+            return self._cursor.fetchall_arrow()
 
     def fetchallarrow(self) -> pyarrow.Table:
         """Legacy alias of `fetch_arrow_table`."""
-        return self._cursor.fetchall_arrow()
+        return self.fetch_arrow_table()
 
     def fetch_record_batch(self) -> pyarrow.RecordBatchReader:
         """
@@ -166,13 +231,17 @@ class _DatabricksPythonCursor:
         import pyarrow as pa  # noqa: PLC0415  (lazy: pyarrow ships with the extra)
 
         arraysize = self._cursor.arraysize
-        first = self._cursor.fetchmany_arrow(arraysize)
+        with _translate_errors():
+            first = self._cursor.fetchmany_arrow(arraysize)
         schema = first.schema
 
         def _batches() -> Any:
             yield from first.to_batches()
             while True:
-                table = self._cursor.fetchmany_arrow(arraysize)
+                # pyarrow re-raises a generator's exception from read_next_batch as is, so
+                # a later batch's failure is translated here, where it happens.
+                with _translate_errors():
+                    table = self._cursor.fetchmany_arrow(arraysize)
                 if table.num_rows == 0:
                     break
                 yield from table.to_batches()
@@ -181,17 +250,20 @@ class _DatabricksPythonCursor:
 
     def fetch_df(self) -> Any:
         """Fetch the result as a ``pandas.DataFrame``."""
-        return self._cursor.fetchall_arrow().to_pandas()
+        with _translate_errors():
+            return self._cursor.fetchall_arrow().to_pandas()
 
     def fetch_polars(self) -> Any:
         """Fetch the result as a ``polars.DataFrame``."""
         import polars  # noqa: PLC0415  (lazy: optional consumer dependency)
 
-        return polars.DataFrame(self._cursor.fetchall_arrow())
+        with _translate_errors():
+            return polars.DataFrame(self._cursor.fetchall_arrow())
 
     def adbc_cancel(self) -> None:
         """Abort the in-flight statement (maps to the connector's ``cancel``)."""
-        self._cursor.cancel()
+        with _translate_errors():
+            self._cursor.cancel()
 
     # ----- ADBC-only extensions with no connector equivalent -----
 
@@ -254,21 +326,25 @@ class _DatabricksPythonConnection:
 
     def cursor(self) -> _DatabricksPythonCursor:
         """Open a new ADBC-shaped cursor over the connector connection."""
-        cursor = _DatabricksPythonCursor(self._conn.cursor(), connection=self)
+        with _translate_errors():
+            cursor = _DatabricksPythonCursor(self._conn.cursor(), connection=self)
         self._open_cursors.add(cursor)
         return cursor
 
     def close(self) -> None:
         """Close the underlying connector connection."""
-        self._conn.close()
+        with _translate_errors():
+            self._conn.close()
 
     def commit(self) -> None:
         """Commit (DB-API compat; a connector no-op when transactions are ignored)."""
-        self._conn.commit()
+        with _translate_errors():
+            self._conn.commit()
 
     def rollback(self) -> None:
         """Roll back (DB-API compat; called by the pool on check-in)."""
-        self._conn.rollback()
+        with _translate_errors():
+            self._conn.rollback()
 
     @property
     def autocommit(self) -> bool:
@@ -330,7 +406,8 @@ def connect(**kwargs: Any) -> _DatabricksPythonConnection:
     # single lazy import + call, the only place the connector is touched directly.
     from databricks import sql  # type: ignore[reportMissingTypeStubs]  # noqa: PLC0415
 
-    return _DatabricksPythonConnection(sql.connect(**kwargs))  # type: ignore[reportUnknownMemberType, reportUnknownArgumentType]
+    with _translate_errors():
+        return _DatabricksPythonConnection(sql.connect(**kwargs))  # type: ignore[reportUnknownMemberType, reportUnknownArgumentType]
 
 
 class DatabricksPythonBackend:

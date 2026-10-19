@@ -253,40 +253,32 @@ def test_execute_reraises_connector_errors_as_adbc(
 
 
 @pytest.mark.parametrize(
-    "call",
+    ("method", "args"),
     [
-        lambda cur: cur.executemany("INSERT", [()]),
-        lambda cur: cur.fetchone(),
-        lambda cur: cur.fetchmany(1),
-        lambda cur: cur.fetchall(),
-        lambda cur: cur.fetch_arrow_table(),
-        lambda cur: cur.fetchallarrow(),
-        lambda cur: cur.fetch_record_batch(),
-        lambda cur: cur.fetch_df(),
-        lambda cur: cur.fetch_polars(),
-        lambda cur: cur.adbc_cancel(),
-    ],
-    ids=[
-        "executemany",
-        "fetchone",
-        "fetchmany",
-        "fetchall",
-        "fetch_arrow_table",
-        "fetchallarrow",
-        "fetch_record_batch",
-        "fetch_df",
-        "fetch_polars",
-        "adbc_cancel",
+        ("executemany", ("INSERT", [()])),
+        ("fetchone", ()),
+        ("fetchmany", (1,)),
+        ("fetchall", ()),
+        ("fetch_arrow_table", ()),
+        ("fetchallarrow", ()),
+        ("fetch_record_batch", ()),
+        ("fetch_df", ()),
+        ("fetch_polars", ()),
+        ("adbc_cancel", ()),
     ],
 )
-def test_every_cursor_call_translates(table: pa.Table, call: Any) -> None:
+def test_every_cursor_call_translates(table: pa.Table, method: str, args: tuple[Any, ...]) -> None:
     import adbc_driver_manager.dbapi as adbc
 
+    if method == "fetch_df":
+        pytest.importorskip("pandas")
+    if method == "fetch_polars":
+        pytest.importorskip("polars")
     error = dbsql_exc.RequestError("connection dropped")
     cur = _raising_adapter(table, error).cursor()
 
     with pytest.raises(adbc.OperationalError) as info:
-        call(cur)
+        getattr(cur, method)(*args)
 
     assert info.value.__cause__ is error
 
