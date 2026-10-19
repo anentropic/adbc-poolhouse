@@ -195,7 +195,16 @@ def test_connection_metadata_gaps_raise_not_supported(
 # passed through unchanged slipped past every such handler. The adapter re-raises each one as
 # the ADBC class of the same PEP 249 category, chaining the connector error as `__cause__`.
 
-dbsql_exc = pytest.importorskip("databricks.sql.exc")
+
+@pytest.fixture
+def dbsql_exc() -> Any:
+    """
+    The connector's exception module, skipping only the tests that need it.
+
+    A module-level ``importorskip`` would skip this whole file, including the
+    connector-free tests above, in the CI jobs that install no connector.
+    """
+    return pytest.importorskip("databricks.sql.exc")
 
 
 def _error_classes() -> list[tuple[str, str]]:
@@ -226,7 +235,7 @@ class _RaisingCursor(_FakeCursor):
         raise self.error
 
     execute = executemany = fetchone = fetchmany = fetchall = _raise
-    fetchall_arrow = fetchmany_arrow = cancel = _raise
+    fetchall_arrow = fetchmany_arrow = cancel = close = _raise
 
 
 def _raising_adapter(table: pa.Table, error: BaseException) -> _DatabricksPythonConnection:
@@ -237,7 +246,7 @@ def _raising_adapter(table: pa.Table, error: BaseException) -> _DatabricksPython
 
 @pytest.mark.parametrize(("connector_cls", "adbc_cls"), _error_classes())
 def test_execute_reraises_connector_errors_as_adbc(
-    table: pa.Table, connector_cls: str, adbc_cls: str
+    table: pa.Table, dbsql_exc: Any, connector_cls: str, adbc_cls: str
 ) -> None:
     import adbc_driver_manager.dbapi as adbc
 
@@ -265,9 +274,12 @@ def test_execute_reraises_connector_errors_as_adbc(
         ("fetch_df", ()),
         ("fetch_polars", ()),
         ("adbc_cancel", ()),
+        ("close", ()),
     ],
 )
-def test_every_cursor_call_translates(table: pa.Table, method: str, args: tuple[Any, ...]) -> None:
+def test_every_cursor_call_translates(
+    table: pa.Table, dbsql_exc: Any, method: str, args: tuple[Any, ...]
+) -> None:
     import adbc_driver_manager.dbapi as adbc
 
     if method == "fetch_df":
@@ -283,7 +295,7 @@ def test_every_cursor_call_translates(table: pa.Table, method: str, args: tuple[
     assert info.value.__cause__ is error
 
 
-def test_a_failure_mid_stream_translates(table: pa.Table) -> None:
+def test_a_failure_mid_stream_translates(table: pa.Table, dbsql_exc: Any) -> None:
     """An error fetching a later batch surfaces from ``read_next_batch`` as an ADBC error."""
     import adbc_driver_manager.dbapi as adbc
 
@@ -308,7 +320,7 @@ def test_a_failure_mid_stream_translates(table: pa.Table) -> None:
 
 
 @pytest.mark.parametrize("method", ["close", "commit", "rollback", "cursor"])
-def test_connection_calls_translate(table: pa.Table, method: str) -> None:
+def test_connection_calls_translate(table: pa.Table, dbsql_exc: Any, method: str) -> None:
     import adbc_driver_manager.dbapi as adbc
 
     error = dbsql_exc.InterfaceError("session closed")
@@ -324,7 +336,9 @@ def test_connection_calls_translate(table: pa.Table, method: str) -> None:
     assert info.value.__cause__ is error
 
 
-def test_connect_translates_connector_errors(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_connect_translates_connector_errors(
+    monkeypatch: pytest.MonkeyPatch, dbsql_exc: Any
+) -> None:
     """A refused connection (bad token, unreachable host) is an ADBC ``OperationalError``."""
     import adbc_driver_manager.dbapi as adbc
     import databricks.sql
@@ -341,6 +355,31 @@ def test_connect_translates_connector_errors(monkeypatch: pytest.MonkeyPatch) ->
     with pytest.raises(adbc.OperationalError) as info:
         _databricks_python.connect(server_hostname="h", http_path="p")
     assert info.value.__cause__ is error
+
+
+def test_autocommit_translates(dbsql_exc: Any) -> None:
+    """The connector's ``autocommit`` raises ``InterfaceError`` on a closed session."""
+    import adbc_driver_manager.dbapi as adbc
+
+    error = dbsql_exc.InterfaceError("session closed")
+
+    class _ClosedSession:
+        @property
+        def autocommit(self) -> bool:
+            raise error
+
+        @autocommit.setter
+        def autocommit(self, value: bool) -> None:
+            raise error
+
+    adapter = _DatabricksPythonConnection(_ClosedSession())
+
+    with pytest.raises(adbc.InterfaceError) as read:
+        _ = adapter.autocommit
+    with pytest.raises(adbc.InterfaceError) as write:
+        adapter.autocommit = True
+    assert read.value.__cause__ is error
+    assert write.value.__cause__ is error
 
 
 def test_non_connector_errors_pass_through(table: pa.Table) -> None:

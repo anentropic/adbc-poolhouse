@@ -175,7 +175,7 @@ ADBC ones alike. The connector's exception stays available as `__cause__`:
 |---|---|
 | `RequestError` and other `OperationalError` subclasses (network, auth, retries) | `OperationalError` |
 | `ServerOperationError` (the warehouse rejected the statement, a table is missing) | `DatabaseError` |
-| `ProgrammingError`, `IntegrityError`, `DataError`, `InternalError`, `NotSupportedError` | The ADBC class of the same name |
+| `ProgrammingError`, `IntegrityError`, `DataError`, `InternalError`, `NotSupportedError`, and the base `DatabaseError` and `Error` | The ADBC class of the same name |
 | `InterfaceError` | `InterfaceError` |
 
 A failed `pool.connect()`, such as a bad token, raises `OperationalError`. Exceptions that

@@ -78,13 +78,17 @@ def _translate_errors() -> Generator[None]:
     try:
         yield
     except Exception as exc:
-        # Lazy, like every connector import here: the connector is installed whenever a
-        # connector call could have raised, and only then is the module consulted.
-        from databricks.sql import (
-            exc as dbsql_exc,  # type: ignore[reportMissingTypeStubs]  # noqa: PLC0415
-        )
+        # Lazy, like every connector import here. Without the connector nothing raised
+        # here can be a connector error (the adapter may be wrapping a test fake), so the
+        # original propagates rather than an ImportError replacing it.
+        try:
+            from databricks.sql import (
+                exc as dbsql_exc,  # type: ignore[reportMissingTypeStubs]  # noqa: PLC0415
+            )
+        except ImportError:
+            dbsql_exc = None
 
-        if not isinstance(exc, dbsql_exc.Error):
+        if dbsql_exc is None or not isinstance(exc, dbsql_exc.Error):
             raise
         for name, adbc_cls, status in _ADBC_EQUIVALENTS:
             connector_cls = getattr(dbsql_exc, name, None)
@@ -349,11 +353,13 @@ class _DatabricksPythonConnection:
     @property
     def autocommit(self) -> bool:
         """Autocommit state of the underlying connection."""
-        return self._conn.autocommit
+        with _translate_errors():
+            return self._conn.autocommit
 
     @autocommit.setter
     def autocommit(self, value: bool) -> None:
-        self._conn.autocommit = value
+        with _translate_errors():
+            self._conn.autocommit = value
 
     def _close_open_cursors(self) -> None:
         """Close any still-open cursors to release Arrow/CloudFetch buffers."""
