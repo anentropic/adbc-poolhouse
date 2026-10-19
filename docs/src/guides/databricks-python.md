@@ -164,6 +164,23 @@ with pool.connect() as conn:
 `fetch_arrow_table`, `fetchallarrow`, `fetch_record_batch`, `fetch_df`,
 `fetch_polars`, and `adbc_cancel` all work.
 
+### Errors
+
+The connector raises its own exception classes from `databricks.sql.exc`. The pooled
+connection re-raises each one as the `adbc_driver_manager.dbapi` class of the same DB-API
+category, so one `except adbc_driver_manager.dbapi.Error` handles this backend and the
+ADBC ones alike. The connector's exception stays available as `__cause__`:
+
+| Connector error | Raised as |
+|---|---|
+| `RequestError` and other `OperationalError` subclasses (network, auth, retries) | `OperationalError` |
+| `ServerOperationError` (the warehouse rejected the statement, a table is missing) | `DatabaseError` |
+| `ProgrammingError`, `IntegrityError`, `DataError`, `InternalError`, `NotSupportedError`, and the base `DatabaseError` and `Error` | The ADBC class of the same name |
+| `InterfaceError` | `InterfaceError` |
+
+A failed `pool.connect()`, such as a bad token, raises `OperationalError`. Exceptions that
+aren't connector DB-API errors, such as a `TypeError` from bad arguments, keep their type.
+
 ### Unsupported methods
 
 The connector has no equivalent for a few ADBC-only cursor and connection methods.
