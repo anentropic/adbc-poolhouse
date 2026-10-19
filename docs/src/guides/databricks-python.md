@@ -14,11 +14,16 @@ drivers use. If you are not targeting Lakehouse//RT, prefer
 ## Installation
 
 This backend needs the `databricks-python` extra, which pulls in
-`databricks-sql-connector` (with PyArrow):
+`databricks-sql-connector` with PyArrow and its `kernel` extra. The kernel
+(`databricks-sql-kernel`) is the Statement Execution path that the default
+`use_kernel=True` runs on, and the only one Lakehouse//RT accepts:
 
 ```bash
 pip install "adbc-poolhouse[databricks-python]"
 ```
+
+The kernel currently requires `pyarrow>=23.0.1,<24`, so this extra holds PyArrow
+below 24 in your environment.
 
 OAuth machine-to-machine auth also needs `databricks-sdk`, which the
 connector itself does not require. When you use that auth method, install the
