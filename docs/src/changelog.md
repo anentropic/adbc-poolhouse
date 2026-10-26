@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- The `databricks-python` and `databricks-python-m2m` extras now install `databricks-sql-connector[kernel,pyarrow]`, up from `[pyarrow]`. `DatabricksPythonConfig` defaults to `use_kernel=True`, and the connector's kernel path, which Lakehouse//RT requires, needs the `databricks-sql-kernel` package that only the `kernel` extra brings. Without it, a pool on the default config could not open a connection until you installed the kernel yourself. The kernel requires `pyarrow>=23.0.1,<24`, so these extras, and `all`, which includes `databricks-python-m2m`, now hold PyArrow below 24. PyArrow 23 has no Python 3.15 wheels, and the kernel has no wheels for musl (Alpine) or glibc older than 2.28, so installs there build from source; the Databricks Python guide lists the details.
+
 ### Fixed
 
 - `DatabricksPythonConfig` pools now raise `adbc_driver_manager.dbapi` errors. The connector's own `databricks.sql.exc` errors used to pass through unchanged, so a handler written for the ADBC backends, `except adbc_driver_manager.dbapi.Error`, missed a failed connection or a rejected query on this one. Each is now re-raised as the ADBC class of the same DB-API category, with the connector's error as `__cause__`.
